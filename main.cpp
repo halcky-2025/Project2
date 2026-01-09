@@ -10,6 +10,7 @@ extern "C" {
     #include <libavcodec/avcodec.h>
     #include <libswscale/swscale.h>
     #include <libavdevice/avdevice.h>
+    #include <libswresample/swresample.h>
 }
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
@@ -33,6 +34,7 @@ namespace F = torch::nn::functional;
 #include "arr.h"
 #include "sqlite3.h"
 #include "db2.h"
+#include "audio.h"
 #include "elem.h"
 bool cuda = false;
 HMODULE torch_cuda_dll;

@@ -145,6 +145,7 @@
     <ClInclude Include="addelem.h" />
     <ClInclude Include="arr.h" />
     <ClInclude Include="arr2.h" />
+    <ClInclude Include="audio.h" />
     <ClInclude Include="Compile.h" />
     <ClInclude Include="db.h" />
     <ClInclude Include="db2.h" />
