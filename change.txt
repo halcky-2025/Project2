@@ -1,0 +1,6 @@
+Rectangle RectDrawCommand
+Copy CopyDrawCommand
+FBO FBODrawCommand
+_ElemEnd NewEndElement
+_Main NewLocal
+_Line NewLine
