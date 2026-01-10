@@ -479,9 +479,9 @@ struct RenderPassKey {
         if (fbo != other.fbo) return fbo < other.fbo;
         if (viewId != other.viewId) return viewId < other.viewId;
         if (zIndexBucket != other.zIndexBucket) return zIndexBucket < other.zIndexBucket;
+        if (dctype != other.dctype) return dctype < other.dctype;
         if (texture != other.texture) return texture < other.texture;
-        if (texture2 != other.texture2) return texture2 < other.texture2;
-        return static_cast<int>(dctype) < static_cast<int>(other.dctype);
+        return texture2 < other.texture2;
     }
 };
 

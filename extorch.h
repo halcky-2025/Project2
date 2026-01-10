@@ -499,7 +499,7 @@ using RegisterModuleType = void (*)(torch::nn::Module*, const char*, torch::nn::
 using CreateTorchModuleType = CustomModuleImpl * (*)(char*, ForwardType);
 using SetForwardFunctionType = void (*)(torch::nn::Module*, void* (*)(void*, void*));
 
-using GC_AddClassType = int (*)(ThreadGC*, int, int, const char*, void (*)(ThreadGC*, char*), void (*)(ThreadGC*, char*));
+using GC_AddClassType = int (*)(ThreadGC*, int, const char*, int, GCCheckFunc, GCFinalizeFunc, bool);
 using GC_AddRootType = RootNode * (*)(ThreadGC*);
 using GC_ReleaseRootType = void(*)(RootNode*);
 using GC_SetRootType = void (*)(RootNode*, char**);
@@ -885,7 +885,7 @@ CustomModuleImpl* ReadDll(ThreadGC* thgc) {
         FreeLibrary(h);
         return NULL;
     }
-    *gcAddClassPtr = GC_AddClass;
+    *gcAddClassPtr = GC_register_class;
 
     auto gcAddRootPtr = reinterpret_cast<GC_AddRootType*>(GetProcAddress(h, "GC_AddRoot"));
     if (!gcAddRootPtr) {
@@ -893,7 +893,7 @@ CustomModuleImpl* ReadDll(ThreadGC* thgc) {
         FreeLibrary(h);
         return NULL;
     }
-    *gcAddRootPtr = GC_AddRoot;
+    *gcAddRootPtr = GC_add_root_node;
 
     auto gcReleaseRootPtr = reinterpret_cast<GC_ReleaseRootType*>(GetProcAddress(h, "GC_ReleaseRoot"));
     if (!gcReleaseRootPtr) {
@@ -901,7 +901,7 @@ CustomModuleImpl* ReadDll(ThreadGC* thgc) {
         FreeLibrary(h);
         return NULL;
     }
-    *gcReleaseRootPtr = GC_ReleaseRoot;
+    *gcReleaseRootPtr = GC_release_root_node;
 
     auto gcSetRootPtr = reinterpret_cast<GC_SetRootType*>(GetProcAddress(h, "GC_SetRoot"));
     if (!gcSetRootPtr) {
@@ -909,7 +909,7 @@ CustomModuleImpl* ReadDll(ThreadGC* thgc) {
         FreeLibrary(h);
         return NULL;
     }
-    *gcSetRootPtr = GC_SetRoot;
+    *gcSetRootPtr = GC_add_root;
 
     auto gcBackRootPtr = reinterpret_cast<GC_BackRootType*>(GetProcAddress(h, "GC_BackRoot"));
     if (!gcBackRootPtr) {
@@ -917,7 +917,7 @@ CustomModuleImpl* ReadDll(ThreadGC* thgc) {
         FreeLibrary(h);
         return NULL;
     }
-    *gcBackRootPtr = GC_BackRoot;
+    *gcBackRootPtr = GC_pop_roots;
 
     auto gcMallocPtr = reinterpret_cast<GC_mallocType*>(GetProcAddress(h, "GC_malloc"));
     if (!gcMallocPtr) {
@@ -925,7 +925,7 @@ CustomModuleImpl* ReadDll(ThreadGC* thgc) {
         FreeLibrary(h);
         return NULL;
     }
-    *gcMallocPtr = GC_malloc;
+    *gcMallocPtr = GC_alloc;
 
     auto createAdamPtr = reinterpret_cast<CreateAdamType*>(GetProcAddress(h, "CreateAdam"));
     if (!createAdamPtr) {
@@ -999,7 +999,7 @@ CustomModuleImpl* ReadDll(ThreadGC* thgc) {
         FreeLibrary(h);
         return NULL;
     }
-    *copyObjectPtr = copy_object;
+    *copyObjectPtr = copy_object_young;
 
     auto cloneObjectPtr = reinterpret_cast<CopyObjectType*>(GetProcAddress(h, "CloneObject"));
     if (!cloneObjectPtr) {
@@ -1007,7 +1007,7 @@ CustomModuleImpl* ReadDll(ThreadGC* thgc) {
         FreeLibrary(h);
         return NULL;
     }
-    *cloneObjectPtr = clone_object;
+    *cloneObjectPtr = GC_clone;
 
     auto getHashValuePtr = reinterpret_cast<GetHashValueType*>(GetProcAddress(h, "GetHashValue"));
     if (!getHashValuePtr) {
@@ -1288,7 +1288,7 @@ CustomModuleImpl* ReadDll(ThreadGC* thgc) {
         FreeLibrary(h);
         return NULL;
     }
-    *cloANTptr = clone_object_ant;
+    *cloANTptr = GC_clone_unlocked;
 
     /*auto creDivptr = reinterpret_cast<CreateDivType*>(GetProcAddress(h, "CreateDiv"));
     if (!creDivptr) {
@@ -1357,8 +1357,8 @@ CustomModuleImpl* ReadDll(ThreadGC* thgc) {
 
 
     auto cnl = reinterpret_cast<int*>(GetProcAddress(h, "cnl"));
-    int oldcn = thgc->cn;
-    thgc->cn += *cnl;
+    int oldcn = thgc->class_count;
+    thgc->class_count += *cnl;
 
     using VoiFun = void (*)(int);
     VoiFun mainF = reinterpret_cast<VoiFun>(GetProcAddress(h, "main"));
@@ -1374,47 +1374,47 @@ CustomModuleImpl* ReadDll(ThreadGC* thgc) {
 }
 CustomModuleImpl* GoThread(ThreadGC* thgc) {
 
-    GC_SetClass(thgc, _String, "Str", sizeof(String), NULL, NULL);
-    GC_SetClass(thgc, _List, "List", sizeof(List), ListCheck, NULL);
-    GC_SetClass(thgc, _Element, "Elem", sizeof(NewElement), NULL, NULL);
-    GC_SetClass(thgc, _FRect, "FRect", sizeof(SDL_FRect), NULL, NULL);
-    GC_SetClass(thgc, _LetterC, "Letter", sizeof(NewLetter), NULL, NULL);
-    GC_SetClass(thgc, _LineC, "Line", sizeof(NewLine), NULL, NULL);
+    GC_register_class(thgc, _String, "Str", sizeof(String), NULL, NULL);
+    GC_register_class(thgc, _List, "List", sizeof(List), ListCheck, NULL);
+    GC_register_class(thgc, _Element, "Elem", sizeof(NewElement), NULL, NULL);
+    GC_register_class(thgc, _FRect, "FRect", sizeof(SDL_FRect), NULL, NULL);
+    GC_register_class(thgc, _LetterC, "Letter", sizeof(NewLetter), NULL, NULL);
+    GC_register_class(thgc, _LineC, "Line", sizeof(NewLine), NULL, NULL);
     //GC_SetClass(thgc, _VLineC, "VirtualLine", sizeof(VLine), VLineCheck, NULL);
     //GC_SetClass(thgc, _Select, "Select", sizeof(Select), SelectCheck, NULL);
     //GC_SetClass(thgc, _State, "State", sizeof(State), StateCheck, NULL);
-    GC_SetClass(thgc, _LocalC, "Local", sizeof(NewLocal), NULL, NULL);
+    GC_register_class(thgc, _LocalC, "Local", sizeof(NewLocal), NULL, NULL);
     //GC_SetClass(thgc, _LetterPart, "LetterPart", sizeof(LetterPart), LetterPartCheck, NULL);
-    GC_SetClass(thgc, _KV, "KeyValue", sizeof(KV), KVCheck, NULL);
-    GC_SetClass(thgc, _MapData, "MapData", sizeof(MapData), MapDataCheck, NULL);
-    GC_SetClass(thgc, _Map, "Map", sizeof(Map), MapCheck, NULL);
-    GC_SetClass(thgc, _EndC, "End", sizeof(NewEndElement), NULL, NULL);
+    GC_register_class(thgc, _KV, "KeyValue", sizeof(KV), KVCheck, NULL);
+    GC_register_class(thgc, _MapData, "MapData", sizeof(MapData), MapDataCheck, NULL);
+    GC_register_class(thgc, _Map, "Map", sizeof(Map), MapCheck, NULL);
+    GC_register_class(thgc, _EndC, "End", sizeof(NewEndElement), NULL, NULL);
     //GC_SetClass(thgc, _CloneElemC, "CloneElem", sizeof(CloneElement), CloneElementCheck, NULL);
     //GC_SetClass(thgc, _HoppyWindow, "HoppyWindow", sizeof(HoppyWindow), HoppyWindowCheck, NULL);
-    GC_SetClass(thgc, _ColumnMeta, "ColumnMeta", sizeof(ColumnMeta), NULL, NULL);
-    GC_SetClass(thgc, _Table, "Table", sizeof(Table), NULL, NULL);
-    GC_SetClass(thgc, _Column, "Column", sizeof(Column), NULL, NULL);
-    GC_SetClass(thgc, _TreeElement, "TreeElement", sizeof(TreeElement), NULL, NULL);
+    GC_register_class(thgc, _ColumnMeta, "ColumnMeta", sizeof(ColumnMeta), NULL, NULL);
+    GC_register_class(thgc, _Table, "Table", sizeof(Table), NULL, NULL);
+    GC_register_class(thgc, _Column, "Column", sizeof(Column), NULL, NULL);
+    GC_register_class(thgc, _TreeElement, "TreeElement", sizeof(TreeElement), NULL, NULL);
     //GC_SetClass(thgc, _DivC, "Div", sizeof(Div), NULL, NULL);
     //GC_SetClass(thgc, _SheetC, "Sheet", sizeof(Sheet), NULL, NULL);
-    GC_SetClass(thgc, _MemTable, "MemTable", sizeof(MemTable), NULL, NULL);
-	GC_SetClass(thgc, _MemFunc, "MemFunc", sizeof(MemFunc), NULL, NULL);
-    GC_SetClass(thgc, _FuncType, "FuncType", sizeof(FuncType), NULL, NULL);
+    GC_register_class(thgc, _MemTable, "MemTable", sizeof(MemTable), NULL, NULL);
+    GC_register_class(thgc, _MemFunc, "MemFunc", sizeof(MemFunc), NULL, NULL);
+    GC_register_class(thgc, _FuncType, "FuncType", sizeof(FuncType), NULL, NULL);
     //GC_SetClass(thgc, _MouseEvent, "MouseEvent", sizeof(MouseEvent), NULL, NULL);
     //GC_SetClass(thgc, _KeyEvent, "KeyEvent", sizeof(KeyEvent), NULL, NULL);
-    GC_SetClass(thgc, _Offscreen, "Offscreen", sizeof(Offscreen), NULL, NULL);
+    GC_register_class(thgc, _Offscreen, "Offscreen", sizeof(Offscreen), NULL, NULL);
     //HoppyWindow* hw = (HoppyWindow*)GC_malloc(thgc, _HoppyWindow);
     //initHoppyWindow(thgc, hw);
-	NewLocal* local = (NewLocal*)GC_malloc(thgc, _LocalC);
+	NewLocal* local = (NewLocal*)GC_alloc(thgc, _LocalC);
     initNewLocal(thgc, local);
-    NewLetter* let = (NewLetter*)GC_malloc(thgc, _LetterC);
+    NewLetter* let = (NewLetter*)GC_alloc(thgc, _LetterC);
     initNewLetter(thgc, let, getFont("sans", 16), _Letter);
 	let->text = createString(thgc, (char*)"Hello,world!", 13, 1);
     let->color = 0xFFFFFFFF;
     NewElementAddLast(thgc, local, (NewElement*)local, (NewElement*)let);
     thgc->map = create_mapy(magc, false);
     String* str = createString(thgc, (char*)"main", 4, 1);
-    TreeElement* te = (TreeElement*)GC_malloc(thgc, _TreeElement);
+    TreeElement* te = (TreeElement*)GC_alloc(thgc, _TreeElement);
     te->id = str;
     te->elem = (NewElement*)local;
     te->children = create_list(thgc, sizeof(TreeElement*), true);

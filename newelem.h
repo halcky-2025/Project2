@@ -357,7 +357,7 @@ void NewNextElement(ThreadGC* thgc, NewLocal* local, NewElement* before, NewElem
 	else {
 		NewNext(local, before, elem);
 		if (CheckOffscreen(elem)) {
-			elem->offscreen = (Offscreen*)GC_malloc(thgc, CType::_Offscreen);
+			elem->offscreen = (Offscreen*)GC_alloc(thgc, CType::_Offscreen);
 			elem->offscreen->group = &createGroup(thgc);
 			elem->offscreen->elem = elem;
 		}
@@ -379,7 +379,7 @@ void changeXtype(ThreadGC* thgc, NewLocal* local, NewElement* elem, SizeType xty
 	elem->xtype = xtype;
 	if (elem->offscreen == NULL) {
 		if (CheckOffscreen(elem)) {
-			elem->offscreen = (Offscreen*)GC_malloc(thgc, CType::_Offscreen);
+			elem->offscreen = (Offscreen*)GC_alloc(thgc, CType::_Offscreen);
 			elem->offscreen->group = &createGroup(thgc);
 			elem->offscreen->elem = elem;
 		}
@@ -396,7 +396,7 @@ void changeYType(ThreadGC* thgc, NewLocal* local, NewElement* elem, SizeType yty
 	FindOffscreen(elem)->markLayout(local);
 	if (elem->offscreen == NULL) {
 		if (CheckOffscreen(elem)) {
-			elem->offscreen = (Offscreen*)GC_malloc(thgc, CType::_Offscreen);
+			elem->offscreen = (Offscreen*)GC_alloc(thgc, CType::_Offscreen);
 			elem->offscreen->group = &createGroup(thgc);
 			elem->offscreen->elem = elem;
 		}
@@ -413,7 +413,7 @@ void changeOffscreen(ThreadGC* thgc, NewLocal* local, NewElement* elem, bool off
 	if (offscreened) {
 		if (elem->offscreen == NULL) {
 			FindOffscreen(elem)->markLayout(local);
-			elem->offscreen = (Offscreen*)GC_malloc(thgc, CType::_Offscreen);
+			elem->offscreen = (Offscreen*)GC_alloc(thgc, CType::_Offscreen);
 			elem->offscreen->group = &createGroup(thgc);
 			elem->offscreen->elem = elem;
 		}
@@ -486,7 +486,7 @@ void setTransform(NewElement* elem, float tx, float ty, float scale, float rot) 
 void initNewLine(ThreadGC* thgc, NewLine* line);
 void NewElementAddLast(ThreadGC* thgc, NewLocal* local, NewElement* parent, NewElement* child) {
 	if (parent->childend->before->type != LetterType::_Line) {
-		auto line = (NewLine*)GC_malloc(thgc, CType::_LineC);
+		auto line = (NewLine*)GC_alloc(thgc, CType::_LineC);
 		initNewLine(thgc, line);
 		NewBefore(local, parent->childend, line);
 	}
@@ -626,7 +626,7 @@ void NewDrawCall(ThreadGC* thgc, NewElement* elem, NewGraphic* g, NewLocal* loca
 void initNewLocal(ThreadGC* thgc, NewLocal* local) {
 	local->next = local->before = (NewElement*)local;
 	local->parent = NULL;
-	NewEndElement* end = (NewEndElement*)GC_malloc(thgc, CType::_EndC);
+	NewEndElement* end = (NewEndElement*)GC_alloc(thgc, CType::_EndC);
 	initNewEndElement(thgc, end, (NewElement*)local);
 	end->id = std::numeric_limits<unsigned long>::max();
 	local->childend = (NewElement*)end;
@@ -646,7 +646,7 @@ void initNewLocal(ThreadGC* thgc, NewLocal* local) {
 	local->Draw = NewDrawCall;
 	local->Mouse = NULL;
 	local->Key = NULL;
-	local->offscreen = (Offscreen*)GC_malloc(thgc, CType::_Offscreen);
+	local->offscreen = (Offscreen*)GC_alloc(thgc, CType::_Offscreen);
 	local->offscreen->group = &createGroup(thgc);
 	local->offscreen->markLayout(local);
 	local->offscreen->elem = local;
@@ -662,7 +662,7 @@ void initNewLocal(ThreadGC* thgc, NewLocal* local) {
 void RecompileLine(ThreadGC* thgc, NewLocal* local, NewLine* line) {
 	if (!line->recompile) return;
 	NewElement* start = line->childend;
-	String* text = (String*)GC_malloc(thgc, CType::_String);
+	String* text = (String*)GC_alloc(thgc, CType::_String);
 	FontId* font = NULL;
 	for (NewElement* child = line->childend->next; ;) {
 		if (child->type == LetterType::_Letter) {
@@ -726,7 +726,7 @@ void initNewLine(ThreadGC* thgc, NewLine* line) {
 	line->next = line;
 	line->before = line;
 	line->parent = NULL;
-	line->childend = (NewElement*)GC_malloc(thgc, CType::_EndC);
+	line->childend = (NewElement*)GC_alloc(thgc, CType::_EndC);
 	initNewEndElement(thgc, (NewEndElement*)line->childend, line);
 	line->orient = true;
 	line->id = 0;

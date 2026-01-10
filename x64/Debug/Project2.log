@@ -5,12 +5,6 @@ C:\Users\hayah\Downloads\libtorch-win-shared-with-deps-debug-2.6.0+cu126\libtorc
 C:\C2\include\libavutil\rational.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
   (compiling source file 'main.cpp')
   
-C:\Users\hayah\source\repos\Project2\Project2\gc.h(28,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'ClassType' の左辺を無視します。
-  (compiling source file 'main.cpp')
-  
-C:\Users\hayah\source\repos\Project2\Project2\gc.h(314,37): warning C4312: '型キャスト': 'int' からより大きいサイズの 'char *' へ変換します。
-  (compiling source file 'main.cpp')
-  
 C:\Users\hayah\source\repos\Project2\Project2\arr.h(592,12): warning C4477: 'printf' : 書式文字列 '%d' には、型 'int' の引数が必要ですが、可変個引数 1 は型 'char *' です
   (compiling source file 'main.cpp')
   
@@ -87,7 +81,7 @@ C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\
           [
               _Ty=int
           ]
-          C:\Users\hayah\source\repos\Project2\Project2\main.cpp(436,1):
+          C:\Users\hayah\source\repos\Project2\Project2\main.cpp(438,1):
           コンパイル対象の関数 テンプレート インスタンス化 'std::_Optional_destruct_base<_Ty,true>::_Optional_destruct_base<const unsigned __int64>(std::in_place_t,const unsigned __int64 &&) noexcept' のリファレンスを確認してください
           with
           [

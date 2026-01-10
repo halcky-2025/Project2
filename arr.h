@@ -6,17 +6,17 @@ struct String {
     int esize;
 };
 String* createString(ThreadGC* thgc, char* tex, int size, int esize) {
-	String* str = (String*)GC_malloc(thgc, _String);
-	str->data = (char*)GC_malloc_size(thgc, size);
+	String* str = (String*)GC_alloc(thgc, _String);
+	str->data = (char*)GC_alloc_size(thgc, size);
 	str->size = size;
     str->esize = esize;
 	memcpy(str->data, tex, size);
 	return str;
 }
 String* createStringant(ThreadGC* thgc, char* tex, int size, int esize) {
-    String* str = (String*)GC_malloc_ant(thgc, _String);
+    String* str = (String*)GC_alloc_ant(thgc, _String);
     if (str == NULL) return NULL;
-    str->data = (char*)GC_malloc_size_ant(thgc, size);
+    str->data = (char*)GC_alloc_size_ant(thgc, size);
     if (str == NULL) return NULL;
     str->size = size;
     str->esize = esize;
@@ -24,11 +24,11 @@ String* createStringant(ThreadGC* thgc, char* tex, int size, int esize) {
     return str;
 }
 String* StringAdd(ThreadGC* thgc, String* str, char* value, int len, int esize) {
-    String* ret = (String*)GC_malloc(thgc, _String);
+    String* ret = (String*)GC_alloc(thgc, _String);
     if (str->esize == esize) {
         ret->esize = esize;
         ret->size = str->size + len;
-        ret->data = (char*)GC_malloc_size(thgc, ret->size);
+        ret->data = (char*)GC_alloc_size(thgc, ret->size);
         memcpy(ret->data, str->data, str->size);
         memcpy((char*)(ret->data + str->size), value, len);
     }
@@ -36,7 +36,7 @@ String* StringAdd(ThreadGC* thgc, String* str, char* value, int len, int esize) 
         ret->esize = 2;
         if (str->esize == 1) {
             ret->size = str->size * 2 + len;
-			ret->data = (char*)GC_malloc_size(thgc, ret->size);
+			ret->data = (char*)GC_alloc_size(thgc, ret->size);
             for (int i = 0; i < str->size; i++) {
 				ret->data[i * 2] = str->data[i];
             }
@@ -44,7 +44,7 @@ String* StringAdd(ThreadGC* thgc, String* str, char* value, int len, int esize) 
         }
         else {
 			ret->size = str->size + len * 2;
-			ret->data = (char*)GC_malloc_size(thgc, ret->size);
+			ret->data = (char*)GC_alloc_size(thgc, ret->size);
             memcpy(ret->data, str->data, str->size);
             for (int i = 0; i < len; i++) {
                 ret->data[str->size + i * 2] = value[i];
@@ -54,11 +54,11 @@ String* StringAdd(ThreadGC* thgc, String* str, char* value, int len, int esize) 
     return ret;
 }
 String* StringAdd2(ThreadGC* thgc, String* str, String* value) {
-    String* ret = (String*)GC_malloc(thgc, _String);
+    String* ret = (String*)GC_alloc(thgc, _String);
     if (str->esize == value->esize) {
         ret->esize = str->esize;
         ret->size = str->size + value->size;
-        ret->data = (char*)GC_malloc_size(thgc, ret->size);
+        ret->data = (char*)GC_alloc_size(thgc, ret->size);
         memcpy(ret->data, str->data, str->size);
         memcpy((char*)(ret->data + str->size), value->data, value->size);
     }
@@ -66,7 +66,7 @@ String* StringAdd2(ThreadGC* thgc, String* str, String* value) {
         ret->esize = 2;
         if (str->esize == 1) {
 			ret->size = str->size * 2 + value->size;
-			ret->data = (char*)GC_malloc_size(thgc, ret->size);
+			ret->data = (char*)GC_alloc_size(thgc, ret->size);
             for (int i = 0; i < str->size; i++) {
                 ret->data[i * 2] = str->data[i];
             }
@@ -74,7 +74,7 @@ String* StringAdd2(ThreadGC* thgc, String* str, String* value) {
         }
         else {
             ret->size = str->size + value->size * 2;
-            ret->data = (char*)GC_malloc_size(thgc, ret->size);
+            ret->data = (char*)GC_alloc_size(thgc, ret->size);
             memcpy(ret->data, str->data, str->size);
             for (int i = 0; i < value->size; i++) {
                 ret->data[str->size + i * 2] = value->data[i];
@@ -84,19 +84,19 @@ String* StringAdd2(ThreadGC* thgc, String* str, String* value) {
     return ret;
 }
 String* StringRemove(ThreadGC* thgc, String* str, int n) {
-	String* ret = (String*)GC_malloc(thgc, _String);
+	String* ret = (String*)GC_alloc(thgc, _String);
     ret->esize = str->esize;
     ret->size = str->size - str->esize;
-	ret->data = (char*)GC_malloc_size(thgc, ret->size);
+	ret->data = (char*)GC_alloc_size(thgc, ret->size);
     memcpy(ret->data, str->data, n * str->esize);
     memcpy((char*)(ret->data + n * str->esize), str->data + (n + 1) * str->esize, str->size - (n + 1) * str->esize);
     return ret;
 }
 String* SubString(ThreadGC* thgc, String* str, int n1, int length) {
-	String* ret = (String*)GC_malloc(thgc, _String);
+	String* ret = (String*)GC_alloc(thgc, _String);
 	ret->esize = str->esize;
 	ret->size = length * str->esize;
-	ret->data = (char*)GC_malloc_size(thgc, ret->size);
+	ret->data = (char*)GC_alloc_size(thgc, ret->size);
     memcpy(ret->data, str->data + n1 * str->esize, ret->size);
 	return ret;
 }
@@ -229,7 +229,7 @@ char* StringUTF8(String* s, int* out_len) {
     throw std::runtime_error("Unsupported esize: " + std::to_string(s->esize));
 }
 String* NumberString(ThreadGC* thgc, int n) {
-    String* ret = (String*)GC_malloc(thgc, _String);
+    String* ret = (String*)GC_alloc(thgc, _String);
     ret->esize = 1;
     int count = 0;
     int n2 = n;
@@ -240,13 +240,13 @@ String* NumberString(ThreadGC* thgc, int n) {
     }
     if (n < 0) {
         ret->size = count + 1;
-        ret->data = (char*)GC_malloc_size(thgc, ret->size);
+        ret->data = (char*)GC_alloc_size(thgc, ret->size);
         ret->data[0] = '-';
         n2 = -n;
     }
     else {
         ret->size = count;
-        ret->data = (char*)GC_malloc_size(thgc, ret->size);
+        ret->data = (char*)GC_alloc_size(thgc, ret->size);
         n2 = n;
     }
     for (int i = 1; ;i++) {
@@ -257,7 +257,7 @@ String* NumberString(ThreadGC* thgc, int n) {
     return ret;
 }
 String* FloatString(ThreadGC* thgc, float n, int dlength) {
-    String* ret = (String*)GC_malloc(thgc, _String);
+    String* ret = (String*)GC_alloc(thgc, _String);
     ret->esize = 1;
     int count = 0;
     int n2 = (int)n;
@@ -268,13 +268,13 @@ String* FloatString(ThreadGC* thgc, float n, int dlength) {
     count += dlength;
     if (n < 0) {
         ret->size = count + 2;
-        ret->data = (char*)GC_malloc_size(thgc, ret->size);
+        ret->data = (char*)GC_alloc_size(thgc, ret->size);
         ret->data[0] = '-';
         n = -n;
     }
     else {
         ret->size = count + 1;
-        ret->data = (char*)GC_malloc_size(thgc, ret->size);
+        ret->data = (char*)GC_alloc_size(thgc, ret->size);
     }
     n2 = (int)n;
     float f2 = n - (float)(int)n2;
@@ -381,25 +381,25 @@ typedef struct {
 } List;
 void ListCheck(ThreadGC* thgc, char* data) {
     List* list = (List*)data;
-    list->data = (char**)copy_object(thgc, (char*)list->data);
+    list->data = (char**)GC_clone(thgc, (char*)list->data);
     if (list->objected) {
         for (int i = 0; i < list->size; i++) {
             char** value = (char**)(list->data + i * list->esize);
-            *value = (char*)copy_object(thgc, *value);
+            *value = (char*)GC_clone(thgc, *value);
         }
     }
 }
 List* create_list(ThreadGC* thgc, int esize, bool objected) {
-    List* list = (List*)GC_malloc(thgc, _List);
+    List* list = (List*)GC_alloc(thgc, _List);
     list->objected = objected;
-    list->data = (char **)GC_malloc_size(thgc, 4 * esize);
+    list->data = (char **)GC_alloc_size(thgc, 4 * esize);
     list->size = 0;
     list->capa = 4;
     list->esize = esize;
     return list;
 }
 List* create_list2(ThreadGC* thgc, List* list, int esize, bool objected) {
-    list->data = (char**)GC_malloc(thgc, _List);
+    list->data = (char**)GC_alloc(thgc, _List);
     list->size = 0;
     list->capa = 4;
     list->esize = esize;
@@ -407,10 +407,10 @@ List* create_list2(ThreadGC* thgc, List* list, int esize, bool objected) {
     return list;
 }
 List* create_list_ant(ThreadGC* thgc, int esize, bool objected) {
-    List* list = (List*)GC_malloc_ant(thgc, _List);
+    List* list = (List*)GC_alloc_ant(thgc, _List);
 	if (list == NULL) return NULL;
     list->objected = objected;
-    list->data = (char**)GC_malloc_size_ant(thgc, 4 * esize);
+    list->data = (char**)GC_alloc_size_ant(thgc, 4 * esize);
 	if (list->data == NULL) return NULL;
     list->size = 0;
     list->capa = 4;
@@ -418,7 +418,7 @@ List* create_list_ant(ThreadGC* thgc, int esize, bool objected) {
     return list;
 }
 List* create_list2_ant(ThreadGC* thgc, List* list, int esize, bool objected) {
-    list->data = (char**)GC_malloc_ant(thgc, _List);
+    list->data = (char**)GC_alloc_ant(thgc, _List);
 	if (list->data == NULL) return NULL;
     list->size = 0;
     list->capa = 4;
@@ -429,7 +429,7 @@ List* create_list2_ant(ThreadGC* thgc, List* list, int esize, bool objected) {
 void add_list(ThreadGC* thgc, List* list, char* value) {
     if (list->size == list->capa) {
         list->capa *= 2;
-        char** data = (char**)GC_malloc_size(thgc, list->capa * list->esize);
+        char** data = (char**)GC_alloc_size(thgc, list->capa * list->esize);
         memcpy(data, list->data, list->size * list->esize);
         list->data = data;
     }
@@ -439,7 +439,7 @@ void add_list(ThreadGC* thgc, List* list, char* value) {
 }
 char* add_list_ant(ThreadGC* thgc, List* list, char* value) {
     if (list->size == list->capa) {
-        char** data = (char**)GC_malloc_size_ant(thgc, list->capa * list->esize * 2);
+        char** data = (char**)GC_alloc_size_ant(thgc, list->capa * list->esize * 2);
         if (data == NULL) return NULL;
         list->capa *= 2;
         memcpy(data, list->data, list->size * list->esize);
@@ -468,7 +468,7 @@ void remove_list(ThreadGC* thgc, List* list, int index) {
         int new_capa = list->capa / 4;
         if (new_capa < 4) new_capa = 4;
         // esize * new_capa バイト確保してコピー
-        char** new_data = (char**)GC_malloc_size(thgc, (size_t)new_capa * (size_t)list->esize);
+        char** new_data = (char**)GC_alloc_size(thgc, (size_t)new_capa * (size_t)list->esize);
         // 縮小確保に失敗しても動作継続（容量変更だけ諦める）
         if (new_data) {
             memcpy(new_data, list->data, (size_t)list->size * (size_t)list->esize);
@@ -521,10 +521,10 @@ typedef struct {
 void KVCheck(ThreadGC* thgc, char* data) {
 	KV* kv = (KV*)data;
 	if (kv->objected) {
-		kv->key = (String*)copy_object(thgc, (char*)kv->key);
-		kv->value = (char*)copy_object(thgc, kv->value);
+		kv->key = (String*)GC_clone(thgc, (char*)kv->key);
+		kv->value = (char*)GC_clone(thgc, kv->value);
 	}
-	else kv->key = (String*)copy_object(thgc, (char*)kv->key);
+	else kv->key = (String*)GC_clone(thgc, (char*)kv->key);
 }
 typedef struct {
     List** _map;
@@ -532,9 +532,9 @@ typedef struct {
 } MapData;
 void MapDataCheck(ThreadGC* thgc, char* data) {
 	MapData* map = (MapData*)data;
-    map->_map = (List**)copy_object(thgc, (char*)map->_map);
+    map->_map = (List**)GC_clone (thgc, (char*)map->_map);
 	for (int i = 0; i < map->capa; i++) {
-        map->_map[i] = (List*)copy_object(thgc, (char*)map->_map[i]);
+        map->_map[i] = (List*)GC_clone(thgc, (char*)map->_map[i]);
 	}
 }
 struct Map{
@@ -544,14 +544,14 @@ struct Map{
 };
 void MapCheck(ThreadGC* thgc, char* data) {
 	Map* map = (Map*)data;
-	map->md = (MapData*)copy_object(thgc, (char*)map->md);
+	map->md = (MapData*)GC_clone(thgc, (char*)map->md);
 }
 MapData* create_map_data(ThreadGC* thgc, int capa, bool objected) {
-    MapData* md = (MapData*)GC_malloc(thgc, _MapData);
+    MapData* md = (MapData*)GC_alloc(thgc, _MapData);
     md->capa = capa;
-    md->_map = (List**)GC_malloc_size(thgc, capa * sizeof(List*));
+    md->_map = (List**)GC_alloc_size(thgc, capa * sizeof(List*));
     for (int i = 0; i < capa; i++) {
-        md->_map[i] = (List*)GC_malloc(thgc, _List);
+        md->_map[i] = (List*)GC_alloc(thgc, _List);
     }
     for (int i = 0; i < md->capa; i++) {
         create_list2(thgc, (List*) md->_map[i], sizeof(KV*), objected);
@@ -559,13 +559,13 @@ MapData* create_map_data(ThreadGC* thgc, int capa, bool objected) {
     return md;
 }
 MapData* create_map_data_ant(ThreadGC* thgc, int capa, bool objected) {
-    MapData* map = (MapData*)GC_malloc_ant(thgc, _MapData);
+    MapData* map = (MapData*)GC_alloc_ant(thgc, _MapData);
     if (map == NULL) return NULL;
     map->capa = capa;
-    map->_map = (List**)GC_malloc_size_ant(thgc, capa * sizeof(List*));
+    map->_map = (List**)GC_alloc_size_ant(thgc, capa * sizeof(List*));
 	if (map->_map == NULL) return NULL;
     for (int i = 0; i < capa; i++) {
-        map->_map[i] = (List*)GC_malloc_ant(thgc, _List);
+        map->_map[i] = (List*)GC_alloc_ant(thgc, _List);
 		if (map->_map[i] == NULL) return NULL;
     }
     for (int i = 0; i < map->capa; i++) {
@@ -604,14 +604,14 @@ void PrintArray(Map* map, int depth, int type) {
     putchar('\n');
 }
 Map* create_mapy(ThreadGC* thgc, bool objected) {
-    Map* map = (Map*)GC_malloc(thgc, _Map);
+    Map* map = (Map*)GC_alloc(thgc, _Map);
 	map->objected = objected;
     map->md = create_map_data(thgc, 16, objected);
     map->kvs = create_list(thgc, sizeof(KV*), objected);
     return map;
 }
 Map* create_mapy_ant(ThreadGC* thgc, bool objected) {
-    Map* map = (Map*)GC_malloc_ant(thgc, _Map);
+    Map* map = (Map*)GC_alloc_ant(thgc, _Map);
     if (map == NULL) return NULL;
     map->objected = objected;
     map->md = create_map_data_ant(thgc, 16, objected);
@@ -655,7 +655,7 @@ head:
                 if (kv->key->data[j] != key->data[j]) break;
             }
         }
-        KV* kv2 = (KV*)GC_malloc(thgc, _KV);
+        KV* kv2 = (KV*)GC_alloc(thgc, _KV);
         kv2->objected = map->objected;
         kv2->key = key;
         kv2->value = value;
@@ -664,7 +664,7 @@ head:
         add_list(thgc, map->kvs, (char*)kv2);
     }
     else {
-        KV* kv2 = (KV*)GC_malloc(thgc, _KV);
+        KV* kv2 = (KV*)GC_alloc(thgc, _KV);
         kv2->objected = map->objected;
         kv2->key = NULL;
         kv2->value = value;
@@ -701,7 +701,7 @@ head:
                 if (kv->key->data[j] != key->data[j]) break;
             }
         }
-        KV* kv2 = (KV*)GC_malloc_ant(thgc, _KV);
+        KV* kv2 = (KV*)GC_alloc_ant(thgc, _KV);
         if (kv2 == NULL) return NULL;
         kv2->objected = map->objected;
         kv2->key = key;
@@ -713,7 +713,7 @@ head:
 		if (o == NULL) return NULL;
     }
     else {
-        KV* kv2 = (KV*)GC_malloc_ant(thgc, _KV);
+        KV* kv2 = (KV*)GC_alloc_ant(thgc, _KV);
 		if (kv2 == NULL) return NULL;
         kv2->objected = map->objected;
         kv2->key = NULL;
@@ -808,7 +808,7 @@ head:
                 return;
             }
         }
-        KV* kv2 = (KV*)GC_malloc(thgc, _KV);
+        KV* kv2 = (KV*)GC_alloc(thgc, _KV);
         kv2->objected = map->objected;
         kv2->key = (String*)key;
         kv2->value = value;
@@ -817,7 +817,7 @@ head:
         add_list(thgc, map->kvs, (char*)kv2);
     }
     else {
-        KV* kv2 = (KV*)GC_malloc(thgc, _KV);
+        KV* kv2 = (KV*)GC_alloc(thgc, _KV);
         kv2->objected = map->objected;
         kv2->key = NULL;
         kv2->value = value;
@@ -851,7 +851,7 @@ head:
 				return (char*)map;
             }
         }
-        KV* kv2 = (KV*)GC_malloc_ant(thgc, _KV);
+        KV* kv2 = (KV*)GC_alloc_ant(thgc, _KV);
         if (kv2 == NULL) return NULL;
         kv2->objected = map->objected;
         kv2->key = (String*)key;
@@ -863,7 +863,7 @@ head:
         if (o == NULL) return NULL;
     }
     else {
-        KV* kv2 = (KV*)GC_malloc_ant(thgc, _KV);
+        KV* kv2 = (KV*)GC_alloc_ant(thgc, _KV);
         if (kv2 == NULL) return NULL;
         kv2->objected = map->objected;
         kv2->key = NULL;

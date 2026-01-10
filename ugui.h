@@ -683,7 +683,17 @@ private:
         //bgfx::setDebug(BGFX_DEBUG_TEXT | BGFX_DEBUG_IFH);
         hoppy_->master.initialize();
         hoppy_->initFonts();
+        if (!engine.initialize()) {
+            std::cerr << "Failed to initialize audio engine" << std::endl;
+            return;
+        }
         initDone.set_value();
+        auto id = engine.load("banban.mp3");
+        engine.play(id);
+        /*std::wstring wpath = L"おどれ！！マグロっ子.mp3";
+        std::string utf8 = utf16_to_utf8(wpath);
+		auto id2 = engine.load(utf8.c_str());
+        engine.play(id2);*/
         QuadVertex::init();
         // シェーダー読み込み
         RenderResources resources{};
@@ -742,6 +752,7 @@ private:
         }
     }
     HopStar* hoppy_;
+    audio::AudioEngine engine;
     SDL_Window* window_;
     std::thread thread_;
     std::atomic<bool> running_;
