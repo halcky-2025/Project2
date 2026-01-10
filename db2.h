@@ -63,7 +63,7 @@ Generator RunGcAndNotify(ThreadGC* thgc,
     bool* done)
 {
     // exegc は「ロック済みラッパ」である前提（= 中で thgc->m を取る）
-    if (thgc->waitgc) exegc(thgc);
+    if (thgc->waitgc) GC_collect_young(thgc);
 
     { std::lock_guard lk(*mu); *done = true; }
     cv->notify_one();
@@ -201,7 +201,7 @@ private:
         }
         rs->columns = rs->rows = NULL;
         {
-            std::unique_lock lock(thgc->m);
+            std::unique_lock lock(thgc->mutex);
         head99:
             rs->columns = create_mapy_ant(thgc, true);
             if (rs->columns == NULL) {
@@ -215,7 +215,7 @@ private:
             }
             for (int i = 0; i < ncol; ++i) {
             head77:
-                ColumnMeta* column = (ColumnMeta*)GC_malloc_ant(thgc, _ColumnMeta);
+                ColumnMeta* column = (ColumnMeta*)GC_alloc_ant(thgc, _ColumnMeta);
                 if (column == NULL) {
                     CallGCant(thgc, queue, &lock);
                     goto head77;
@@ -239,7 +239,7 @@ private:
         }
         while (sqlite3_step(st) == SQLITE_ROW) {
             {
-                std::unique_lock lock(thgc->m);
+                std::unique_lock lock(thgc->mutex);
                 char *o = func(thgc, queue, &lock, st, obj);
             head0:
                 char *l = add_mapy_ant(thgc, rs->rows, NULL, o);
@@ -560,7 +560,7 @@ struct Column {
 char* SetTable(ThreadGC* thgc, CoroutineQueue* queue, std::unique_lock<std::mutex>* lock, sqlite3_stmt* st, char *obj) {
     Table* t;
     head0:
-    t = (Table*)GC_malloc_ant(thgc, _Table);
+    t = (Table*)GC_alloc_ant(thgc, _Table);
 	if (t == NULL) {
 		CallGCant(thgc, queue, lock);
         goto head0;
@@ -586,7 +586,7 @@ char* SetTable(ThreadGC* thgc, CoroutineQueue* queue, std::unique_lock<std::mute
 char* SetColumn(ThreadGC* thgc, CoroutineQueue* queue, std::unique_lock<std::mutex>* lock, sqlite3_stmt* st, char *obj) {
     Column* c;
     head0:
-    c = (Column*)GC_malloc_ant(thgc, _Column);
+    c = (Column*)GC_alloc_ant(thgc, _Column);
 	if (c == NULL) {
 		CallGCant(thgc, queue, lock);
         goto head0;

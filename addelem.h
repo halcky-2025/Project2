@@ -2,13 +2,13 @@
 
 void TreeElementCheck(ThreadGC* thgc, char* self) {
 	TreeElement* tree = (TreeElement*)self;
-	tree->id = (String*)copy_object(thgc, (char*)tree->id);
-	tree->elem = (NewElement*)copy_object(thgc, (char*)tree->elem);
-	tree->parent = (TreeElement*)copy_object(thgc, (char*)tree->parent);
-	tree->children = (List*)copy_object(thgc, (char*)tree->children);
+	GC_UPDATE_PTR_C(thgc, tree->id, String*);
+	GC_UPDATE_PTR_C(thgc, tree->elem, NewElement*);
+	GC_UPDATE_PTR_C(thgc, tree->parent, TreeElement*);
+	GC_UPDATE_PTR_C(thgc, tree->children, List*);
 }
 void createLetter(ThreadGC* thgc, NewElement* parent, String* str, FontId font) {
-	NewLetter* letter = (NewLetter*)GC_malloc(thgc, _LetterC);
+	NewLetter* letter = (NewLetter*)GC_alloc(thgc, _LetterC);
 	initNewLetter(thgc, letter, font, _Letter);
 	letter->text = str;
 	if (parent != NULL) {
@@ -51,7 +51,7 @@ TreeElement* checkTreeElement(ThreadGC* thgc, TreeElement* parentt, NewElement* 
 	TreeElement* te = (TreeElement*)get_mapy(thgc->map, id);
 	if (te == NULL) {
 		NewElement* elem = func(thgc);
-		te = (TreeElement*)GC_malloc(thgc, _TreeElement);
+		te = (TreeElement*)GC_alloc(thgc, _TreeElement);
 		te->elem = elem;
 		te->id = id;
 		te->children = create_list(thgc, sizeof(TreeElement*), true);

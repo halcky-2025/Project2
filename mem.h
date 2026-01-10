@@ -58,7 +58,7 @@ MemTable* StringMem(ThreadGC* thgc, String* str) {
 			int j = i + 1;
 			for (; ; j++) {
 				if (j >= len) {
-					MemTable* mt = (MemTable*)GC_malloc(thgc, sizeof(MemTable));
+					MemTable* mt = (MemTable*)GC_alloc(thgc, sizeof(MemTable));
 					mt->table = create_mapy(thgc, true);
 					return mt;
 				}
@@ -67,7 +67,7 @@ MemTable* StringMem(ThreadGC* thgc, String* str) {
 					continue;
 				}
 				else {
-					MemTable* mt = (MemTable*)GC_malloc(thgc, sizeof(MemTable));
+					MemTable* mt = (MemTable*)GC_alloc(thgc, sizeof(MemTable));
 					mt->table = create_mapy(thgc, true);
 					return mt;
 				}

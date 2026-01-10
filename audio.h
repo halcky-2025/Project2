@@ -24,7 +24,19 @@ extern "C" {
 #include <libavformat/avformat.h>
 #include <libswresample/swresample.h>
 }
+inline std::string utf16_to_utf8(const std::wstring& w) {
+    if (w.empty()) return {};
+    int len = WideCharToMultiByte(CP_UTF8, 0,
+        w.data(), (int)w.size(),
+        nullptr, 0, nullptr, nullptr);
 
+    std::string s(len, '\0');
+    WideCharToMultiByte(CP_UTF8, 0,
+        w.data(), (int)w.size(),
+        s.data(), len, nullptr, nullptr);
+
+    return s;
+}
 namespace audio {
 
     // =============================================================================
