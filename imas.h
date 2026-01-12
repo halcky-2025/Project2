@@ -1,51 +1,56 @@
-#pragma once
+ï»¿#pragma once
+
+#ifdef __ANDROID__
+#include <SDL3/SDL.h>
+#endif
+
 //=============================================================================
-// ImageId –¼‘O‹óŠÔ
+// ImageId
 //=============================================================================
 
 
 
 //=============================================================================
-// ‰ğŒˆŒ‹‰Ê
+// ResolveStatus
 //=============================================================================
 
 
 enum class ResolveStatus {
-    Success,        // ‰ğŒˆ¬Œ÷
-    Pending,        // ƒ[ƒh’†iplaceholderg—p‰Âj
-    NotFound,       // Œ©‚Â‚©‚ç‚È‚¢
-    Evicted,        // evictionÏ‚İiÄƒ[ƒh‰Â”\‚©‚àj
+    Success,        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+    Pending,        // ï¿½ï¿½ï¿½[ï¿½hï¿½ï¿½ï¿½iplaceholderï¿½gï¿½pï¿½Âj
+    NotFound,       // ï¿½ï¿½ï¿½Â‚ï¿½ï¿½ï¿½È‚ï¿½
+    Evicted,        // evictionï¿½Ï‚İiï¿½Äƒï¿½ï¿½[ï¿½hï¿½Â”\ï¿½ï¿½ï¿½ï¿½ï¿½j
 };
 
 struct ResolveResult {
     ResolveStatus status = ResolveStatus::NotFound;
     ResolvedTexture resolved;
-    ResolvedTexture placeholder;  // Pending‚ÌƒtƒH[ƒ‹ƒoƒbƒN
+    ResolvedTexture placeholder;  // Pendingï¿½ï¿½ï¿½Ìƒtï¿½Hï¿½[ï¿½ï¿½ï¿½oï¿½bï¿½N
 
     bool isReady() const { return status == ResolveStatus::Success; }
 
-    // •`‰æ—pi¬Œ÷‚È‚çresolvedAPending‚È‚çplaceholderj
+    // ï¿½`ï¿½ï¿½pï¿½iï¿½ï¿½ï¿½ï¿½ï¿½È‚ï¿½resolvedï¿½APendingï¿½È‚ï¿½placeholderï¿½j
     const ResolvedTexture& forDraw() const {
         return (status == ResolveStatus::Success) ? resolved : placeholder;
     }
 };
 
 //=============================================================================
-// ImageLocation - ImageId‚Ì”z’uî•ñ
+// ImageLocation - ImageIdï¿½Ì”zï¿½uï¿½ï¿½ï¿½
 //=============================================================================
 
 struct ImageLocation {
     enum class Type : uint8_t {
         None,
-        Standalone,   // standaloneTextures_ ‚É‘¶İ
-        FontAtlas,    // FontAtlas ‚É‘¶İ
-        GridAtlas,    // ThumbnailGridAtlas ‚É‘¶İ
-        ShelfAtlas,   // ThumbnailShelfAtlas ‚É‘¶İ
+        Standalone,   // standaloneTextures_ ï¿½É‘ï¿½ï¿½ï¿½
+        FontAtlas,    // FontAtlas ï¿½É‘ï¿½ï¿½ï¿½
+        GridAtlas,    // ThumbnailGridAtlas ï¿½É‘ï¿½ï¿½ï¿½
+        ShelfAtlas,   // ThumbnailShelfAtlas ï¿½É‘ï¿½ï¿½ï¿½
     };
 
     Type type = Type::None;
 
-    // ŠeAtlas—p‚Ì“à•”ƒL[
+    // ï¿½eAtlasï¿½pï¿½Ì“ï¿½ï¿½ï¿½ï¿½Lï¿½[
     union {
         struct { uint64_t glyphKey; } font;           // FontId + codepoint
         struct { ThumbnailHandle handle; } thumbnail; // Grid/Shelf
@@ -59,12 +64,12 @@ struct ImageLocation {
 };
 
 //=============================================================================
-// RenderGroup - Šî–{ƒOƒ‹[ƒv
+// RenderGroup - ï¿½ï¿½{ï¿½Oï¿½ï¿½ï¿½[ï¿½v
 //=============================================================================
 
 
 //=============================================================================
-// ExtendedRenderGroup - ImageMaster —pŠg’£ƒOƒ‹[ƒv
+// ExtendedRenderGroup - ImageMaster ï¿½pï¿½gï¿½ï¿½ï¿½Oï¿½ï¿½ï¿½[ï¿½v
 //=============================================================================
 struct ExtendedRenderGroup : RenderGroup {
     std::unordered_set<uint64_t> usedGridThumbnails;
@@ -84,9 +89,9 @@ struct ExtendedRenderGroup : RenderGroup {
 };
 
 //=============================================================================
-// ImageMasterGroupManager - ‘O•ûéŒ¾
+// ImageMasterGroupManager - ï¿½Oï¿½ï¿½ï¿½éŒ¾
 //=============================================================================
-class ImageMaster;  // ‘O•ûéŒ¾
+class ImageMaster;  // ï¿½Oï¿½ï¿½ï¿½éŒ¾
 
 class ImageMasterGroupManager {
 public:
@@ -140,7 +145,14 @@ public:
         uint32_t groupExpireFrames = 300;
     };
 
-    explicit ImageMaster(const Config& cfg = {})
+    ImageMaster()
+        : config_()
+        , fontAtlas_(config_.fontConfig)
+        , gridAtlas_(config_.gridConfig)
+        , shelfAtlas_(config_.shelfConfig)
+        , groupManager_(*this) {
+    }
+    explicit ImageMaster(const Config& cfg)
         : config_(cfg)
         , fontAtlas_(cfg.fontConfig)
         , gridAtlas_(cfg.gridConfig)
@@ -158,7 +170,7 @@ public:
     }
 
     void shutdown() {
-        // Standalone textures ‰ğ•ú
+        // Standalone textures ï¿½ï¿½ï¿½
         {
             std::lock_guard lock(standaloneMutex_);
             for (auto& [id, info] : standaloneTextures_) {
@@ -172,7 +184,7 @@ public:
             standaloneTextures_.clear();
         }
 
-        // ”z’uî•ñƒNƒŠƒA
+        // ï¿½zï¿½uï¿½ï¿½ï¿½Nï¿½ï¿½ï¿½A
         {
             std::lock_guard lock(locationMutex_);
             imageLocations_.clear();
@@ -192,13 +204,13 @@ public:
     }
 
     void collectGarbage() {
-        // ŠúŒÀØ‚êƒOƒ‹[ƒv‚Ì‰ñû
+        // ï¿½ï¿½ï¿½ï¿½ï¿½Ø‚ï¿½Oï¿½ï¿½ï¿½[ï¿½vï¿½Ì‰ï¿½ï¿½
         collectExpiredGroups(config_.groupExpireFrames);
 
         // FontAtlas GC
         fontAtlas_.collectGarbage();
 
-        // ThumbnailAtlas ‚Í“à•”LRU‚ÅŠÇ—
+        // ThumbnailAtlas ï¿½Í“ï¿½ï¿½ï¿½LRUï¿½ÅŠÇ—ï¿½
         gridAtlas_.evictLRU(16);
         shelfAtlas_.evictLRU(16);
 
@@ -229,7 +241,7 @@ public:
                 }
                 standaloneTextures_.erase(it);
 
-                // ”z’uî•ñ‚àíœ
+                // ï¿½zï¿½uï¿½ï¿½ï¿½ï¿½ï¿½íœ
                 std::lock_guard locLock(locationMutex_);
                 imageLocations_.erase(id);
             }
@@ -239,7 +251,7 @@ public:
     uint64_t currentFrame() const { return currentFrame_; }
 
     //=========================================================================
-    // “Œvî•ñ
+    // ï¿½ï¿½ï¿½vï¿½ï¿½ï¿½
     //=========================================================================
     struct Stats {
         // FontAtlas
@@ -314,7 +326,7 @@ public:
     }
 
     //=========================================================================
-    // yLayer Az“ˆê‰ğŒˆAPIiUI/SceneŒü‚¯j
+    // ï¿½yLayer Aï¿½zï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½APIï¿½iUI/Sceneï¿½ï¿½ï¿½ï¿½ï¿½j
     //=========================================================================
     ResolveResult resolveFontGlyph(ImageId id) {
         ResolveResult result;
@@ -345,7 +357,7 @@ public:
         ResolveResult result;
         uint64_t contentId = getImageIdLocal(id);
 
-        // ‚Ü‚¸ Grid ‚Å’T‚·
+        // ï¿½Ü‚ï¿½ Grid ï¿½Å’Tï¿½ï¿½
         float u0, v0, u1, v1;
         auto gridHandle = gridAtlas_.find(contentId);
         if (gridHandle) {
@@ -361,7 +373,7 @@ public:
             }
         }
 
-        // Ÿ‚É Shelf ‚Å’T‚·
+        // ï¿½ï¿½ï¿½ï¿½ Shelf ï¿½Å’Tï¿½ï¿½
         auto shelfHandle = shelfAtlas_.find(contentId);
         if (shelfHandle) {
             float u0, v0, u1, v1;
@@ -379,7 +391,7 @@ public:
         result.status = ResolveStatus::NotFound;
         return result;
     }
-    // ImageId ¨ •`‰æ‰Â”\‚ÈƒeƒNƒXƒ`ƒƒ‚ğ‰ğŒˆ
+    // ImageId ï¿½ï¿½ ï¿½`ï¿½ï¿½Â”\ï¿½Èƒeï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     ResolveResult resolve(ImageId id) {
         ResolveResult result;
 
@@ -395,7 +407,7 @@ public:
             return resolveFontGlyph(id);
 
         case ImageIdDomain::Thumbnail:
-            return resolveThumbnail(id);  // Grid/Shelf —¼•û
+            return resolveThumbnail(id);  // Grid/Shelf ï¿½ï¿½ï¿½ï¿½
 
         case ImageIdDomain::Offscreen:
         case ImageIdDomain::Memory:
@@ -409,7 +421,7 @@ public:
         }
     }
 
-    // ŠÈˆÕ”Åi¬Œ÷‚Ì‚İƒeƒNƒXƒ`ƒƒî•ñ‚ğ•Ô‚·j
+    // ï¿½ÈˆÕ”Åiï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ì‚İƒeï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô‚ï¿½ï¿½j
     bool resolve(ImageId id, bgfx::TextureHandle& outTex,
         float& u0, float& v0, float& u1, float& v1) {
         auto result = resolve(id);
@@ -423,16 +435,16 @@ public:
         return true;
     }
 
-    // •`‰æ—piPending‚Íplaceholderj
+    // ï¿½`ï¿½ï¿½pï¿½iPendingï¿½ï¿½ï¿½ï¿½placeholderï¿½j
     ResolvedTexture resolveForDraw(ImageId id) {
         return resolve(id).forDraw();
     }
 
     //=========================================================================
-    // yLayer AzImageId “o˜^/ŠÇ—
+    // ï¿½yLayer Aï¿½zImageId ï¿½oï¿½^/ï¿½Ç—ï¿½
     //=========================================================================
 
-    // ImageId‚Ìó‘Ô‚ğŠm”F
+    // ImageIdï¿½Ìï¿½Ô‚ï¿½ï¿½mï¿½F
     bool exists(ImageId id) const {
         std::lock_guard lock(locationMutex_);
         return imageLocations_.find(id) != imageLocations_.end();
@@ -444,7 +456,7 @@ public:
         return it != imageLocations_.end() && it->second.isPending;
     }
 
-    // Pendingó‘Ô‚Å“o˜^iƒ[ƒhŠJnj
+    // Pendingï¿½ï¿½Ô‚Å“oï¿½^ï¿½iï¿½ï¿½ï¿½[ï¿½hï¿½Jï¿½nï¿½ï¿½ï¿½j
     void registerPending(ImageId id) {
         std::lock_guard lock(locationMutex_);
         auto& loc = imageLocations_[id];
@@ -452,11 +464,11 @@ public:
         loc.isPending = true;
     }
 
-    // touchig—pƒ}[ƒNj
+    // touchï¿½iï¿½gï¿½pï¿½}ï¿½[ï¿½Nï¿½j
     void touch(ImageId id) {
         ImageIdDomain domain = getImageIdDomain(id);
 
-        // StandaloneŒn
+        // Standaloneï¿½n
         if (domain == ImageIdDomain::Offscreen ||
             domain == ImageIdDomain::Memory ||
             domain == ImageIdDomain::Generated ||
@@ -468,7 +480,7 @@ public:
             }
         }
 
-        // Grid/Shelf ‚Í“à•”ƒnƒ“ƒhƒ‹Œo—R‚Å touch
+        // Grid/Shelf ï¿½Í“ï¿½ï¿½ï¿½ï¿½nï¿½ï¿½ï¿½hï¿½ï¿½ï¿½oï¿½Rï¿½ï¿½ touch
         std::lock_guard lock(locationMutex_);
         auto it = imageLocations_.find(id);
         if (it != imageLocations_.end()) {
@@ -481,7 +493,7 @@ public:
         }
     }
 
-    // QÆƒJƒEƒ“ƒg
+    // ï¿½Qï¿½ÆƒJï¿½Eï¿½ï¿½ï¿½g
     void retain(ImageId id) {
         ImageIdDomain domain = getImageIdDomain(id);
         if (domain == ImageIdDomain::Offscreen ||
@@ -495,7 +507,7 @@ public:
                 it->second.lastUsedFrame = currentFrame_;
             }
         }
-        // Grid/Shelf‚Í“à•”LRU‚ÅŠÇ—
+        // Grid/Shelfï¿½Í“ï¿½ï¿½ï¿½LRUï¿½ÅŠÇ—ï¿½
     }
 
     void release(ImageId id) {
@@ -513,10 +525,10 @@ public:
     }
 
     //=========================================================================
-    // yLayer BzStandalone ƒeƒNƒXƒ`ƒƒi’áƒŒƒxƒ‹j
+    // ï¿½yLayer Bï¿½zStandalone ï¿½eï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½iï¿½áƒŒï¿½xï¿½ï¿½ï¿½j
     //=========================================================================
 
-    // ì¬iƒsƒNƒZƒ‹ƒf[ƒ^‚©‚çj
+    // ï¿½ì¬ï¿½iï¿½sï¿½Nï¿½Zï¿½ï¿½ï¿½fï¿½[ï¿½^ï¿½ï¿½ï¿½ï¿½j
     ImageId createStandaloneTexture(const void* pixels, uint16_t w, uint16_t h,
         int pitch, bool persistent = false) {
         ImageId id = ImageIdGenerator::fromMemory();
@@ -527,7 +539,7 @@ public:
         return id;
     }
 
-    // ì¬iSDL_Surface ‚©‚çj
+    // ï¿½ì¬ï¿½iSDL_Surface ï¿½ï¿½ï¿½ï¿½j
     ImageId createStandaloneTexture(SDL_Surface* surface, bool persistent = false) {
         if (!surface) return 0;
 
@@ -544,7 +556,7 @@ public:
         return id;
     }
 
-    // ì¬i‹óƒeƒNƒXƒ`ƒƒj
+    // ï¿½ì¬ï¿½iï¿½ï¿½eï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½j
     ImageId createEmptyStandaloneTexture(uint16_t w, uint16_t h, bool persistent = false) {
         if (w == 0 || h == 0) return 0;
 
@@ -570,7 +582,7 @@ public:
         info.origin = ImageOrigin::Memory;
         info.isRenderTarget = false;
 
-        // ”z’uî•ñ‚ğ“o˜^
+        // ï¿½zï¿½uï¿½ï¿½ï¿½ï¿½oï¿½^
         {
             std::lock_guard locLock(locationMutex_);
             auto& loc = imageLocations_[id];
@@ -583,11 +595,11 @@ public:
         return id;
     }
     //=========================================================================
-    // ƒeƒNƒXƒ`ƒƒƒ|ƒCƒ“ƒ^æ“¾APIi’Ç‰Áj
+    // ï¿½eï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½|ï¿½Cï¿½ï¿½ï¿½^ï¿½æ“¾APIï¿½iï¿½Ç‰ï¿½ï¿½j
     //=========================================================================
 
-    // Standalone ƒeƒNƒXƒ`ƒƒ‚Ö‚Ìƒ|ƒCƒ“ƒ^æ“¾
-    bgfx::TextureHandle * getStandaloneTexturePtr(ImageId id) {
+    // Standalone ï¿½eï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½Ö‚Ìƒ|ï¿½Cï¿½ï¿½ï¿½^ï¿½æ“¾
+    bgfx::TextureHandle* getStandaloneTexturePtr(ImageId id) {
         std::lock_guard lock(standaloneMutex_);
         auto it = standaloneTextures_.find(id);
         if (it != standaloneTextures_.end()) {
@@ -596,7 +608,7 @@ public:
         return nullptr;
     }
 
-    // FBO ‚Ö‚Ìƒ|ƒCƒ“ƒ^æ“¾
+    // FBO ï¿½Ö‚Ìƒ|ï¿½Cï¿½ï¿½ï¿½^ï¿½æ“¾
     bgfx::FrameBufferHandle* getOffscreenFBOPtr(ImageId id) {
         std::lock_guard lock(standaloneMutex_);
         auto it = standaloneTextures_.find(id);
@@ -606,12 +618,12 @@ public:
         return nullptr;
     }
 
-    // ‹ŒAPIŒİŠ·
+    // ï¿½ï¿½APIï¿½İŠï¿½
     ImageId reserveOffscreenTexture(uint16_t w, uint16_t h,
         bool persistent = false) {
         ImageId id = ImageIdGenerator::forOffscreen();
 
-        // æ‚ÉƒGƒ“ƒgƒŠ‚ğì¬iƒeƒNƒXƒ`ƒƒ–¢¶¬j
+        // ï¿½ï¿½ÉƒGï¿½ï¿½ï¿½gï¿½ï¿½ï¿½ï¿½ï¿½ì¬ï¿½iï¿½eï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½j
         {
             std::lock_guard lock(standaloneMutex_);
             auto [it, inserted] = standaloneTextures_.emplace(id, StandaloneTextureInfo{});
@@ -631,10 +643,10 @@ public:
                 loc.isPending = true;
             }
 
-            // ì¬ƒLƒ…[‚É’Ç‰Á
+            // ï¿½ì¬ï¿½Lï¿½ï¿½ï¿½[ï¿½É’Ç‰ï¿½
             {
                 std::lock_guard lock(offscreenQueueMutex_);
-                offscreenCreateQueue_.push_back({ id, w, h, persistent});
+                offscreenCreateQueue_.push_back({ id, w, h, persistent });
             }
 
             return id;
@@ -646,7 +658,7 @@ public:
         std::lock_guard lock(offscreenQueueMutex_);
         offscreenResizeQueue_.push_back({ id, newW, newH });
     }
-    // ’ÊíƒeƒNƒXƒ`ƒƒ—\–ñiƒ[ƒh‘O‚Éƒ|ƒCƒ“ƒ^æ“¾j
+    // ï¿½Êï¿½eï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½\ï¿½ï¿½iï¿½ï¿½ï¿½[ï¿½hï¿½Oï¿½Éƒ|ï¿½Cï¿½ï¿½ï¿½^ï¿½æ“¾ï¿½j
     ImageId reserveTexture(bgfx::TextureHandle** outTexPtr, uint16_t w, uint16_t h) {
         ImageId id = ImageIdGenerator::fromMemory();
 
@@ -672,7 +684,7 @@ public:
 
         return id;
     }
-    // ƒeƒNƒXƒ`ƒƒƒf[ƒ^‚ğƒAƒbƒvƒ[ƒhi—\–ñÏ‚İID‚É‘Î‚µ‚Äj
+    // ï¿½eï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½fï¿½[ï¿½^ï¿½ï¿½ï¿½Aï¿½bï¿½vï¿½ï¿½ï¿½[ï¿½hï¿½iï¿½\ï¿½ï¿½Ï‚ï¿½IDï¿½É‘Î‚ï¿½ï¿½Äj
     bool uploadTexture(ImageId id, const void* pixels, uint16_t w, uint16_t h, int pitch) {
         std::lock_guard lock(standaloneMutex_);
         auto it = standaloneTextures_.find(id);
@@ -680,7 +692,7 @@ public:
 
         auto& info = it->second;
 
-        // ƒeƒNƒXƒ`ƒƒì¬
+        // ï¿½eï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½ì¬
         const bgfx::Memory* mem = bgfx::copy(pixels, w * h * 4);
         info.handle = bgfx::createTexture2D(
             w, h, false, 1,
@@ -694,7 +706,7 @@ public:
         info.size.y = h;
         info.lastUsedFrame = currentFrame_;
 
-        // Pending‰ğœ
+        // Pendingï¿½ï¿½ï¿½ï¿½
         {
             std::lock_guard locLock(locationMutex_);
             auto locIt = imageLocations_.find(id);
@@ -707,14 +719,14 @@ public:
     }
 
     //=========================================================================
-    // FontAtlas ƒeƒNƒXƒ`ƒƒƒ|ƒCƒ“ƒ^æ“¾
+    // FontAtlas ï¿½eï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½|ï¿½Cï¿½ï¿½ï¿½^ï¿½æ“¾
     //=========================================================================
 
     bgfx::TextureHandle* getFontAtlasTexturePtr(uint16_t pageIndex) {
         return &fontAtlas_.getPageTexture(pageIndex);
     }
 
-    // ƒOƒŠƒtæ“¾iƒ|ƒCƒ“ƒ^•t‚«j
+    // ï¿½Oï¿½ï¿½ï¿½tï¿½æ“¾ï¿½iï¿½|ï¿½Cï¿½ï¿½ï¿½^ï¿½tï¿½ï¿½ï¿½j
     struct GlyphResult {
         const GlyphInfo* info = nullptr;
         bgfx::TextureHandle* texturePtr = nullptr;
@@ -733,7 +745,7 @@ public:
     }
 
     //=========================================================================
-    // Thumbnail ƒeƒNƒXƒ`ƒƒƒ|ƒCƒ“ƒ^æ“¾
+    // Thumbnail ï¿½eï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½|ï¿½Cï¿½ï¿½ï¿½^ï¿½æ“¾
     //=========================================================================
 
     bgfx::TextureHandle* getGridAtlasTexturePtr(uint16_t pageIndex) {
@@ -744,7 +756,7 @@ public:
         return (bgfx::TextureHandle*)(&shelfAtlas_.getTexture(pageIndex));
     }
 
-    // Thumbnail æ“¾iƒ|ƒCƒ“ƒ^•t‚«j
+    // Thumbnail ï¿½æ“¾ï¿½iï¿½|ï¿½Cï¿½ï¿½ï¿½^ï¿½tï¿½ï¿½ï¿½j
     struct ThumbnailResult {
         ThumbnailHandle handle;
         bgfx::TextureHandle* texturePtr = nullptr;
@@ -776,7 +788,7 @@ public:
     }
 
     //=========================================================================
-    // Placeholder ƒeƒNƒXƒ`ƒƒƒ|ƒCƒ“ƒ^
+    // Placeholder ï¿½eï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½|ï¿½Cï¿½ï¿½ï¿½^
     //=========================================================================
 
     bgfx::TextureHandle* getPlaceholderTexturePtr() {
@@ -796,17 +808,17 @@ public:
 
         auto& info = it->second;
 
-        // ƒTƒCƒY•ÏX‚È‚µ‚È‚ç‰½‚à‚µ‚È‚¢
+        // ï¿½Tï¿½Cï¿½Yï¿½ÏXï¿½È‚ï¿½ï¿½È‚ç‰½ï¿½ï¿½ï¿½ï¿½ï¿½È‚ï¿½
         if (info.size.x == newW && info.size.y == newH) {
             return true;
         }
 
-        // ŒÃ‚¢ƒŠƒ\[ƒX”jŠü
+        // ï¿½Ã‚ï¿½ï¿½ï¿½ï¿½\ï¿½[ï¿½Xï¿½jï¿½ï¿½
         if (bgfx::isValid(info.fbo)) {
             bgfx::destroy(info.fbo);
         }
 
-        // V‚µ‚¢ƒeƒNƒXƒ`ƒƒì¬
+        // ï¿½Vï¿½ï¿½ï¿½ï¿½ï¿½eï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½ì¬
         bgfx::TextureHandle newHandle = bgfx::createTexture2D(
             newW, newH, false, 1,
             bgfx::TextureFormat::RGBA8,
@@ -827,7 +839,7 @@ public:
         info.size.y = newH;
         info.lastUsedFrame = currentFrame_;
 
-        // ”z’uî•ñ‚àXV
+        // ï¿½zï¿½uï¿½ï¿½ï¿½ï¿½ï¿½Xï¿½V
         {
             std::lock_guard locLock(locationMutex_);
             auto locIt = imageLocations_.find(id);
@@ -867,7 +879,7 @@ public:
             resizes.swap(offscreenResizeQueue_);
         }
         int size = creates.size() + resizes.size();
-        // ì¬
+        // ï¿½ì¬
         for (auto& req : creates) {
             if (createOffscreenInternal(req.id, req.width, req.height, req.persistent)) {
                 if (req.dest) {
@@ -897,13 +909,13 @@ public:
             }
             standaloneTextures_.erase(it);
 
-            // ”z’uî•ñ‚àíœ
+            // ï¿½zï¿½uï¿½ï¿½ï¿½ï¿½ï¿½íœ
             std::lock_guard locLock(locationMutex_);
             imageLocations_.erase(id);
         }
     }
 
-    // ‹ŒAPIŒİŠ·
+    // ï¿½ï¿½APIï¿½İŠï¿½
     void touchStandaloneTexture(ImageId id) {
         touch(id);
     }
@@ -920,14 +932,14 @@ public:
         destroyStandalone(id);
     }
 
-    // Standalone ƒeƒNƒXƒ`ƒƒî•ñæ“¾
+    // Standalone ï¿½eï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½ï¿½ï¿½æ“¾
     StandaloneTextureInfo* getStandaloneTexture(ImageId id) {
         std::lock_guard lock(standaloneMutex_);
         auto it = standaloneTextures_.find(id);
         return (it != standaloneTextures_.end()) ? &it->second : nullptr;
     }
 
-    // Standalone ƒeƒNƒXƒ`ƒƒXV
+    // Standalone ï¿½eï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½Xï¿½V
     bool updateStandaloneTexture(ImageId id, const void* pixels,
         uint16_t x, uint16_t y, uint16_t w, uint16_t h, int pitch) {
         std::lock_guard lock(standaloneMutex_);
@@ -949,13 +961,13 @@ public:
     }
 
     //=========================================================================
-    // yLayer BzFontAtlasi’áƒŒƒxƒ‹j
+    // ï¿½yLayer Bï¿½zFontAtlasï¿½iï¿½áƒŒï¿½xï¿½ï¿½ï¿½j
     //=========================================================================
 
     FontAtlas& fontAtlas() { return fontAtlas_; }
     const FontAtlas& fontAtlas() const { return fontAtlas_; }
 
-    // FontAtlas •Ö—˜ƒƒ\ƒbƒhiˆÏ÷j
+    // FontAtlas ï¿½Ö—ï¿½ï¿½ï¿½ï¿½\ï¿½bï¿½hï¿½iï¿½Ïï¿½ï¿½j
     FontId registerFont(const char* name, const std::string& fontPath, int size) {
         return fontAtlas_.registerFont(name, fontPath, size);
     }
@@ -982,21 +994,21 @@ public:
         return fontAtlas_.getPageTexture(pageIndex);
     }
 
-    // ƒOƒŠƒt’Ç‰Á‚µ‚ÄImageId‚ğ•Ô‚·
+    // ï¿½Oï¿½ï¿½ï¿½tï¿½Ç‰ï¿½ï¿½ï¿½ï¿½ï¿½ImageIdï¿½ï¿½Ô‚ï¿½
     ImageId addGlyph(FontId font, uint32_t codepoint, SDL_Color color = { 255,255,255,255 }) {
-        // FontIndex ‚ğæ“¾iÕ“Ë‚È‚µ‚Ì˜A”Ôj
+        // FontIndex ï¿½ï¿½ï¿½æ“¾ï¿½iï¿½Õ“Ë‚È‚ï¿½ï¿½Ì˜Aï¿½Ôj
         uint32_t fontIndex = fontAtlas_.getFontIndex(font);
-        if (fontIndex == 0) return 0;  // –¢“o˜^ƒtƒHƒ“ƒg
+        if (fontIndex == 0) return 0;  // ï¿½ï¿½ï¿½oï¿½^ï¿½tï¿½Hï¿½ï¿½ï¿½g
 
         const auto& gi = fontAtlas_.getOrAddGlyph(font, codepoint, nullptr, color);
         if (gi.width == 0) return 0;
 
-        // localId = fontIndex(24bit) + codepoint(24bit) ‚ÅˆêˆÓ
-        // codepoint ‚Í Unicode ‚ÅÅ‘å 0x10FFFF (21bit) ‚È‚Ì‚Å 24bit ‚Å\•ª
+        // localId = fontIndex(24bit) + codepoint(24bit) ï¿½Åˆï¿½ï¿½
+        // codepoint ï¿½ï¿½ Unicode ï¿½ÅÅ‘ï¿½ 0x10FFFF (21bit) ï¿½È‚Ì‚ï¿½ 24bit ï¿½Å\ï¿½ï¿½
         uint64_t localId = (uint64_t(fontIndex) << 24) | (codepoint & 0x00FFFFFF);
         ImageId id = ImageIdGenerator::forFontGlyph(localId);
 
-        // ”z’uî•ñ‚ğ“o˜^
+        // ï¿½zï¿½uï¿½ï¿½ï¿½ï¿½oï¿½^
         {
             std::lock_guard lock(locationMutex_);
             auto& loc = imageLocations_[id];
@@ -1010,7 +1022,7 @@ public:
         return id;
     }
 
-    // ‰æ‘œ’Ç‰Á‚µ‚ÄImageId‚ğ•Ô‚·
+    // ï¿½æ‘œï¿½Ç‰ï¿½ï¿½ï¿½ï¿½ï¿½ImageIdï¿½ï¿½Ô‚ï¿½
     ImageId addImageToFontAtlas(SDL_Surface* surface, bool pinned = false) {
         ImageId id = ImageIdGenerator::forFontGlyph(nextFontAtlasImageId_++);
         const auto& gi = fontAtlas_.addImage(id, surface, nullptr, pinned);
@@ -1029,19 +1041,19 @@ public:
         return id;
     }
 
-    // ’¼ÚƒAƒNƒZƒX
+    // ï¿½ï¿½ï¿½ÚƒAï¿½Nï¿½Zï¿½X
     bgfx::TextureHandle getFontAtlasTexture(uint16_t pageIndex) {
         return fontAtlas_.getPageTexture(pageIndex);
     }
 
     //=========================================================================
-    // yLayer BzThumbnailGridAtlasi’áƒŒƒxƒ‹j
+    // ï¿½yLayer Bï¿½zThumbnailGridAtlasï¿½iï¿½áƒŒï¿½xï¿½ï¿½ï¿½j
     //=========================================================================
 
     ThumbnailGridAtlas& gridAtlas() { return gridAtlas_; }
     const ThumbnailGridAtlas& gridAtlas() const { return gridAtlas_; }
 
-    // Grid •Ö—˜ƒƒ\ƒbƒhiˆÏ÷j
+    // Grid ï¿½Ö—ï¿½ï¿½ï¿½ï¿½\ï¿½bï¿½hï¿½iï¿½Ïï¿½ï¿½j
     bool getGridUV(ThumbnailHandle handle, float& u0, float& v0, float& u1, float& v1) const {
         return gridAtlas_.getUV(handle, u0, v0, u1, v1);
     }
@@ -1066,7 +1078,7 @@ public:
         return gridAtlas_.isValid(handle);
     }
 
-    // ƒTƒ€ƒlƒCƒ‹æ“¾/ì¬‚µ‚ÄImageId‚ğ•Ô‚·
+    // ï¿½Tï¿½ï¿½ï¿½lï¿½Cï¿½ï¿½ï¿½æ“¾/ï¿½ì¬ï¿½ï¿½ï¿½ï¿½ImageIdï¿½ï¿½Ô‚ï¿½
     ImageId acquireGridThumbnail(uint64_t contentId, bool& outNeedsLoad) {
         ImageId id = ImageIdGenerator::forThumbnail(contentId);
         ThumbnailHandle handle = gridAtlas_.acquire(contentId, outNeedsLoad);
@@ -1084,7 +1096,7 @@ public:
         return id;
     }
 
-    // ƒAƒbƒvƒ[ƒhŠ®—¹’Ê’m
+    // ï¿½Aï¿½bï¿½vï¿½ï¿½ï¿½[ï¿½hï¿½ï¿½ï¿½ï¿½ï¿½Ê’m
     void onGridUploadComplete(ImageId id) {
         std::lock_guard lock(locationMutex_);
         auto it = imageLocations_.find(id);
@@ -1093,7 +1105,7 @@ public:
         }
     }
 
-    // ’¼ÚƒAƒNƒZƒX
+    // ï¿½ï¿½ï¿½ÚƒAï¿½Nï¿½Zï¿½X
     bool queueGridUpload(ImageId id, const void* data, uint16_t w, uint16_t h) {
         std::lock_guard lock(locationMutex_);
         auto it = imageLocations_.find(id);
@@ -1114,13 +1126,13 @@ public:
     }
 
     //=========================================================================
-    // yLayer BzThumbnailShelfAtlasi’áƒŒƒxƒ‹j
+    // ï¿½yLayer Bï¿½zThumbnailShelfAtlasï¿½iï¿½áƒŒï¿½xï¿½ï¿½ï¿½j
     //=========================================================================
 
     ThumbnailShelfAtlas& shelfAtlas() { return shelfAtlas_; }
     const ThumbnailShelfAtlas& shelfAtlas() const { return shelfAtlas_; }
 
-    // Shelf •Ö—˜ƒƒ\ƒbƒhiˆÏ÷j
+    // Shelf ï¿½Ö—ï¿½ï¿½ï¿½ï¿½\ï¿½bï¿½hï¿½iï¿½Ïï¿½ï¿½j
     bool getShelfUV(ThumbnailHandle handle, float& u0, float& v0, float& u1, float& v1) const {
         return shelfAtlas_.getUV(handle, u0, v0, u1, v1);
     }
@@ -1183,10 +1195,10 @@ public:
     }
 
     //=========================================================================
-    // ImageLoader ‚©‚çŒÄ‚Î‚ê‚é“o˜^ƒƒ\ƒbƒhiIDw’è”Åj
+    // ImageLoader ï¿½ï¿½ï¿½ï¿½Ä‚Î‚ï¿½ï¿½oï¿½^ï¿½ï¿½ï¿½\ï¿½bï¿½hï¿½iIDï¿½wï¿½ï¿½Åj
     //=========================================================================
 
-    // FontAtlas‰æ‘œ‚ğ“o˜^iImageLoader—pj
+    // FontAtlasï¿½æ‘œï¿½ï¿½oï¿½^ï¿½iImageLoaderï¿½pï¿½j
     void registerFontAtlasImage(ImageId id, uint16_t width, uint16_t height) {
         std::lock_guard lock(locationMutex_);
         auto& loc = imageLocations_[id];
@@ -1197,7 +1209,7 @@ public:
         loc.isPending = false;
     }
 
-    // Grid‰æ‘œ‚ğ“o˜^iImageLoader—pj
+    // Gridï¿½æ‘œï¿½ï¿½oï¿½^ï¿½iImageLoaderï¿½pï¿½j
     void registerGridImage(ImageId id, ThumbnailHandle handle, uint16_t width, uint16_t height) {
         std::lock_guard lock(locationMutex_);
         auto& loc = imageLocations_[id];
@@ -1208,7 +1220,7 @@ public:
         loc.isPending = false;
     }
 
-    // Shelf‰æ‘œ‚ğ“o˜^iImageLoader—pj
+    // Shelfï¿½æ‘œï¿½ï¿½oï¿½^ï¿½iImageLoaderï¿½pï¿½j
     void registerShelfImage(ImageId id, ThumbnailHandle handle, uint16_t width, uint16_t height) {
         std::lock_guard lock(locationMutex_);
         auto& loc = imageLocations_[id];
@@ -1219,7 +1231,7 @@ public:
         loc.isPending = false;
     }
 
-    // Standaloneì¬iIDw’è”ÅAImageLoader—pj
+    // Standaloneï¿½ì¬ï¿½iIDï¿½wï¿½ï¿½ÅAImageLoaderï¿½pï¿½j
     bool createStandaloneWithId(ImageId id, const void* pixels, uint16_t w, uint16_t h,
         int pitch, bool persistent) {
         return createStandaloneInternal(id, pixels, w, h, pitch, persistent,
@@ -1259,7 +1271,7 @@ public:
     }
 private:
     //=========================================================================
-    // “à•”resolveŠÖ”
+    // ï¿½ï¿½ï¿½ï¿½resolveï¿½Öï¿½
     //=========================================================================
 
     ResolveResult resolveStandalone(ImageId id) {
@@ -1288,7 +1300,7 @@ private:
 
         float u0, v0, u1, v1;
         if (!gridAtlas_.getUV(loc.thumbnail.handle, u0, v0, u1, v1)) {
-            // eviction ‚³‚ê‚Ä‚¢‚é‰Â”\«
+            // eviction ï¿½ï¿½ï¿½ï¿½Ä‚ï¿½ï¿½ï¿½Â”\ï¿½ï¿½
             result.status = ResolveStatus::Evicted;
             return result;
         }
@@ -1325,7 +1337,7 @@ private:
     }
 
     //=========================================================================
-    // “à•”ì¬ŠÖ”
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ì¬ï¿½Öï¿½
     //=========================================================================
 
     bool createStandaloneInternal(ImageId id, const void* pixels, uint16_t w, uint16_t h,
@@ -1358,7 +1370,7 @@ private:
         info.origin = origin;
         info.isRenderTarget = isRenderTarget;
 
-        // ”z’uî•ñ‚ğ“o˜^
+        // ï¿½zï¿½uï¿½ï¿½ï¿½ï¿½oï¿½^
         {
             std::lock_guard locLock(locationMutex_);
             auto& loc = imageLocations_[id];
@@ -1410,7 +1422,7 @@ private:
     }
 
     //=========================================================================
-    // ƒƒ“ƒo
+    // ï¿½ï¿½ï¿½ï¿½ï¿½o
     //=========================================================================
 
     Config config_;
@@ -1430,7 +1442,7 @@ private:
 
 public:
     //=========================================================================
-    // RenderGroup ŠÇ—iˆÏ÷ + À‘•j
+    // RenderGroup ï¿½Ç—ï¿½ï¿½iï¿½Ïï¿½ + ï¿½ï¿½ï¿½ï¿½ï¿½j
     //=========================================================================
 
     ExtendedRenderGroup& createGroup(SurfaceId surfaceId,
@@ -1446,15 +1458,15 @@ public:
         auto* g = groupManager_.getGroup(id);
         if (!g) return;
 
-        // FontAtlas ‚Ö‚Ì’Ê’m
+        // FontAtlas ï¿½Ö‚Ì’Ê’m
         fontAtlas_.onGroupDestroyed(*g);
 
-        // Standalone texture ‚ÌQÆ‰ğ•ú
+        // Standalone texture ï¿½ÌQï¿½Æ‰ï¿½ï¿½
         for (auto texId : g->usedStandaloneTextures) {
             release(texId);
         }
 
-        // Surface ƒŠƒXƒg‚©‚çíœ
+        // Surface ï¿½ï¿½ï¿½Xï¿½gï¿½ï¿½ï¿½ï¿½íœ
         auto& sv = groupManager_.surfaceGroups_[g->surfaceId];
         sv.erase(std::remove(sv.begin(), sv.end(), id), sv.end());
 
@@ -1493,7 +1505,7 @@ public:
 
     ImageMasterGroupManager& groupManager() { return groupManager_; }
 
-    // ImageId ¨ ”z’uî•ñ‚Ìƒ}ƒbƒsƒ“ƒO
+    // ImageId ï¿½ï¿½ ï¿½zï¿½uï¿½ï¿½ï¿½Ìƒ}ï¿½bï¿½sï¿½ï¿½ï¿½O
     mutable std::mutex locationMutex_;
     std::unordered_map<ImageId, ImageLocation> imageLocations_;
 
@@ -1503,7 +1515,7 @@ public:
 
 
 //=============================================================================
-// ImageSource - ‰æ‘œƒ\[ƒX
+// ImageSource - ï¿½æ‘œï¿½\ï¿½[ï¿½X
 //=============================================================================
 struct ImageSource {
     enum class Type { File, Memory, SDL_Surface };
@@ -1526,16 +1538,16 @@ struct ImageSource {
 };
 
 //=============================================================================
-// ImageUsage - ”z’uƒqƒ“ƒg
+// ImageUsage - ï¿½zï¿½uï¿½qï¿½ï¿½ï¿½g
 //=============================================================================
 enum class ImageUsage : uint8_t {
-    Auto,           // ƒTƒCƒY‚©‚ç©“®”»’f
-    Icon,           // ¬‚³‚È³•ûŒ` ¨ Grid
-    Thumbnail,      // ’ÊíƒTƒ€ƒl ¨ ƒTƒCƒY‚Å Grid or Shelf
-    VideoThumb,     // ‰¡’·ƒTƒ€ƒl ¨ Shelf
-    Background,     // ”wŒi‰æ‘œ ¨ Standalone (persistent)
-    UIImage,        // UI‰æ‘œ ¨ Standalone or FontAtlas
-    Dynamic,        // “®“IXV ¨ Standalone
+    Auto,           // ï¿½Tï¿½Cï¿½Yï¿½ï¿½ï¿½ç©ï¿½ï¿½ï¿½ï¿½ï¿½f
+    Icon,           // ï¿½ï¿½ï¿½ï¿½ï¿½Èï¿½ï¿½ï¿½ï¿½` ï¿½ï¿½ Grid
+    Thumbnail,      // ï¿½Êï¿½Tï¿½ï¿½ï¿½l ï¿½ï¿½ ï¿½Tï¿½Cï¿½Yï¿½ï¿½ Grid or Shelf
+    VideoThumb,     // ï¿½ï¿½ï¿½ï¿½ï¿½Tï¿½ï¿½ï¿½l ï¿½ï¿½ Shelf
+    Background,     // ï¿½wï¿½iï¿½æ‘œ ï¿½ï¿½ Standalone (persistent)
+    UIImage,        // UIï¿½æ‘œ ï¿½ï¿½ Standalone or FontAtlas
+    Dynamic,        // ï¿½ï¿½ï¿½Iï¿½Xï¿½V ï¿½ï¿½ Standalone
 };
 
 //=============================================================================
@@ -1553,7 +1565,7 @@ using FileDecoder = std::function<DecodedImage(const std::string& path)>;
 using MemoryDecoder = std::function<DecodedImage(const void* data, size_t size)>;
 
 //=============================================================================
-// PlacementPolicy - ”z’uƒ|ƒŠƒV[
+// PlacementPolicy - ï¿½zï¿½uï¿½|ï¿½ï¿½ï¿½Vï¿½[
 //=============================================================================
 struct PlacementPolicy {
     uint16_t gridMaxSize = 128;
@@ -1566,7 +1578,7 @@ struct PlacementPolicy {
 };
 
 //=============================================================================
-// CachedImage - CPUƒLƒƒƒbƒVƒ…ƒGƒ“ƒgƒŠ
+// CachedImage - CPUï¿½Lï¿½ï¿½ï¿½bï¿½Vï¿½ï¿½ï¿½Gï¿½ï¿½ï¿½gï¿½ï¿½
 //=============================================================================
 struct CachedImage {
     ImageId imageId = 0;
@@ -1583,14 +1595,14 @@ struct CachedImage {
 };
 
 //=============================================================================
-// LoadRequest - ”ñ“¯Šúƒ[ƒhƒŠƒNƒGƒXƒg
+// LoadRequest - ï¿½ñ“¯Šï¿½ï¿½ï¿½ï¿½[ï¿½hï¿½ï¿½ï¿½Nï¿½Gï¿½Xï¿½g
 //=============================================================================
 struct LoadRequest {
-    ImageId imageId;              // © •ÏX: –‘O‚ÉŒˆ’è‚³‚ê‚½ID
+    ImageId imageId;              // ï¿½ï¿½ ï¿½ÏX: ï¿½ï¿½ï¿½Oï¿½ÉŒï¿½ï¿½è‚³ï¿½ê‚½ID
     ImageSource source;
     ImageUsage usage;
     bool persistent;
-    std::function<void(ImageId, bool success)> callback;  // © •ÏX: ImageId ‚ğ•Ô‚·
+    std::function<void(ImageId, bool success)> callback;  // ï¿½ï¿½ ï¿½ÏX: ImageId ï¿½ï¿½Ô‚ï¿½
 };
 
 //=============================================================================
@@ -1606,7 +1618,7 @@ public:
     ~ImageLoader() { shutdown(); }
 
     //=========================================================================
-    // ƒfƒR[ƒ_[İ’è
+    // ï¿½fï¿½Rï¿½[ï¿½_ï¿½[ï¿½İ’ï¿½
     //=========================================================================
     void setFileDecoder(FileDecoder decoder) {
         fileDecoder_ = std::move(decoder);
@@ -1617,7 +1629,7 @@ public:
     }
 
     //=========================================================================
-    // ‰Šú‰»EI—¹
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Eï¿½Iï¿½ï¿½
     //=========================================================================
     bool initialize(int workerThreads = 2) {
         if (running_) return true;
@@ -1646,16 +1658,16 @@ public:
     }
 
     //=========================================================================
-    // “¯Šúƒ[ƒh - ImageId ‚ğ•Ô‚·i•ÏXj
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½[ï¿½h - ImageId ï¿½ï¿½Ô‚ï¿½ï¿½iï¿½ÏXï¿½j
     //=========================================================================
     ImageId loadSync(const ImageSource& source, ImageUsage usage = ImageUsage::Auto,
         bool persistent = false) {
-        // ImageId ‚ğ–‘O‚ÉŒˆ’è
+        // ImageId ï¿½ï¿½ï¿½ï¿½ï¿½Oï¿½ÉŒï¿½ï¿½ï¿½
         ImageId imageId = computeImageId(source);
 
-        // Šù‚ÉƒAƒbƒvƒ[ƒhÏ‚İ‚È‚ç‘¦•Ô‚·
+        // ï¿½ï¿½ï¿½ÉƒAï¿½bï¿½vï¿½ï¿½ï¿½[ï¿½hï¿½Ï‚İ‚È‚ç‘¦ï¿½Ô‚ï¿½
         if (master_.exists(imageId) && !master_.isPending(imageId)) {
-            // touch ‚µ‚Ä•Ô‚·
+            // touch ï¿½ï¿½ï¿½Ä•Ô‚ï¿½
             master_.touch(imageId);
             std::lock_guard lock(cacheMutex_);
             auto it = cache_.find(imageId);
@@ -1665,13 +1677,13 @@ public:
             return imageId;
         }
 
-        // ƒfƒR[ƒh
+        // ï¿½fï¿½Rï¿½[ï¿½h
         auto decoded = decodeImage(source);
         if (!decoded.isValid()) {
             return 0;
         }
 
-        // ƒLƒƒƒbƒVƒ…‚É“o˜^
+        // ï¿½Lï¿½ï¿½ï¿½bï¿½Vï¿½ï¿½ï¿½É“oï¿½^
         {
             std::lock_guard lock(cacheMutex_);
             auto& cached = cache_[imageId];
@@ -1685,7 +1697,7 @@ public:
             cached.refCount = 1;
         }
 
-        // GPU ‚ÉƒAƒbƒvƒ[ƒh
+        // GPU ï¿½ÉƒAï¿½bï¿½vï¿½ï¿½ï¿½[ï¿½h
         if (!uploadToGpu(imageId)) {
             return 0;
         }
@@ -1693,43 +1705,43 @@ public:
         return imageId;
     }
 
-    // ƒtƒ@ƒCƒ‹‚©‚ç - ImageId ‚ğ•Ô‚·i•ÏXj
+    // ï¿½tï¿½@ï¿½Cï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ - ImageId ï¿½ï¿½Ô‚ï¿½ï¿½iï¿½ÏXï¿½j
     ImageId loadFromFile(const std::string& path, ImageUsage usage = ImageUsage::Auto,
         bool persistent = false) {
         return loadSync(ImageSource::fromFile(path), usage, persistent);
     }
 
-    // ƒƒ‚ƒŠ‚©‚ç - ImageId ‚ğ•Ô‚·i•ÏXj
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ - ImageId ï¿½ï¿½Ô‚ï¿½ï¿½iï¿½ÏXï¿½j
     ImageId loadFromMemory(const void* data, size_t size,
         ImageUsage usage = ImageUsage::Auto,
         bool persistent = false) {
         return loadSync(ImageSource::fromMemory(data, size), usage, persistent);
     }
 
-    // SDL_Surface ‚©‚ç - ImageId ‚ğ•Ô‚·i•ÏXj
+    // SDL_Surface ï¿½ï¿½ï¿½ï¿½ - ImageId ï¿½ï¿½Ô‚ï¿½ï¿½iï¿½ÏXï¿½j
     ImageId loadFromSurface(SDL_Surface* surface, ImageUsage usage = ImageUsage::Auto,
         bool persistent = false) {
         return loadSync(ImageSource::fromSurface(surface), usage, persistent);
     }
 
     //=========================================================================
-    // ”ñ“¯Šúƒ[ƒh - ImageId ‚ğ•Ô‚·i•ÏX: Pendingó‘Ô‚Å‘¦À‚É•Ô‚·j
+    // ï¿½ñ“¯Šï¿½ï¿½ï¿½ï¿½[ï¿½h - ImageId ï¿½ï¿½Ô‚ï¿½ï¿½iï¿½ÏX: Pendingï¿½ï¿½Ô‚Å‘ï¿½ï¿½ï¿½ï¿½É•Ô‚ï¿½ï¿½j
     //=========================================================================
     ImageId loadAsync(const ImageSource& source, ImageUsage usage = ImageUsage::Auto,
         bool persistent = false,
         std::function<void(ImageId, bool success)> callback = nullptr) {
-        // ImageId ‚ğ–‘O‚ÉŒˆ’è
+        // ImageId ï¿½ï¿½ï¿½ï¿½ï¿½Oï¿½ÉŒï¿½ï¿½ï¿½
         ImageId imageId = computeImageId(source);
 
-        // Šù‚ÉƒAƒbƒvƒ[ƒhÏ‚İ‚È‚ç‘¦Š®—¹
+        // ï¿½ï¿½ï¿½ÉƒAï¿½bï¿½vï¿½ï¿½ï¿½[ï¿½hï¿½Ï‚İ‚È‚ç‘¦ï¿½ï¿½ï¿½ï¿½
         if (master_.exists(imageId) && !master_.isPending(imageId)) {
             if (callback) callback(imageId, true);
             return imageId;
         }
 
-        // Šù‚É Pending ‚È‚çd•¡ƒ[ƒh‚µ‚È‚¢
+        // ï¿½ï¿½ï¿½ï¿½ Pending ï¿½È‚ï¿½dï¿½ï¿½ï¿½ï¿½ï¿½[ï¿½hï¿½ï¿½ï¿½È‚ï¿½
         if (master_.isPending(imageId)) {
-            // ƒR[ƒ‹ƒoƒbƒN‚¾‚¯“o˜^
+            // ï¿½Rï¿½[ï¿½ï¿½ï¿½oï¿½bï¿½Nï¿½ï¿½ï¿½ï¿½ï¿½oï¿½^
             if (callback) {
                 std::lock_guard lock(pendingCallbacksMutex_);
                 pendingCallbacks_[imageId].push_back(callback);
@@ -1737,7 +1749,7 @@ public:
             return imageId;
         }
 
-        // Pending ‚Æ‚µ‚Ä ImageMaster ‚É“o˜^
+        // Pending ï¿½Æ‚ï¿½ï¿½ï¿½ ImageMaster ï¿½É“oï¿½^
         master_.registerPending(imageId);
 
         LoadRequest req;
@@ -1753,11 +1765,11 @@ public:
         }
         queueCv_.notify_one();
 
-        return imageId;  // Pending ó‘Ô‚Ì ImageId ‚ğ‘¦À‚É•Ô‚·
+        return imageId;  // Pending ï¿½ï¿½Ô‚ï¿½ ImageId ï¿½ğ‘¦ï¿½ï¿½É•Ô‚ï¿½
     }
 
     //=========================================================================
-    // ImageId –‘OŒvZiV‹Kj
+    // ImageId ï¿½ï¿½ï¿½Oï¿½vï¿½Zï¿½iï¿½Vï¿½Kï¿½j
     //=========================================================================
     static ImageId computeImageId(const ImageSource& source) {
         switch (source.type) {
@@ -1772,7 +1784,7 @@ public:
     }
 
     //=========================================================================
-    // ó‘ÔŠm”Fi•ÏX: ImageMaster ‚ÉˆÏ÷j
+    // ï¿½ï¿½ÔŠmï¿½Fï¿½iï¿½ÏX: ImageMaster ï¿½ÉˆÏï¿½ï¿½j
     //=========================================================================
     bool isLoaded(ImageId imageId) const {
         return master_.exists(imageId) && !master_.isPending(imageId);
@@ -1782,21 +1794,21 @@ public:
         return master_.isPending(imageId);
     }
 
-    // ‹ŒAPIŒİŠ·
+    // ï¿½ï¿½APIï¿½İŠï¿½
     bool isUploaded(ImageId imageId) const {
         return isLoaded(imageId);
     }
 
     //=========================================================================
-    // getDrawInfo ‚Ííœ - ImageMaster.resolve() ‚ğg—p
+    // getDrawInfo ï¿½Ííœ - ImageMaster.resolve() ï¿½ï¿½ï¿½gï¿½p
     //=========================================================================
     // 
-    // y‹Œz
+    // ï¿½yï¿½ï¿½ï¿½z
     // bgfx::TextureHandle tex;
     // float u0, v0, u1, v1;
     // if (loader.getDrawInfo(handle, tex, u0, v0, u1, v1)) { ... }
     //
-    // yVz
+    // ï¿½yï¿½Vï¿½z
     // auto resolved = master.resolveForDraw(imageId);
     // if (resolved.isValid()) {
     //     // resolved.texture, resolved.u0, v0, u1, v1
@@ -1804,7 +1816,7 @@ public:
     //
 
     //=========================================================================
-    // QÆƒJƒEƒ“ƒg
+    // ï¿½Qï¿½ÆƒJï¿½Eï¿½ï¿½ï¿½g
     //=========================================================================
     void retain(ImageId imageId) {
         master_.retain(imageId);
@@ -1825,7 +1837,7 @@ public:
     }
 
     //=========================================================================
-    // eviction ’Ê’miImageMaster ‚©‚çŒÄ‚Î‚ê‚éj
+    // eviction ï¿½Ê’mï¿½iImageMaster ï¿½ï¿½ï¿½ï¿½Ä‚Î‚ï¿½ï¿½j
     //=========================================================================
     void onEvicted(ImageId id) {
         std::lock_guard lock(cacheMutex_);
@@ -1836,7 +1848,7 @@ public:
     }
 
     //=========================================================================
-    // ÄƒAƒbƒvƒ[ƒhieviction Œã‚ÉÄ“x•K—v‚É‚È‚Á‚½ê‡j
+    // ï¿½ÄƒAï¿½bï¿½vï¿½ï¿½ï¿½[ï¿½hï¿½ieviction ï¿½ï¿½ÉÄ“xï¿½Kï¿½vï¿½É‚È‚ï¿½ï¿½ï¿½ï¿½ê‡ï¿½j
     //=========================================================================
     bool reupload(ImageId imageId) {
         std::lock_guard lock(cacheMutex_);
@@ -1848,7 +1860,7 @@ public:
     }
 
     //=========================================================================
-    // ƒtƒŒ[ƒ€ˆ—
+    // ï¿½tï¿½ï¿½ï¿½[ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     //=========================================================================
     void beginFrame() {
         ++currentFrame_;
@@ -1856,7 +1868,7 @@ public:
     }
 
     //=========================================================================
-    // CPUƒLƒƒƒbƒVƒ…ŠÇ—
+    // CPUï¿½Lï¿½ï¿½ï¿½bï¿½Vï¿½ï¿½ï¿½Ç—ï¿½
     //=========================================================================
     void collectGarbage() {
         std::lock_guard lock(cacheMutex_);
@@ -1907,7 +1919,7 @@ public:
     }
 
     //=========================================================================
-    // “Œvî•ñ
+    // ï¿½ï¿½ï¿½vï¿½ï¿½ï¿½
     //=========================================================================
     struct Stats {
         size_t cacheEntries;
@@ -1941,7 +1953,7 @@ public:
 
 private:
     //=========================================================================
-    // ”z’uæŒˆ’è
+    // ï¿½zï¿½uï¿½æŒˆï¿½ï¿½
     //=========================================================================
     ImageLocation::Type decidePlacement(uint16_t w, uint16_t h, ImageUsage usage) {
         switch (usage) {
@@ -1986,7 +1998,7 @@ private:
     }
 
     //=========================================================================
-    // ‰æ‘œƒfƒR[ƒh
+    // ï¿½æ‘œï¿½fï¿½Rï¿½[ï¿½h
     //=========================================================================
     DecodedImage decodeImage(const ImageSource& source) {
         DecodedImage decoded;
@@ -2045,7 +2057,30 @@ private:
     void setDefaultDecoders() {
         fileDecoder_ = [](const std::string& path) -> DecodedImage {
             int w, h, channels;
-            unsigned char* pixels = stbi_load(path.c_str(), &w, &h, &channels, 4);
+            unsigned char* pixels = nullptr;
+
+#ifdef __ANDROID__
+            // Android: Use SDL_IOFromFile to read from assets
+            SDL_IOStream* io = SDL_IOFromFile(path.c_str(), "rb");
+            if (!io) return DecodedImage{};
+
+            Sint64 size = SDL_GetIOSize(io);
+            if (size <= 0) {
+                SDL_CloseIO(io);
+                return DecodedImage{};
+            }
+
+            std::vector<uint8_t> fileData(static_cast<size_t>(size));
+            size_t read = SDL_ReadIO(io, fileData.data(), fileData.size());
+            SDL_CloseIO(io);
+
+            if (read != fileData.size()) return DecodedImage{};
+
+            pixels = stbi_load_from_memory(fileData.data(), (int)fileData.size(), &w, &h, &channels, 4);
+#else
+            pixels = stbi_load(path.c_str(), &w, &h, &channels, 4);
+#endif
+
             if (!pixels) return DecodedImage{};
 
             DecodedImage result;
@@ -2072,7 +2107,7 @@ private:
     }
 
     //=========================================================================
-    // GPU ƒAƒbƒvƒ[ƒh - ImageMaster ‚É“o˜^
+    // GPU ï¿½Aï¿½bï¿½vï¿½ï¿½ï¿½[ï¿½h - ImageMaster ï¿½É“oï¿½^
     //=========================================================================
     bool uploadToGpu(ImageId imageId) {
         std::lock_guard lock(cacheMutex_);
@@ -2154,7 +2189,7 @@ private:
     }
 
     //=========================================================================
-    // ƒ[ƒJ[ƒXƒŒƒbƒh
+    // ï¿½ï¿½ï¿½[ï¿½Jï¿½[ï¿½Xï¿½ï¿½ï¿½bï¿½h
     //=========================================================================
     void workerThread() {
         while (running_) {
@@ -2172,12 +2207,12 @@ private:
                 loadQueue_.pop();
             }
 
-            // ƒfƒR[ƒhiƒƒbƒNŠOj
+            // ï¿½fï¿½Rï¿½[ï¿½hï¿½iï¿½ï¿½ï¿½bï¿½Nï¿½Oï¿½j
             auto decoded = decodeImage(req.source);
             bool success = decoded.isValid();
 
             if (success) {
-                // ƒLƒƒƒbƒVƒ…‚É“o˜^
+                // ï¿½Lï¿½ï¿½ï¿½bï¿½Vï¿½ï¿½ï¿½É“oï¿½^
                 {
                     std::lock_guard lock(cacheMutex_);
                     auto& cached = cache_[req.imageId];
@@ -2192,7 +2227,7 @@ private:
                 }
             }
 
-            // Š®—¹ƒLƒ…[‚É’Ç‰Á
+            // ï¿½ï¿½ï¿½ï¿½ï¿½Lï¿½ï¿½ï¿½[ï¿½É’Ç‰ï¿½
             {
                 std::lock_guard lock(completedMutex_);
                 completedLoads_.push_back({ req.imageId, req.callback, success });
@@ -2201,7 +2236,7 @@ private:
     }
 
     //=========================================================================
-    // Š®—¹ˆ—iƒƒCƒ“ƒXƒŒƒbƒh‚ÅŒÄ‚Î‚ê‚éj
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½iï¿½ï¿½ï¿½Cï¿½ï¿½ï¿½Xï¿½ï¿½ï¿½bï¿½hï¿½ÅŒÄ‚Î‚ï¿½ï¿½j
     //=========================================================================
     void processCompletedLoads() {
         std::vector<CompletedLoad> completed;
@@ -2212,16 +2247,16 @@ private:
 
         for (auto& c : completed) {
             if (c.success && c.imageId != 0) {
-                // GPUƒAƒbƒvƒ[ƒh
+                // GPUï¿½Aï¿½bï¿½vï¿½ï¿½ï¿½[ï¿½h
                 uploadToGpu(c.imageId);
             }
 
-            // ƒƒCƒ“ƒR[ƒ‹ƒoƒbƒN
+            // ï¿½ï¿½ï¿½Cï¿½ï¿½ï¿½Rï¿½[ï¿½ï¿½ï¿½oï¿½bï¿½N
             if (c.callback) {
                 c.callback(c.imageId, c.success);
             }
 
-            // ’Ç‰ÁƒR[ƒ‹ƒoƒbƒNid•¡ƒ[ƒh‰ñ”ğ‚É“o˜^‚³‚ê‚½‚à‚Ìj
+            // ï¿½Ç‰ï¿½ï¿½Rï¿½[ï¿½ï¿½ï¿½oï¿½bï¿½Nï¿½iï¿½dï¿½ï¿½ï¿½ï¿½ï¿½[ï¿½hï¿½ï¿½ï¿½ï¿½ï¿½ï¿½É“oï¿½^ï¿½ï¿½ï¿½ê‚½ï¿½ï¿½ï¿½Ìj
             {
                 std::lock_guard lock(pendingCallbacksMutex_);
                 auto it = pendingCallbacks_.find(c.imageId);
@@ -2242,7 +2277,7 @@ private:
     };
 
     //=========================================================================
-    // ƒƒ“ƒo
+    // ï¿½ï¿½ï¿½ï¿½ï¿½o
     //=========================================================================
     ImageMaster& master_;
     PlacementPolicy policy_;
@@ -2264,7 +2299,7 @@ private:
     std::mutex completedMutex_;
     std::vector<CompletedLoad> completedLoads_;
 
-    // d•¡ƒ[ƒh‰ñ”ğ—pƒR[ƒ‹ƒoƒbƒN
+    // ï¿½dï¿½ï¿½ï¿½ï¿½ï¿½[ï¿½hï¿½ï¿½ï¿½pï¿½Rï¿½[ï¿½ï¿½ï¿½oï¿½bï¿½N
     std::mutex pendingCallbacksMutex_;
     std::unordered_map<ImageId, std::vector<std::function<void(ImageId, bool)>>> pendingCallbacks_;
 };

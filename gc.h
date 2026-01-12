@@ -1,5 +1,10 @@
 ﻿
-#include <coro/coro.hpp> 
+#ifdef __ANDROID__
+#include <coroutine>
+namespace coro = std;
+#else
+#include <coro/coro.hpp>
+#endif
 
 #include <atomic>
 #include <condition_variable>

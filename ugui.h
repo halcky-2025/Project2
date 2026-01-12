@@ -473,7 +473,15 @@ bool initBgfx(SDL_Window* window) {
     SDL_PropertiesID props = SDL_GetWindowProperties(window);
     memset(&pd, 0, sizeof(pd));
 
-#if defined(_WIN32)
+    int width = 800, height = 600;
+
+#if defined(__ANDROID__)
+    void* nwh = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_ANDROID_WINDOW_POINTER, nullptr);
+    pd.nwh = nwh;
+    SDL_GetWindowSize(window, &width, &height);
+    SDL_Log("initBgfx: Android nwh=%p, size=%dx%d", nwh, width, height);
+
+#elif defined(_WIN32)
     void* hwnd = SDL_GetPointerProperty(props, "SDL.window.win32.hwnd", nullptr);
     pd.nwh = hwnd;
 
@@ -501,16 +509,19 @@ bool initBgfx(SDL_Window* window) {
 
     bgfx::Init init;
     init.platformData = pd;
-    init.resolution.width = 800;
-    init.resolution.height = 600;
+#ifdef __ANDROID__
+    init.type = bgfx::RendererType::Vulkan;
+#endif
+    init.resolution.width = width;
+    init.resolution.height = height;
     init.resolution.reset = BGFX_RESET_VSYNC;
     init.debug = true;  // デバッグ情報を有効
 
     if (!bgfx::init(init)) {
-        printf("bgfx::init failed\n");
+        SDL_Log("bgfx::init failed");
         return false;
     }
-    printf("bgfx initialized successfully\n");
+    SDL_Log("bgfx initialized successfully");
 
     return true;
 }
@@ -585,6 +596,7 @@ public:
         time += deltaTime;
         TreeElement* te = (TreeElement*)get_mapy(target->map, createString(target, (char*)"main", 4, 1));
         local = (NewLocal*)te->elem;
+		local->dirty = DirtyType::RebuildValue;
         if ((local->dirty & DirtyType::Partial) > 0) {
             q->begin(frameId, 1024);
             auto& layer = q->setCurrentSlotLayer({}, 1.0f, true, true, 800, 600);
@@ -630,7 +642,7 @@ public:
             q->publish();
             render++;
             cv_.notify_one();
-            invalidate = 0;
+            invalidate = 1;
         }
     }
 
@@ -676,20 +688,128 @@ public:
             thread_.join();
         }
     }
+    enum class LayoutMode {
+        Stack,   // PiP形式
+        Grid,    // グリッド
+        Single   // 単一表示
+    };
+	nle::Timeline timeline_;
+    std::unique_ptr<nle::TimelineRenderer<ImageMaster>> renderer_;
+    size_t selected_track_ = 0;
+    int width_ = 1280, height_ = 720;
+    LayoutMode layout_mode_ = LayoutMode::Stack;
+    private:void calculate_layout_pixels(size_t index, size_t total,
+        std::shared_ptr<nle::VideoClip> clip,
+        float& x, float& y, float& w, float& h) {
+        float video_aspect = (float)clip->get_width() / clip->get_height();
 
-private:
+        switch (layout_mode_) {
+        case LayoutMode::Stack:
+            if (index == 0) {
+                // フルスクリーン（アスペクト比維持）
+                float screen_aspect = (float)width_ / height_;
+                if (video_aspect > screen_aspect) {
+                    w = (float)width_;
+                    h = w / video_aspect;
+                    x = 0;
+                    y = (height_ - h) * 0.5f;
+                }
+                else {
+                    h = (float)height_;
+                    w = h * video_aspect;
+                    x = (width_ - w) * 0.5f;
+                    y = 0;
+                }
+            }
+            else {
+                // PiP: 右上に並べる
+                float pip_scale = 0.25f;
+                w = width_ * pip_scale;
+                h = w / video_aspect;
+                float margin = 10.0f;
+                x = width_ - w - margin;
+                y = margin + (h + margin) * (index - 1);
+            }
+            break;
+
+        case LayoutMode::Grid: {
+            int cols = (int)std::ceil(std::sqrt((double)total));
+            int rows = (int)std::ceil((double)total / cols);
+            int col = index % cols;
+            int row = index / cols;
+
+            float cell_w = (float)width_ / cols;
+            float cell_h = (float)height_ / rows;
+            float cell_aspect = cell_w / cell_h;
+
+            if (video_aspect > cell_aspect) {
+                w = cell_w;
+                h = w / video_aspect;
+            }
+            else {
+                h = cell_h;
+                w = h * video_aspect;
+            }
+
+            x = col * cell_w + (cell_w - w) * 0.5f;
+            y = row * cell_h + (cell_h - h) * 0.5f;
+            break;
+        }
+
+        case LayoutMode::Single:
+        default:
+            if (index == selected_track_) {
+                float screen_aspect = (float)width_ / height_;
+                if (video_aspect > screen_aspect) {
+                    w = (float)width_;
+                    h = w / video_aspect;
+                    x = 0;
+                    y = (height_ - h) * 0.5f;
+                }
+                else {
+                    h = (float)height_;
+                    w = h * video_aspect;
+                    x = (width_ - w) * 0.5f;
+                    y = 0;
+                }
+            }
+            else {
+                x = y = w = h = 0;  // 非表示
+            }
+            break;
+        }
+    }
     void run() {
         initBgfx(window_);
         //bgfx::setDebug(BGFX_DEBUG_TEXT | BGFX_DEBUG_IFH);
         hoppy_->master.initialize();
         hoppy_->initFonts();
-        if (!engine.initialize()) {
-            std::cerr << "Failed to initialize audio engine" << std::endl;
+        initDone.set_value();
+        auto video_track = timeline_.add_video_track();
+        auto video_clip = video_track->add_clip();
+
+        if (!video_clip->open("pyonpyon.mp4")) {
             return;
         }
-        initDone.set_value();
-        auto id = engine.load("banban.mp3");
-        engine.play(id);
+
+        video_clip->timeline_range.start = 0;
+        video_clip->timeline_range.end = video_clip->source_range.duration();
+
+        // オーディオトラック（同じファイルから音声を抽出）
+        auto audio_track = timeline_.add_audio_track();
+        auto audio_clip = audio_track->add_clip();
+
+        if (audio_clip->open("pyonpyon.mp4")) {
+            audio_clip->timeline_range.start = 0;
+            audio_clip->timeline_range.end = audio_clip->source_range.duration();
+        }
+        auto audio_output_ = std::make_unique<nle::AudioOutput>(timeline_);
+        if (!audio_output_->initialize()) {
+        }
+        renderer_ = std::make_unique <nle::TimelineRenderer<ImageMaster >>(timeline_, hoppy_->master);
+        timeline_.play();
+        /*auto id = engine.load("banban.mp3");
+        engine.play(id);*/
         /*std::wstring wpath = L"おどれ！！マグロっ子.mp3";
         std::string utf8 = utf16_to_utf8(wpath);
 		auto id2 = engine.load(utf8.c_str());
@@ -747,12 +867,71 @@ private:
                 rendered = true;
                 // layers構築処理
                 auto end = std::chrono::high_resolution_clock::now();
+                renderer_->update();
+                auto render_items = renderer_->get_render_items();
+
+                // レイヤー順に描画（下から上へ）
+                for (size_t i = 0; i < render_items.size(); i++) {
+                    std::vector<UnifiedDrawCommand> commands;
+                    std::vector<bgfx::TextureHandle> textures;  // テクスチャハンドルを保持
+
+                    commands.reserve(render_items.size());
+                    textures.reserve(render_items.size());
+
+                    float base_z = 0.0f;
+                    for (size_t i = 0; i < render_items.size(); i++) {
+                        const auto& item = render_items[i];
+                        auto resolved = hoppy_->master.resolve(item.image_id);
+
+                        if (!resolved.isReady()) continue;
+
+                        // レイアウト計算（ピクセル座標）
+                        float px, py, pw, ph;
+                        calculate_layout_pixels(i, render_items.size(), item.clip, px, py, pw, ph);
+
+                        // テクスチャを保存
+                        textures.push_back(resolved.resolved.texture);
+
+                        UnifiedDrawCommand cmd{};
+                        cmd.type = DrawCommandType::Image;
+                        cmd.viewId = 0;
+                        cmd.zIndex = base_z + i * 0.001f;
+                        cmd.texture = &textures.back();
+                        cmd.texture2 = &nulltex;
+
+                        // 位置とサイズ（ピクセル座標）
+                        cmd.x = px;
+                        cmd.y = py;
+                        cmd.width = pw;
+                        cmd.height = ph;
+
+                        // Image モード: UV座標
+                        cmd.angle = 0.0f;      // uvMin.x
+                        cmd.dataOffset = 0.0f; // uvMin.y
+                        cmd.scrollX = 1.0f;    // uvMax.x
+                        cmd.scrollY = 1.0f;    // uvMax.y
+
+                        // 角丸、シャドウなし
+                        cmd.radius = 0.0f;
+                        cmd.aa = 1.0f;
+                        cmd.shadowX = 0.0f;
+                        cmd.shadowY = 0.0f;
+                        cmd.shadowBlur = 0.0f;
+                        cmd.borderWidth = 0.0f;
+
+                        cmd.shadowColor = 0x00000000;
+                        cmd.fillColor = 0xFFFFFFFF;
+                        cmd.borderColor = 0x00000000;
+                        std::vector<UnifiedDrawCommand*> single_batch = { &cmd };
+                        drawUnifiedBatch(single_batch, resources,
+                            BGFX_INVALID_HANDLE, BGFX_INVALID_HANDLE, 30);
+                    }
+                }
                 frameN = bgfx::frame();
             }
         }
     }
     HopStar* hoppy_;
-    audio::AudioEngine engine;
     SDL_Window* window_;
     std::thread thread_;
     std::atomic<bool> running_;

@@ -671,6 +671,34 @@ void renderAllLayers(NewLocal* local, std::vector<LayerInfo>& layers,
 // ============================================================
 // シェーダーバイナリ読み込み
 bgfx::ShaderHandle loadShader(const char* filename) {
+#ifdef __ANDROID__
+    // Android: use SDL_IOFromFile to read from assets
+    SDL_IOStream* io = SDL_IOFromFile(filename, "rb");
+    if (!io) {
+        SDL_Log("loadShader: Failed to open shader file: %s", filename);
+        return BGFX_INVALID_HANDLE;
+    }
+
+    Sint64 size = SDL_GetIOSize(io);
+    if (size <= 0) {
+        SDL_Log("loadShader: Invalid file size for: %s", filename);
+        SDL_CloseIO(io);
+        return BGFX_INVALID_HANDLE;
+    }
+
+    std::vector<char> buffer(size);
+    size_t read = SDL_ReadIO(io, buffer.data(), size);
+    SDL_CloseIO(io);
+
+    if (read != (size_t)size) {
+        SDL_Log("loadShader: Failed to read shader file: %s", filename);
+        return BGFX_INVALID_HANDLE;
+    }
+
+    SDL_Log("loadShader: Loaded %s (%lld bytes)", filename, (long long)size);
+    const bgfx::Memory* mem = bgfx::copy(buffer.data(), static_cast<uint32_t>(size));
+    return bgfx::createShader(mem);
+#else
     std::ifstream file(filename, std::ios::binary | std::ios::ate);
     if (!file.is_open()) {
         return BGFX_INVALID_HANDLE;
@@ -686,7 +714,9 @@ bgfx::ShaderHandle loadShader(const char* filename) {
 
     const bgfx::Memory* mem = bgfx::copy(buffer.data(), static_cast<uint32_t>(size));
     return bgfx::createShader(mem);
+#endif
 }
+
 void initRenderResources(RenderResources& resources) {
     createUnitQuad(resources.quadVB, resources.quadIB);
     resources.paletteUniform = bgfx::createUniform("s_palette", bgfx::UniformType::Sampler);
@@ -695,9 +725,6 @@ void initRenderResources(RenderResources& resources) {
     bgfx::ShaderHandle vsu = loadShader("vs_unite2.bin");
     bgfx::ShaderHandle fsu = loadShader("fs_unite2.bin");
     resources.uniteProgram = bgfx::createProgram(vsu, fsu, true);
-    bgfx::ShaderHandle vsp = loadShader("vs_page.bin");
-    bgfx::ShaderHandle fsp = loadShader("fs_page.bin");
-    resources.pageProgram = bgfx::createProgram(vsp, fsp, true);
     // シェーダープログラムの登録は外部で行う
     // resources.programs[DrawCommandType::Rectangle] = loadProgram(...);
 }

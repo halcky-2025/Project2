@@ -590,7 +590,7 @@ void NewDrawCall(ThreadGC* thgc, NewElement* elem, NewGraphic* g, NewLocal* loca
 		drawRightPagingBar(g->layer, *getAtlas(thgc), getFont("sans", 16), sizex + 10.0f, elem->pos2.y, 5.0f, 100.0f, 3.0, 16.0, 0.0f, g->group, g->fb, g->fbsize, g->viewId);
 		drawUnderScrollBar(g->layer, elem->pos2.x, sizey + 100.0f, sizex, 5.0f, 100.0f, 50.0f, 300.0f, 0.0f, g->fb, g->fbsize, g->viewId);
 		drawRightScrollBar(g->layer, sizex, elem->pos2.y, 5.0f, 100.0f, 100.0f, 50.0f, 300.0f, 0.0f, g->fb, g->fbsize, g->viewId);
-		pro += 0.34f;
+		pro += 0.004f;
 		pro = fmod(pro, 1.0f);
 		auto info2 = mygetStandaloneTextureInfo(thgc, elem->background->tex1);
 		g->layer->pushPageCurl(elem->pos2.x + 10, elem->pos2.y + 150.f, sizex, sizey,
