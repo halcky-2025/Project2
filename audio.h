@@ -1,786 +1,1100 @@
-// audio_engine.hpp
-// �w�b�_�[�I�����[���� v2
-// Generator���ۉ� + ���b�N�t���[�R�[���o�b�N
+﻿// nle_timeline.hpp
+// Non-Linear Editing Timeline System
+// 
+// 設計:
+//   Timeline (時間の支配者)
+//   ├─ MasterClock
+//   ├─ VideoTrack[] → VideoClip[]
+//   ├─ AudioTrack[] → AudioClip[]
+//   └─ OverlayTrack[] → OverlayClip[]
+//
+// 各Clipは独立したデコーダーとテクスチャを持つ
 
 #pragma once
 
-#include <cstdint>
-#include <cstring>
-#include <cmath>
-#include <atomic>
-#include <thread>
-#include <mutex>
 #include <vector>
 #include <memory>
 #include <string>
-#include <array>
+#include <cstring>
+#include <functional>
 #include <algorithm>
-#include <iostream>
-#include <numbers>
+#include <cstdint>
+#include <chrono>
+#include <mutex>
+#include <atomic>
 
+#ifdef __ANDROID__
+#include <SDL3/SDL.h>
+#endif
+
+// FFmpeg
 extern "C" {
-#include <portaudio.h>
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <libavutil/imgutils.h>
+#include <libswscale/swscale.h>
 #include <libswresample/swresample.h>
 }
-inline std::string utf16_to_utf8(const std::wstring& w) {
-    if (w.empty()) return {};
-    int len = WideCharToMultiByte(CP_UTF8, 0,
-        w.data(), (int)w.size(),
-        nullptr, 0, nullptr, nullptr);
 
-    std::string s(len, '\0');
-    WideCharToMultiByte(CP_UTF8, 0,
-        w.data(), (int)w.size(),
-        s.data(), len, nullptr, nullptr);
-
-    return s;
-}
-namespace audio {
+namespace nle {
 
     // =============================================================================
-    // �萔
+    // 時間単位
     // =============================================================================
-    constexpr int MASTER_SAMPLE_RATE = 48000;
-    constexpr int MASTER_CHANNELS = 2;
-    constexpr int FRAMES_PER_BUFFER = 512;
-    constexpr size_t RING_BUFFER_FRAMES = 48000;
-    constexpr size_t MAX_ACTIVE_SOURCES = 64;
+    using TimeUs = int64_t;
+    constexpr TimeUs SECOND_US = 1'000'000;
 
-    using SoundId = uint32_t;
+    inline double to_seconds(TimeUs us) { return static_cast<double>(us) / SECOND_US; }
+    inline TimeUs from_seconds(double s) { return static_cast<TimeUs>(s * SECOND_US); }
 
     // =============================================================================
-    // ���b�N�t���[�����O�o�b�t�@�iSPSC�j
+    // 時間範囲
     // =============================================================================
-    template<typename T>
-    class RingBuffer {
+    struct TimeRange {
+        TimeUs start = 0;
+        TimeUs end = 0;
+
+        TimeUs duration() const { return end - start; }
+        bool contains(TimeUs t) const { return t >= start && t < end; }
+        bool overlaps(const TimeRange& other) const {
+            return start < other.end && end > other.start;
+        }
+    };
+
+#ifdef __ANDROID__
+    // =============================================================================
+    // Android Asset Helper - assets から内部ストレージに展開
+    // =============================================================================
+    inline std::string extractAssetToInternal(const std::string& assetPath) {
+        SDL_IOStream* io = SDL_IOFromFile(assetPath.c_str(), "rb");
+        if (!io) return "";
+
+        Sint64 size = SDL_GetIOSize(io);
+        if (size <= 0) {
+            SDL_CloseIO(io);
+            return "";
+        }
+
+        std::vector<uint8_t> data(static_cast<size_t>(size));
+        size_t read = SDL_ReadIO(io, data.data(), data.size());
+        SDL_CloseIO(io);
+
+        if (read != data.size()) return "";
+
+        const char* prefPath = SDL_GetPrefPath("org.libsdl.app", "cache");
+        if (!prefPath) return "";
+
+        std::string filename = assetPath;
+        size_t lastSlash = filename.find_last_of("/\\");
+        if (lastSlash != std::string::npos) {
+            filename = filename.substr(lastSlash + 1);
+        }
+        std::string outputPath = std::string(prefPath) + filename;
+
+        SDL_IOStream* outIo = SDL_IOFromFile(outputPath.c_str(), "wb");
+        if (!outIo) return "";
+
+        size_t written = SDL_WriteIO(outIo, data.data(), data.size());
+        SDL_CloseIO(outIo);
+
+        if (written != data.size()) return "";
+
+        return outputPath;
+    }
+#endif
+
+    // =============================================================================
+    // MasterClock - タイムライン全体の時間管理
+    // =============================================================================
+    class MasterClock {
     public:
-        explicit RingBuffer(size_t capacity)
-            : buffer_(capacity), capacity_(capacity), write_pos_(0), read_pos_(0) {
-        }
-
-        size_t write(const T* data, size_t count) {
-            const size_t write = write_pos_.load(std::memory_order_relaxed);
-            const size_t read = read_pos_.load(std::memory_order_acquire);
-            const size_t available = capacity_ - (write - read);
-            const size_t to_write = std::min(count, available);
-
-            for (size_t i = 0; i < to_write; ++i) {
-                buffer_[(write + i) % capacity_] = data[i];
+        void start() {
+            if (!running_) {
+                start_time_ = std::chrono::steady_clock::now();
+                start_position_ = position_;
+                running_ = true;
             }
-            write_pos_.store(write + to_write, std::memory_order_release);
-            return to_write;
         }
 
-        size_t read(T* data, size_t count) {
-            const size_t read = read_pos_.load(std::memory_order_relaxed);
-            const size_t write = write_pos_.load(std::memory_order_acquire);
-            const size_t available = write - read;
-            const size_t to_read = std::min(count, available);
-
-            for (size_t i = 0; i < to_read; ++i) {
-                data[i] = buffer_[(read + i) % capacity_];
+        void pause() {
+            if (running_) {
+                position_ = now();
+                running_ = false;
             }
-            read_pos_.store(read + to_read, std::memory_order_release);
-            return to_read;
         }
 
-        size_t available_write() const {
-            const size_t write = write_pos_.load(std::memory_order_relaxed);
-            const size_t read = read_pos_.load(std::memory_order_acquire);
-            return capacity_ - (write - read);
+        void stop() {
+            pause();
+            position_ = 0;
         }
 
-        void clear() {
-            read_pos_.store(write_pos_.load(std::memory_order_relaxed), std::memory_order_release);
+        void seek(TimeUs time) {
+            position_ = time;
+            if (running_) {
+                start_time_ = std::chrono::steady_clock::now();
+                start_position_ = position_;
+            }
         }
+
+        TimeUs now() const {
+            if (!running_) return position_;
+
+            auto elapsed = std::chrono::steady_clock::now() - start_time_;
+            auto elapsed_us = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
+            return start_position_ + static_cast<TimeUs>(elapsed_us * speed_);
+        }
+
+        bool is_running() const { return running_; }
+
+        void set_speed(double speed) { speed_ = speed; }
+        double get_speed() const { return speed_; }
 
     private:
-        std::vector<T> buffer_;
-        size_t capacity_;
-        std::atomic<size_t> write_pos_;
-        std::atomic<size_t> read_pos_;
+        std::chrono::steady_clock::time_point start_time_;
+        TimeUs start_position_ = 0;
+        TimeUs position_ = 0;
+        double speed_ = 1.0;
+        bool running_ = false;
     };
 
     // =============================================================================
-    // Generator �C���^�[�t�F�[�X�i�������ہj
+    // VideoDecoder - 動画デコーダー（単一ファイル用）
     // =============================================================================
-    struct GeneratorState {
-        bool finished = false;
-        int64_t position = 0;
-        int64_t duration = 0;
-    };
-
-    class IAudioGenerator {
+    class VideoDecoder {
     public:
-        virtual ~IAudioGenerator() = default;
+        ~VideoDecoder() { close(); }
 
-        // PCM�𐶐��i�R�[���o�b�N����Ă΂��j
-        virtual size_t generate(float* out, size_t frames) = 0;
+        bool open(const std::string& path) {
+            close();
 
-        // ��Ԏ擾
-        virtual GeneratorState state() const = 0;
+#ifdef __ANDROID__
+            // Android: assets から内部ストレージに展開
+            std::string realPath = extractAssetToInternal(path);
+            if (realPath.empty()) return false;
 
-        // �V�[�N
-        virtual void seek(int64_t position_samples) { (void)position_samples; }
+            int ret = avformat_open_input(&format_ctx_, realPath.c_str(), nullptr, nullptr);
+            if (ret < 0) return false;
+#else
+            int ret = avformat_open_input(&format_ctx_, path.c_str(), nullptr, nullptr);
+            if (ret < 0) return false;
+#endif
 
-        // ���Z�b�g
-        virtual void reset() { seek(0); }
-    };
-
-    // =============================================================================
-    // FileGenerator - �t�@�C�������iFFmpeg�j
-    // =============================================================================
-    class FileGenerator : public IAudioGenerator {
-    public:
-        explicit FileGenerator(const std::string& path) : path_(path) {
-            ring_buffer_ = std::make_unique<RingBuffer<float>>(RING_BUFFER_FRAMES * MASTER_CHANNELS);
-            if (open_file()) {
-                start_decode_thread();
-            }
-        }
-
-        ~FileGenerator() {
-            stop_decode_thread();
-            close_file();
-        }
-
-        size_t generate(float* out, size_t frames) override {
-            size_t samples = frames * MASTER_CHANNELS;
-            size_t read = ring_buffer_->read(out, samples);
-
-            if (read == 0 && finished_.load(std::memory_order_relaxed)) {
-                return 0;
-            }
-
-            if (read < samples) {
-                std::memset(out + read, 0, (samples - read) * sizeof(float));
-            }
-
-            position_.fetch_add(read / MASTER_CHANNELS, std::memory_order_relaxed);
-            return read / MASTER_CHANNELS;
-        }
-
-        GeneratorState state() const override {
-            return {
-                .finished = finished_.load(std::memory_order_relaxed),
-                .position = position_.load(std::memory_order_relaxed),
-                .duration = duration_
-            };
-        }
-
-        void seek(int64_t position_samples) override {
-            if (!format_ctx_) return;
-
-            seeking_.store(true, std::memory_order_release);
-            ring_buffer_->clear();
-
-            int64_t timestamp = av_rescale_q(position_samples,
-                { 1, MASTER_SAMPLE_RATE },
-                format_ctx_->streams[audio_stream_index_]->time_base);
-            av_seek_frame(format_ctx_, audio_stream_index_, timestamp, AVSEEK_FLAG_BACKWARD);
-            avcodec_flush_buffers(codec_ctx_);
-
-            position_.store(position_samples, std::memory_order_relaxed);
-            finished_.store(false, std::memory_order_relaxed);
-            seeking_.store(false, std::memory_order_release);
-        }
-
-        void reset() override { seek(0); }
-        void set_looping(bool loop) { looping_.store(loop, std::memory_order_relaxed); }
-        bool is_valid() const { return format_ctx_ != nullptr; }
-
-    private:
-        bool open_file() {
-            if (avformat_open_input(&format_ctx_, path_.c_str(), nullptr, nullptr) < 0) {
-                return false;
-            }
             if (avformat_find_stream_info(format_ctx_, nullptr) < 0) {
-                avformat_close_input(&format_ctx_);
+                close();
                 return false;
             }
 
-            audio_stream_index_ = -1;
-            for (unsigned i = 0; i < format_ctx_->nb_streams; ++i) {
+            // ビデオストリーム検索
+            for (unsigned i = 0; i < format_ctx_->nb_streams; i++) {
+                if (format_ctx_->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+                    video_stream_index_ = i;
+                    break;
+                }
+            }
+
+            if (video_stream_index_ < 0) {
+                close();
+                return false;
+            }
+
+            AVStream* stream = format_ctx_->streams[video_stream_index_];
+            const AVCodec* codec = avcodec_find_decoder(stream->codecpar->codec_id);
+            if (!codec) {
+                close();
+                return false;
+            }
+
+            codec_ctx_ = avcodec_alloc_context3(codec);
+            avcodec_parameters_to_context(codec_ctx_, stream->codecpar);
+
+            ret = avcodec_open2(codec_ctx_, codec, nullptr);
+            if (ret < 0) {
+                close();
+                return false;
+            }
+
+            // スケーラー（RGBA出力）
+            sws_ctx_ = sws_getContext(
+                codec_ctx_->width, codec_ctx_->height, codec_ctx_->pix_fmt,
+                codec_ctx_->width, codec_ctx_->height, AV_PIX_FMT_RGBA,
+                SWS_BILINEAR, nullptr, nullptr, nullptr);
+
+            if (!sws_ctx_) {
+                close();
+                return false;
+            }
+
+            width_ = codec_ctx_->width;
+            height_ = codec_ctx_->height;
+            time_base_ = stream->time_base;
+
+            // フレームレート
+            if (stream->avg_frame_rate.num > 0) {
+                frame_rate_ = av_q2d(stream->avg_frame_rate);
+            }
+            else {
+                frame_rate_ = 30.0;
+            }
+            frame_duration_us_ = static_cast<TimeUs>(SECOND_US / frame_rate_);
+
+            // 総時間
+            if (format_ctx_->duration != AV_NOPTS_VALUE) {
+                duration_us_ = av_rescale_q(format_ctx_->duration, AV_TIME_BASE_Q, { 1, 1000000 });
+            }
+
+            frame_ = av_frame_alloc();
+            packet_ = av_packet_alloc();
+            frame_buffer_.resize(width_ * height_ * 4);
+
+            is_open_ = true;
+            return true;
+        }
+
+        void close() {
+            is_open_ = false;
+            if (sws_ctx_) { sws_freeContext(sws_ctx_); sws_ctx_ = nullptr; }
+            if (frame_) { av_frame_free(&frame_); }
+            if (packet_) { av_packet_free(&packet_); }
+            if (codec_ctx_) { avcodec_free_context(&codec_ctx_); }
+            if (format_ctx_) { avformat_close_input(&format_ctx_); }
+            frame_buffer_.clear();
+        }
+
+        bool seek(TimeUs time_us) {
+            if (!is_open_) return false;
+
+            int64_t ts = av_rescale_q(time_us, { 1, 1000000 }, time_base_);
+            if (av_seek_frame(format_ctx_, video_stream_index_, ts, AVSEEK_FLAG_BACKWARD) < 0) {
+                return false;
+            }
+            avcodec_flush_buffers(codec_ctx_);
+            current_pts_ = time_us;
+            eof_ = false;
+            return true;
+        }
+
+        // 指定時刻のフレームをデコード
+        bool decode_frame_at(TimeUs target_time) {
+            if (!is_open_ || eof_) return false;
+
+            // 既に目標時刻のフレームを持っている場合
+            if (has_frame_ && current_pts_ <= target_time &&
+                current_pts_ + frame_duration_us_ > target_time) {
+                return true;
+            }
+
+            // 目標より前にいる場合、またはシーク必要な場合
+            if (current_pts_ > target_time + frame_duration_us_ * 10 ||
+                current_pts_ + frame_duration_us_ * 30 < target_time) {
+                seek(target_time - frame_duration_us_ * 2);
+            }
+
+            // 目標時刻までデコード
+            while (!eof_) {
+                if (!decode_next_frame()) {
+                    if (eof_) return has_frame_;
+                    continue;
+                }
+
+                if (current_pts_ + frame_duration_us_ > target_time) {
+                    return true;
+                }
+            }
+
+            return has_frame_;
+        }
+
+        bool decode_next_frame() {
+            if (!is_open_) return false;
+
+            while (av_read_frame(format_ctx_, packet_) >= 0) {
+                if (packet_->stream_index != video_stream_index_) {
+                    av_packet_unref(packet_);
+                    continue;
+                }
+
+                int ret = avcodec_send_packet(codec_ctx_, packet_);
+                av_packet_unref(packet_);
+
+                if (ret < 0) continue;
+
+                ret = avcodec_receive_frame(codec_ctx_, frame_);
+                if (ret == AVERROR(EAGAIN)) continue;
+                if (ret < 0) continue;
+
+                // PTS計算
+                int64_t pts = frame_->best_effort_timestamp;
+                if (pts != AV_NOPTS_VALUE) {
+                    current_pts_ = av_rescale_q(pts, time_base_, { 1, 1000000 });
+                }
+                else {
+                    current_pts_ += frame_duration_us_;
+                }
+
+                // RGBA変換
+                uint8_t* dst_data[1] = { frame_buffer_.data() };
+                int dst_linesize[1] = { width_ * 4 };
+                sws_scale(sws_ctx_, frame_->data, frame_->linesize, 0, height_,
+                    dst_data, dst_linesize);
+
+                av_frame_unref(frame_);
+                has_frame_ = true;
+                return true;
+            }
+
+            eof_ = true;
+            return false;
+        }
+
+        const uint8_t* get_frame_data() const { return frame_buffer_.data(); }
+        int get_width() const { return width_; }
+        int get_height() const { return height_; }
+        TimeUs get_pts() const { return current_pts_; }
+        TimeUs get_duration() const { return duration_us_; }
+        TimeUs get_frame_duration() const { return frame_duration_us_; }
+        double get_frame_rate() const { return frame_rate_; }
+        bool is_open() const { return is_open_; }
+        bool is_eof() const { return eof_; }
+        bool has_valid_frame() const { return has_frame_; }
+
+    private:
+        AVFormatContext* format_ctx_ = nullptr;
+        AVCodecContext* codec_ctx_ = nullptr;
+        SwsContext* sws_ctx_ = nullptr;
+        AVFrame* frame_ = nullptr;
+        AVPacket* packet_ = nullptr;
+
+        int video_stream_index_ = -1;
+        AVRational time_base_{ 1, 1000000 };
+
+        int width_ = 0;
+        int height_ = 0;
+        double frame_rate_ = 30.0;
+        TimeUs frame_duration_us_ = 33333;
+        TimeUs duration_us_ = 0;
+
+        std::vector<uint8_t> frame_buffer_;
+        TimeUs current_pts_ = 0;
+
+        bool is_open_ = false;
+        bool eof_ = false;
+        bool has_frame_ = false;
+    };
+
+    // =============================================================================
+    // ClipBase - 全クリップの基底
+    // =============================================================================
+    struct ClipBase {
+        TimeRange timeline_range;  // タイムライン上の配置
+        TimeRange source_range;    // ソース内の使用範囲
+
+        // タイムライン時刻からソース時刻へ変換
+        TimeUs timeline_to_source(TimeUs timeline_time) const {
+            TimeUs offset = timeline_time - timeline_range.start;
+            return source_range.start + offset;
+        }
+
+        // このクリップがタイムライン時刻でアクティブか
+        bool is_active_at(TimeUs timeline_time) const {
+            return timeline_range.contains(timeline_time);
+        }
+    };
+
+    // =============================================================================
+    // VideoClip - 動画クリップ
+    // =============================================================================
+    class VideoClip : public ClipBase {
+    public:
+        bool open(const std::string& path) {
+            path_ = path;
+            if (!decoder_.open(path)) {
+                return false;
+            }
+
+            // デフォルトではソース全体を使用
+            source_range.start = 0;
+            source_range.end = decoder_.get_duration();
+
+            return true;
+        }
+
+        void close() {
+            decoder_.close();
+        }
+
+        // タイムライン時刻でフレームを更新
+        bool update(TimeUs timeline_time) {
+            if (!is_active_at(timeline_time)) {
+                return false;
+            }
+
+            TimeUs source_time = timeline_to_source(timeline_time);
+
+            // ソース範囲を超えたらクリップ
+            source_time = std::clamp(source_time, source_range.start, source_range.end);
+
+            return decoder_.decode_frame_at(source_time);
+        }
+
+        const uint8_t* get_frame_data() const { return decoder_.get_frame_data(); }
+        int get_width() const { return decoder_.get_width(); }
+        int get_height() const { return decoder_.get_height(); }
+        bool has_valid_frame() const { return decoder_.has_valid_frame(); }
+
+        const std::string& get_path() const { return path_; }
+        VideoDecoder& decoder() { return decoder_; }
+
+        // ImageMaster用
+        uint64_t image_id = 0;
+        bool frame_dirty = false;
+
+    private:
+        std::string path_;
+        VideoDecoder decoder_;
+    };
+
+    // =============================================================================
+    // AudioDecoder - 音声デコーダー
+    // =============================================================================
+    class AudioDecoder {
+    public:
+        static constexpr int SAMPLE_RATE = 48000;
+        static constexpr int CHANNELS = 2;
+
+        ~AudioDecoder() { close(); }
+
+        bool open(const std::string& path) {
+            close();
+
+#ifdef __ANDROID__
+            // Android: assets から内部ストレージに展開
+            std::string realPath = extractAssetToInternal(path);
+            if (realPath.empty()) {
+                return false;
+            }
+            if (avformat_open_input(&format_ctx_, realPath.c_str(), nullptr, nullptr) < 0) {
+                return false;
+            }
+#else
+            if (avformat_open_input(&format_ctx_, path.c_str(), nullptr, nullptr) < 0) {
+                return false;
+            }
+#endif
+
+            if (avformat_find_stream_info(format_ctx_, nullptr) < 0) {
+                close();
+                return false;
+            }
+
+            for (unsigned i = 0; i < format_ctx_->nb_streams; i++) {
                 if (format_ctx_->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
                     audio_stream_index_ = i;
                     break;
                 }
             }
+
             if (audio_stream_index_ < 0) {
-                avformat_close_input(&format_ctx_);
+                close();
                 return false;
             }
 
-            AVCodecParameters* codecpar = format_ctx_->streams[audio_stream_index_]->codecpar;
-            const AVCodec* codec = avcodec_find_decoder(codecpar->codec_id);
+            AVStream* stream = format_ctx_->streams[audio_stream_index_];
+            const AVCodec* codec = avcodec_find_decoder(stream->codecpar->codec_id);
             if (!codec) {
-                avformat_close_input(&format_ctx_);
+                close();
                 return false;
             }
 
             codec_ctx_ = avcodec_alloc_context3(codec);
-            if (!codec_ctx_ ||
-                avcodec_parameters_to_context(codec_ctx_, codecpar) < 0 ||
-                avcodec_open2(codec_ctx_, codec, nullptr) < 0) {
-                if (codec_ctx_) avcodec_free_context(&codec_ctx_);
-                avformat_close_input(&format_ctx_);
+            avcodec_parameters_to_context(codec_ctx_, stream->codecpar);
+
+            if (avcodec_open2(codec_ctx_, codec, nullptr) < 0) {
+                close();
                 return false;
             }
 
-            AVChannelLayout out_layout = AV_CHANNEL_LAYOUT_STEREO;
-            AVChannelLayout in_layout;
-            if (codec_ctx_->ch_layout.nb_channels > 0) {
-                av_channel_layout_copy(&in_layout, &codec_ctx_->ch_layout);
-            }
-            else {
-                av_channel_layout_default(&in_layout, codecpar->ch_layout.nb_channels);
-            }
+            // リサンプラー設定
+            AVChannelLayout out_ch_layout = AV_CHANNEL_LAYOUT_STEREO;
+            AVChannelLayout in_ch_layout;
+            av_channel_layout_copy(&in_ch_layout, &codec_ctx_->ch_layout);
 
-            int ret = swr_alloc_set_opts2(&swr_ctx_, &out_layout, AV_SAMPLE_FMT_FLT,
-                MASTER_SAMPLE_RATE, &in_layout,
-                codec_ctx_->sample_fmt,
-                codec_ctx_->sample_rate, 0, nullptr);
-            av_channel_layout_uninit(&in_layout);
+            swr_alloc_set_opts2(&swr_ctx_,
+                &out_ch_layout, AV_SAMPLE_FMT_FLT, SAMPLE_RATE,
+                &in_ch_layout, codec_ctx_->sample_fmt, codec_ctx_->sample_rate,
+                0, nullptr);
 
-            if (ret < 0 || swr_init(swr_ctx_) < 0) {
-                if (swr_ctx_) swr_free(&swr_ctx_);
-                avcodec_free_context(&codec_ctx_);
-                avformat_close_input(&format_ctx_);
+            if (!swr_ctx_ || swr_init(swr_ctx_) < 0) {
+                close();
                 return false;
             }
+
+            time_base_ = stream->time_base;
 
             if (format_ctx_->duration != AV_NOPTS_VALUE) {
-                duration_ = av_rescale(format_ctx_->duration, MASTER_SAMPLE_RATE, AV_TIME_BASE);
+                duration_us_ = av_rescale_q(format_ctx_->duration, AV_TIME_BASE_Q, { 1, 1000000 });
             }
+
+            frame_ = av_frame_alloc();
+            packet_ = av_packet_alloc();
+            is_open_ = true;
+            return true;
+        }
+
+        void close() {
+            is_open_ = false;
+            if (swr_ctx_) { swr_free(&swr_ctx_); }
+            if (frame_) { av_frame_free(&frame_); }
+            if (packet_) { av_packet_free(&packet_); }
+            if (codec_ctx_) { avcodec_free_context(&codec_ctx_); }
+            if (format_ctx_) { avformat_close_input(&format_ctx_); }
+            pcm_buffer_.clear();
+        }
+
+        bool seek(TimeUs time_us) {
+            if (!is_open_) return false;
+
+            int64_t ts = av_rescale_q(time_us, { 1, 1000000 }, time_base_);
+            if (av_seek_frame(format_ctx_, audio_stream_index_, ts, AVSEEK_FLAG_BACKWARD) < 0) {
+                return false;
+            }
+            avcodec_flush_buffers(codec_ctx_);
+            current_pts_ = time_us;
+            eof_ = false;
+            return true;
+        }
+
+        // 全体をデコードしてPCMバッファに格納
+        bool decode_all() {
+            if (!is_open_) return false;
+
+            pcm_buffer_.clear();
+            seek(0);
+
+            while (av_read_frame(format_ctx_, packet_) >= 0) {
+                if (packet_->stream_index != audio_stream_index_) {
+                    av_packet_unref(packet_);
+                    continue;
+                }
+
+                int ret = avcodec_send_packet(codec_ctx_, packet_);
+                av_packet_unref(packet_);
+                if (ret < 0) continue;
+
+                while (avcodec_receive_frame(codec_ctx_, frame_) >= 0) {
+                    int out_samples = av_rescale_rnd(
+                        swr_get_delay(swr_ctx_, codec_ctx_->sample_rate) + frame_->nb_samples,
+                        SAMPLE_RATE, codec_ctx_->sample_rate, AV_ROUND_UP);
+
+                    size_t offset = pcm_buffer_.size();
+                    pcm_buffer_.resize(offset + out_samples * CHANNELS);
+
+                    uint8_t* out_data[1] = { reinterpret_cast<uint8_t*>(pcm_buffer_.data() + offset) };
+                    int converted = swr_convert(swr_ctx_,
+                        out_data, out_samples,
+                        (const uint8_t**)frame_->data, frame_->nb_samples);
+
+                    if (converted > 0) {
+                        pcm_buffer_.resize(offset + converted * CHANNELS);
+                    }
+                    else {
+                        pcm_buffer_.resize(offset);
+                    }
+
+                    av_frame_unref(frame_);
+                }
+            }
+
+            total_samples_ = pcm_buffer_.size() / CHANNELS;
+            return !pcm_buffer_.empty();
+        }
+
+        const std::vector<float>& get_pcm_buffer() const { return pcm_buffer_; }
+        size_t get_total_samples() const { return total_samples_; }
+        TimeUs get_duration() const { return duration_us_; }
+        bool is_open() const { return is_open_; }
+
+    private:
+        AVFormatContext* format_ctx_ = nullptr;
+        AVCodecContext* codec_ctx_ = nullptr;
+        SwrContext* swr_ctx_ = nullptr;
+        AVFrame* frame_ = nullptr;
+        AVPacket* packet_ = nullptr;
+
+        int audio_stream_index_ = -1;
+        AVRational time_base_{ 1, 1000000 };
+        TimeUs duration_us_ = 0;
+        TimeUs current_pts_ = 0;
+
+        std::vector<float> pcm_buffer_;
+        size_t total_samples_ = 0;
+
+        bool is_open_ = false;
+        bool eof_ = false;
+    };
+
+    // =============================================================================
+    // AudioClip - 音声クリップ
+    // =============================================================================
+    class AudioClip : public ClipBase {
+    public:
+        bool open(const std::string& path) {
+            path_ = path;
+            if (!decoder_.open(path)) {
+                return false;
+            }
+
+            // 全体をデコード（小〜中規模ファイル向け）
+            if (!decoder_.decode_all()) {
+                return false;
+            }
+
+            source_range.start = 0;
+            source_range.end = decoder_.get_duration();
 
             return true;
         }
 
-        void close_file() {
-            if (swr_ctx_) swr_free(&swr_ctx_);
-            if (codec_ctx_) avcodec_free_context(&codec_ctx_);
-            if (format_ctx_) avformat_close_input(&format_ctx_);
+        void close() {
+            decoder_.close();
         }
 
-        void start_decode_thread() {
-            decode_running_.store(true, std::memory_order_release);
-            decode_thread_ = std::thread([this]() { decode_loop(); });
-        }
-
-        void stop_decode_thread() {
-            decode_running_.store(false, std::memory_order_release);
-            if (decode_thread_.joinable()) {
-                decode_thread_.join();
-            }
-        }
-
-        void decode_loop() {
-            AVPacket* packet = av_packet_alloc();
-            AVFrame* frame = av_frame_alloc();
-            std::vector<float> resample_buffer(8192 * MASTER_CHANNELS);
-
-            while (decode_running_.load(std::memory_order_relaxed)) {
-                if (seeking_.load(std::memory_order_acquire)) {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-                    continue;
-                }
-
-                if (ring_buffer_->available_write() < 4096) {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(5));
-                    continue;
-                }
-
-                int ret = av_read_frame(format_ctx_, packet);
-                if (ret < 0) {
-                    if (looping_.load(std::memory_order_relaxed)) {
-                        av_seek_frame(format_ctx_, audio_stream_index_, 0, AVSEEK_FLAG_BACKWARD);
-                        avcodec_flush_buffers(codec_ctx_);
-                        position_.store(0, std::memory_order_relaxed);
-                        continue;
-                    }
-                    finished_.store(true, std::memory_order_release);
-                    break;
-                }
-
-                if (packet->stream_index != audio_stream_index_) {
-                    av_packet_unref(packet);
-                    continue;
-                }
-
-                ret = avcodec_send_packet(codec_ctx_, packet);
-                av_packet_unref(packet);
-                if (ret < 0) continue;
-
-                while (ret >= 0) {
-                    ret = avcodec_receive_frame(codec_ctx_, frame);
-                    if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) break;
-                    if (ret < 0) break;
-
-                    int out_samples = swr_get_out_samples(swr_ctx_, frame->nb_samples);
-                    if (out_samples * MASTER_CHANNELS > (int)resample_buffer.size()) {
-                        resample_buffer.resize(out_samples * MASTER_CHANNELS);
-                    }
-
-                    uint8_t* out_ptr = reinterpret_cast<uint8_t*>(resample_buffer.data());
-                    int converted = swr_convert(swr_ctx_, &out_ptr, out_samples,
-                        (const uint8_t**)frame->extended_data, frame->nb_samples);
-
-                    if (converted > 0) {
-                        ring_buffer_->write(resample_buffer.data(), converted * MASTER_CHANNELS);
-                    }
-                    av_frame_unref(frame);
-                }
+        // 指定時刻のサンプルを取得
+        // output: インターリーブされたステレオサンプル
+        // returns: 書き込んだサンプル数
+        size_t get_samples(TimeUs timeline_time, float* output, size_t num_samples) const {
+            if (!is_active_at(timeline_time)) {
+                return 0;
             }
 
-            av_frame_free(&frame);
-            av_packet_free(&packet);
+            TimeUs source_time = timeline_to_source(timeline_time);
+            source_time = std::clamp(source_time, source_range.start, source_range.end);
+
+            // サンプル位置を計算
+            size_t sample_pos = static_cast<size_t>(
+                (double)source_time / SECOND_US * AudioDecoder::SAMPLE_RATE);
+
+            const auto& pcm = decoder_.get_pcm_buffer();
+            size_t total = decoder_.get_total_samples();
+
+            if (sample_pos >= total) {
+                return 0;
+            }
+
+            size_t available = total - sample_pos;
+            size_t to_copy = std::min(num_samples, available);
+
+            // インターリーブ形式でコピー
+            std::memcpy(output, pcm.data() + sample_pos * 2, to_copy * 2 * sizeof(float));
+
+            return to_copy;
         }
+
+        const std::string& get_path() const { return path_; }
+        AudioDecoder& decoder() { return decoder_; }
+
+        float volume = 1.0f;
+        float pan = 0.0f;  // -1.0 (L) to 1.0 (R)
 
     private:
         std::string path_;
-
-        AVFormatContext* format_ctx_ = nullptr;
-        AVCodecContext* codec_ctx_ = nullptr;
-        SwrContext* swr_ctx_ = nullptr;
-        int audio_stream_index_ = -1;
-
-        std::unique_ptr<RingBuffer<float>> ring_buffer_;
-
-        std::atomic<bool> decode_running_{ false };
-        std::atomic<bool> seeking_{ false };
-        std::atomic<bool> finished_{ false };
-        std::atomic<bool> looping_{ false };
-        std::atomic<int64_t> position_{ 0 };
-        int64_t duration_ = 0;
-
-        std::thread decode_thread_;
+        AudioDecoder decoder_;
     };
 
     // =============================================================================
-    // SineGenerator - �T�C���g
+    // Track - クリップのコンテナ
     // =============================================================================
-    class SineGenerator : public IAudioGenerator {
+    template<typename ClipType>
+    class Track {
     public:
-        SineGenerator(double frequency = 440.0, double duration_sec = 0.0)
-            : frequency_(frequency)
-            , duration_samples_(duration_sec > 0 ? static_cast<int64_t>(duration_sec * MASTER_SAMPLE_RATE) : -1) {
+        using ClipPtr = std::shared_ptr<ClipType>;
+
+        ClipPtr add_clip() {
+            auto clip = std::make_shared<ClipType>();
+            clips_.push_back(clip);
+            return clip;
         }
 
-        size_t generate(float* out, size_t frames) override {
-            if (duration_samples_ > 0 && position_ >= duration_samples_) {
-                std::memset(out, 0, frames * MASTER_CHANNELS * sizeof(float));
-                return 0;
-            }
-
-            size_t to_generate = frames;
-            if (duration_samples_ > 0) {
-                int64_t remaining = duration_samples_ - position_;
-                to_generate = std::min(frames, static_cast<size_t>(remaining));
-            }
-
-            const double inc = frequency_ / MASTER_SAMPLE_RATE;
-
-            for (size_t i = 0; i < to_generate; ++i) {
-                float v = static_cast<float>(std::sin(phase_ * 2.0 * std::numbers::pi)) * amplitude_;
-                phase_ += inc;
-                if (phase_ >= 1.0) phase_ -= 1.0;
-
-                out[i * MASTER_CHANNELS + 0] = v;
-                out[i * MASTER_CHANNELS + 1] = v;
-            }
-
-            for (size_t i = to_generate; i < frames; ++i) {
-                out[i * MASTER_CHANNELS + 0] = 0.0f;
-                out[i * MASTER_CHANNELS + 1] = 0.0f;
-            }
-
-            position_ += to_generate;
-            return to_generate;
+        void remove_clip(ClipPtr clip) {
+            clips_.erase(
+                std::remove(clips_.begin(), clips_.end(), clip),
+                clips_.end());
         }
 
-        GeneratorState state() const override {
-            return {
-                .finished = (duration_samples_ > 0 && position_ >= duration_samples_),
-                .position = position_,
-                .duration = duration_samples_ > 0 ? duration_samples_ : 0
-            };
+        // 指定時刻でアクティブなクリップを取得
+        std::vector<ClipPtr> get_active_clips(TimeUs timeline_time) const {
+            std::vector<ClipPtr> active;
+            for (const auto& clip : clips_) {
+                if (clip->is_active_at(timeline_time)) {
+                    active.push_back(clip);
+                }
+            }
+            return active;
         }
 
-        void seek(int64_t position_samples) override { position_ = position_samples; }
-        void set_frequency(double freq) { frequency_ = freq; }
-        void set_amplitude(float amp) { amplitude_ = amp; }
+        const std::vector<ClipPtr>& clips() const { return clips_; }
+        std::vector<ClipPtr>& clips() { return clips_; }
+
+        bool muted = false;
+        float opacity = 1.0f;  // VideoTrack用
+        float volume = 1.0f;   // AudioTrack用
 
     private:
-        double frequency_;
-        double phase_ = 0.0;
-        float amplitude_ = 0.3f;
-        int64_t position_ = 0;
-        int64_t duration_samples_;
+        std::vector<ClipPtr> clips_;
     };
 
+    using VideoTrack = Track<VideoClip>;
+    using AudioTrack = Track<AudioClip>;
+
     // =============================================================================
-    // NoiseGenerator - �z���C�g�m�C�Y
+    // Timeline - 全体を統括
     // =============================================================================
-    class NoiseGenerator : public IAudioGenerator {
+    class Timeline {
     public:
-        explicit NoiseGenerator(double duration_sec = 0.0)
-            : duration_samples_(duration_sec > 0 ? static_cast<int64_t>(duration_sec * MASTER_SAMPLE_RATE) : -1) {
+        // トラック管理
+        std::shared_ptr<VideoTrack> add_video_track() {
+            auto track = std::make_shared<VideoTrack>();
+            video_tracks_.push_back(track);
+            return track;
         }
 
-        size_t generate(float* out, size_t frames) override {
-            if (duration_samples_ > 0 && position_ >= duration_samples_) {
-                std::memset(out, 0, frames * MASTER_CHANNELS * sizeof(float));
-                return 0;
-            }
-
-            size_t to_generate = frames;
-            if (duration_samples_ > 0) {
-                int64_t remaining = duration_samples_ - position_;
-                to_generate = std::min(frames, static_cast<size_t>(remaining));
-            }
-
-            for (size_t i = 0; i < to_generate; ++i) {
-                seed_ = seed_ * 1103515245 + 12345;
-                float v = (static_cast<float>(seed_ & 0x7FFFFFFF) / 0x7FFFFFFF * 2.0f - 1.0f) * amplitude_;
-                out[i * MASTER_CHANNELS + 0] = v;
-                out[i * MASTER_CHANNELS + 1] = v;
-            }
-
-            for (size_t i = to_generate; i < frames; ++i) {
-                out[i * MASTER_CHANNELS + 0] = 0.0f;
-                out[i * MASTER_CHANNELS + 1] = 0.0f;
-            }
-
-            position_ += to_generate;
-            return to_generate;
+        std::shared_ptr<AudioTrack> add_audio_track() {
+            auto track = std::make_shared<AudioTrack>();
+            audio_tracks_.push_back(track);
+            return track;
         }
 
-        GeneratorState state() const override {
-            return {
-                .finished = (duration_samples_ > 0 && position_ >= duration_samples_),
-                .position = position_,
-                .duration = duration_samples_ > 0 ? duration_samples_ : 0
-            };
+        // 再生制御
+        void play() { clock_.start(); }
+        void pause() { clock_.pause(); }
+        void stop() { clock_.stop(); notify_seek(0); }
+        void seek(TimeUs time) { clock_.seek(time); notify_seek(time); }
+
+        bool is_playing() const { return clock_.is_running(); }
+        TimeUs now() const { return clock_.now(); }
+
+        // 全クリップを更新
+        void update() {
+            TimeUs current_time = clock_.now();
+
+            for (auto& track : video_tracks_) {
+                if (track->muted) continue;
+
+                for (auto& clip : track->clips()) {
+                    if (clip->is_active_at(current_time)) {
+                        if (clip->update(current_time)) {
+                            clip->frame_dirty = true;
+                        }
+                    }
+                }
+            }
         }
 
-        void set_amplitude(float amp) { amplitude_ = amp; }
+        // オーディオミキシング（指定時刻から連続的にサンプルを取得）
+        void mix_audio_at(float* output, size_t num_samples, TimeUs audio_time) {
+            // 出力バッファをゼロクリア
+            std::memset(output, 0, num_samples * 2 * sizeof(float));
+
+            // 一時バッファ
+            thread_local std::vector<float> temp_buffer;
+            temp_buffer.resize(num_samples * 2);
+
+            for (auto& track : audio_tracks_) {
+                if (track->muted) continue;
+
+                for (auto& clip : track->clips()) {
+                    if (!clip->is_active_at(audio_time)) continue;
+
+                    size_t got = clip->get_samples(audio_time, temp_buffer.data(), num_samples);
+                    if (got == 0) continue;
+
+                    // ミックス（ボリューム・パン適用）
+                    float vol_l = clip->volume * track->volume * (1.0f - std::max(0.0f, clip->pan));
+                    float vol_r = clip->volume * track->volume * (1.0f + std::min(0.0f, clip->pan));
+
+                    for (size_t i = 0; i < got; i++) {
+                        output[i * 2 + 0] += temp_buffer[i * 2 + 0] * vol_l;
+                        output[i * 2 + 1] += temp_buffer[i * 2 + 1] * vol_r;
+                    }
+                }
+            }
+
+            // マスターボリューム適用 & クリッピング
+            for (size_t i = 0; i < num_samples * 2; i++) {
+                output[i] *= master_volume_;
+                output[i] = std::clamp(output[i], -1.0f, 1.0f);
+            }
+        }
+
+        // シーク通知用コールバック登録
+        using SeekCallback = std::function<void(TimeUs)>;
+        void set_seek_callback(SeekCallback callback) {
+            seek_callback_ = callback;
+        }
+
+        // 現在アクティブな全VideoClipを取得
+        std::vector<std::shared_ptr<VideoClip>> get_active_video_clips() const {
+            std::vector<std::shared_ptr<VideoClip>> result;
+            TimeUs current_time = clock_.now();
+
+            for (const auto& track : video_tracks_) {
+                if (track->muted) continue;
+
+                auto active = track->get_active_clips(current_time);
+                result.insert(result.end(), active.begin(), active.end());
+            }
+
+            return result;
+        }
+
+        // 現在アクティブな全AudioClipを取得
+        std::vector<std::shared_ptr<AudioClip>> get_active_audio_clips() const {
+            std::vector<std::shared_ptr<AudioClip>> result;
+            TimeUs current_time = clock_.now();
+
+            for (const auto& track : audio_tracks_) {
+                if (track->muted) continue;
+
+                auto active = track->get_active_clips(current_time);
+                result.insert(result.end(), active.begin(), active.end());
+            }
+
+            return result;
+        }
+
+        // タイムライン全体の長さを計算
+        TimeUs get_duration() const {
+            TimeUs max_end = 0;
+            for (const auto& track : video_tracks_) {
+                for (const auto& clip : track->clips()) {
+                    max_end = std::max(max_end, clip->timeline_range.end);
+                }
+            }
+            for (const auto& track : audio_tracks_) {
+                for (const auto& clip : track->clips()) {
+                    max_end = std::max(max_end, clip->timeline_range.end);
+                }
+            }
+            return max_end;
+        }
+
+        MasterClock& clock() { return clock_; }
+        const MasterClock& clock() const { return clock_; }
+
+        std::vector<std::shared_ptr<VideoTrack>>& video_tracks() { return video_tracks_; }
+        std::vector<std::shared_ptr<AudioTrack>>& audio_tracks() { return audio_tracks_; }
+
+        void set_master_volume(float vol) { master_volume_ = std::clamp(vol, 0.0f, 2.0f); }
+        float get_master_volume() const { return master_volume_; }
 
     private:
-        uint32_t seed_ = 12345;
-        float amplitude_ = 0.2f;
-        int64_t position_ = 0;
-        int64_t duration_samples_;
-    };
-
-    // =============================================================================
-    // AudioSource�iGenerator + �Đ���ԁj
-    // =============================================================================
-    struct AudioSource {
-        SoundId id = 0;
-        std::unique_ptr<IAudioGenerator> generator;
-
-        std::atomic<bool> playing{ false };
-        std::atomic<bool> remove_when_finished{ false };
-        std::atomic<float> volume{ 1.0f };
-        std::atomic<float> pan{ 0.0f };
-    };
-
-    // =============================================================================
-    // �I�[�f�B�I�G���W��
-    // =============================================================================
-    class AudioEngine {
-    public:
-        AudioEngine() {
-            for (auto& slot : active_sources_) {
-                slot.store(nullptr, std::memory_order_relaxed);
+        void notify_seek(TimeUs time) {
+            if (seek_callback_) {
+                seek_callback_(time);
             }
         }
 
-        ~AudioEngine() { shutdown(); }
+        MasterClock clock_;
+        std::vector<std::shared_ptr<VideoTrack>> video_tracks_;
+        std::vector<std::shared_ptr<AudioTrack>> audio_tracks_;
+        float master_volume_ = 1.0f;
+        SeekCallback seek_callback_;
+    };
+
+    // =============================================================================
+    // TimelineRenderer - ImageMasterと統合してレンダリング
+    // =============================================================================
+    template<typename ImageMasterT>
+    class TimelineRenderer {
+    public:
+        TimelineRenderer(Timeline& timeline, ImageMasterT& image_master)
+            : timeline_(timeline), image_master_(image_master) {
+        }
+
+        // 各クリップにテクスチャを割り当て
+        void prepare_clip(std::shared_ptr<VideoClip> clip) {
+            if (clip->image_id == 0) {
+                clip->image_id = image_master_.createEmptyStandaloneTexture(
+                    clip->get_width(), clip->get_height(), false);
+            }
+        }
+
+        // フレーム更新
+        // フレーム更新（beginFrame()は外部で呼ぶこと）
+        void update() {
+            timeline_.update();
+
+            // アクティブなクリップのテクスチャを更新
+            auto active_clips = timeline_.get_active_video_clips();
+            for (auto& clip : active_clips) {
+                if (clip->image_id == 0) {
+                    prepare_clip(clip);
+                }
+
+                if (clip->frame_dirty && clip->has_valid_frame()) {
+                    image_master_.updateStandaloneTexture(
+                        clip->image_id,
+                        clip->get_frame_data(),
+                        0, 0,
+                        clip->get_width(), clip->get_height(),
+                        clip->get_width() * 4);
+                    image_master_.touch(clip->image_id);
+                    clip->frame_dirty = false;
+                }
+            }
+        }
+
+        // 描画用にアクティブクリップとテクスチャ情報を取得
+        struct RenderItem {
+            std::shared_ptr<VideoClip> clip;
+            uint64_t image_id;
+            float opacity;
+        };
+
+        std::vector<RenderItem> get_render_items() const {
+            std::vector<RenderItem> items;
+
+            for (const auto& track : timeline_.video_tracks()) {
+                if (track->muted) continue;
+
+                auto active = track->get_active_clips(timeline_.now());
+                for (const auto& clip : active) {
+                    if (clip->image_id != 0 && clip->has_valid_frame()) {
+                        items.push_back({ clip, clip->image_id, track->opacity });
+                    }
+                }
+            }
+
+            return items;
+        }
+
+    private:
+        Timeline& timeline_;
+        ImageMasterT& image_master_;
+    };
+
+    // =============================================================================
+    // AudioOutput - PortAudioによる音声出力
+    // =============================================================================
+#include <portaudio.h>
+
+    class AudioOutput {
+    public:
+        static constexpr int SAMPLE_RATE = 48000;
+        static constexpr int CHANNELS = 2;
+        static constexpr int FRAMES_PER_BUFFER = 256;
+
+        AudioOutput(Timeline& timeline) : timeline_(timeline) {
+            // シークコールバックを登録
+            timeline_.set_seek_callback([this](TimeUs time) {
+                seek_to(time);
+                });
+        }
+
+        ~AudioOutput() { shutdown(); }
 
         bool initialize() {
-            if (initialized_) return true;
-
             PaError err = Pa_Initialize();
             if (err != paNoError) {
-                std::cerr << "PortAudio init failed: " << Pa_GetErrorText(err) << std::endl;
                 return false;
             }
+            pa_initialized_ = true;
 
-            err = Pa_OpenDefaultStream(&stream_, 0, MASTER_CHANNELS, paFloat32,
-                MASTER_SAMPLE_RATE, FRAMES_PER_BUFFER,
-                pa_callback, this);
+            err = Pa_OpenDefaultStream(
+                &stream_,
+                0,              // 入力チャンネル
+                CHANNELS,       // 出力チャンネル
+                paFloat32,      // サンプルフォーマット
+                SAMPLE_RATE,
+                FRAMES_PER_BUFFER,
+                audio_callback,
+                this);
+
             if (err != paNoError) {
-                Pa_Terminate();
                 return false;
             }
 
             err = Pa_StartStream(stream_);
             if (err != paNoError) {
                 Pa_CloseStream(stream_);
-                Pa_Terminate();
+                stream_ = nullptr;
                 return false;
             }
 
-            initialized_ = true;
             return true;
         }
 
         void shutdown() {
-            if (!initialized_) return;
-
-            {
-                std::lock_guard<std::mutex> lock(sources_mutex_);
-                for (auto& slot : active_sources_) {
-                    slot.store(nullptr, std::memory_order_release);
-                }
-                sources_.clear();
-            }
-
             if (stream_) {
                 Pa_StopStream(stream_);
                 Pa_CloseStream(stream_);
                 stream_ = nullptr;
             }
-            Pa_Terminate();
-            initialized_ = false;
-        }
-
-        // =========================================================================
-        // �t�@�C������
-        // =========================================================================
-        SoundId load(const std::string& path) {
-            auto gen = std::make_unique<FileGenerator>(path);
-            if (!gen->is_valid()) {
-                std::cerr << "Failed to open: " << path << std::endl;
-                return 0;
-            }
-            return add_source(std::move(gen));
-        }
-
-        // =========================================================================
-        // �v���O���}�u������
-        // =========================================================================
-        SoundId create_sine(double frequency, double duration_sec = 0.0) {
-            return add_source(std::make_unique<SineGenerator>(frequency, duration_sec));
-        }
-
-        SoundId create_noise(double duration_sec = 0.0) {
-            return add_source(std::make_unique<NoiseGenerator>(duration_sec));
-        }
-
-        SoundId add_generator(std::unique_ptr<IAudioGenerator> generator) {
-            return add_source(std::move(generator));
-        }
-
-        // =========================================================================
-        // ����
-        // =========================================================================
-        void play(SoundId id) {
-            std::lock_guard<std::mutex> lock(sources_mutex_);
-            auto it = sources_.find(id);
-            if (it == sources_.end()) return;
-
-            auto* source = it->second.get();
-            if (source->playing.load(std::memory_order_relaxed)) return;
-
-            source->playing.store(true, std::memory_order_release);
-            activate_source(source);
-        }
-
-        void pause(SoundId id) {
-            std::lock_guard<std::mutex> lock(sources_mutex_);
-            auto it = sources_.find(id);
-            if (it != sources_.end()) {
-                it->second->playing.store(false, std::memory_order_release);
+            if (pa_initialized_) {
+                Pa_Terminate();
+                pa_initialized_ = false;
             }
         }
 
-        void stop(SoundId id) {
-            std::lock_guard<std::mutex> lock(sources_mutex_);
-            auto it = sources_.find(id);
-            if (it == sources_.end()) return;
-
-            auto* source = it->second.get();
-            source->playing.store(false, std::memory_order_release);
-            deactivate_source(source);
-            source->generator->reset();
-        }
-
-        void unload(SoundId id) {
-            std::lock_guard<std::mutex> lock(sources_mutex_);
-            auto it = sources_.find(id);
-            if (it != sources_.end()) {
-                deactivate_source(it->second.get());
-                sources_.erase(it);
-            }
-        }
-
-        void set_volume(SoundId id, float volume) {
-            std::lock_guard<std::mutex> lock(sources_mutex_);
-            auto it = sources_.find(id);
-            if (it != sources_.end()) {
-                it->second->volume.store(std::clamp(volume, 0.0f, 2.0f), std::memory_order_relaxed);
-            }
-        }
-
-        void set_pan(SoundId id, float pan) {
-            std::lock_guard<std::mutex> lock(sources_mutex_);
-            auto it = sources_.find(id);
-            if (it != sources_.end()) {
-                it->second->pan.store(std::clamp(pan, -1.0f, 1.0f), std::memory_order_relaxed);
-            }
-        }
-
-        void seek(SoundId id, double position_sec) {
-            std::lock_guard<std::mutex> lock(sources_mutex_);
-            auto it = sources_.find(id);
-            if (it != sources_.end()) {
-                int64_t samples = static_cast<int64_t>(position_sec * MASTER_SAMPLE_RATE);
-                it->second->generator->seek(samples);
-            }
-        }
-
-        void set_looping(SoundId id, bool loop) {
-            std::lock_guard<std::mutex> lock(sources_mutex_);
-            auto it = sources_.find(id);
-            if (it != sources_.end()) {
-                if (auto* fg = dynamic_cast<FileGenerator*>(it->second->generator.get())) {
-                    fg->set_looping(loop);
-                }
-            }
-        }
-
-        // =========================================================================
-        // ��Ԏ擾
-        // =========================================================================
-        bool is_playing(SoundId id) const {
-            std::lock_guard<std::mutex> lock(sources_mutex_);
-            auto it = sources_.find(id);
-            return it != sources_.end() && it->second->playing.load(std::memory_order_relaxed);
-        }
-
-        double get_position_seconds(SoundId id) const {
-            std::lock_guard<std::mutex> lock(sources_mutex_);
-            auto it = sources_.find(id);
-            if (it != sources_.end()) {
-                return static_cast<double>(it->second->generator->state().position) / MASTER_SAMPLE_RATE;
-            }
-            return 0.0;
-        }
-
-        double get_duration_seconds(SoundId id) const {
-            std::lock_guard<std::mutex> lock(sources_mutex_);
-            auto it = sources_.find(id);
-            if (it != sources_.end()) {
-                int64_t dur = it->second->generator->state().duration;
-                return dur > 0 ? static_cast<double>(dur) / MASTER_SAMPLE_RATE : 0.0;
-            }
-            return 0.0;
-        }
-
-        int64_t get_master_position() const {
-            return master_position_.load(std::memory_order_relaxed);
-        }
-
-        double get_master_time() const {
-            return static_cast<double>(master_position_.load(std::memory_order_relaxed)) / MASTER_SAMPLE_RATE;
+        // 指定時刻にシーク（サンプル位置をリセット）
+        void seek_to(TimeUs time) {
+            sample_position_.store(time_to_samples(time));
         }
 
     private:
-        SoundId add_source(std::unique_ptr<IAudioGenerator> generator) {
-            auto source = std::make_unique<AudioSource>();
-            source->id = next_id_++;
-            source->generator = std::move(generator);
-
-            SoundId id = source->id;
-            std::lock_guard<std::mutex> lock(sources_mutex_);
-            sources_[id] = std::move(source);
-            return id;
+        // 時刻からサンプル位置に変換
+        static size_t time_to_samples(TimeUs time) {
+            return static_cast<size_t>((time * SAMPLE_RATE) / SECOND_US);
         }
 
-        void activate_source(AudioSource* source) {
-            for (auto& slot : active_sources_) {
-                AudioSource* expected = nullptr;
-                if (slot.compare_exchange_strong(expected, source, std::memory_order_release)) {
-                    return;
+        // サンプル位置から時刻に変換
+        static TimeUs samples_to_time(size_t samples) {
+            return static_cast<TimeUs>((samples * SECOND_US) / SAMPLE_RATE);
+        }
+
+        static int audio_callback(
+            const void* input,
+            void* output,
+            unsigned long frame_count,
+            const PaStreamCallbackTimeInfo* time_info,
+            PaStreamCallbackFlags status_flags,
+            void* user_data)
+        {
+            auto* self = static_cast<AudioOutput*>(user_data);
+            float* out = static_cast<float*>(output);
+
+            bool is_playing = self->timeline_.is_playing();
+            bool was_playing = self->was_playing_;
+            self->was_playing_ = is_playing;
+
+            if (is_playing) {
+                // 再生開始時にサンプル位置を同期
+                if (!was_playing) {
+                    self->sample_position_.store(time_to_samples(self->timeline_.now()));
                 }
-            }
-            std::cerr << "Warning: No free slot for audio source" << std::endl;
-        }
 
-        void deactivate_source(AudioSource* source) {
-            for (auto& slot : active_sources_) {
-                AudioSource* expected = source;
-                if (slot.compare_exchange_strong(expected, nullptr, std::memory_order_release)) {
-                    return;
-                }
-            }
-        }
+                // 現在のサンプル位置から時刻を計算
+                size_t current_samples = self->sample_position_.load();
+                TimeUs audio_time = samples_to_time(current_samples);
 
-        static int pa_callback(const void*, void* output, unsigned long frames,
-            const PaStreamCallbackTimeInfo*, PaStreamCallbackFlags,
-            void* user_data) {
-            auto* engine = static_cast<AudioEngine*>(user_data);
-            engine->mix_to_output(static_cast<float*>(output), frames);
-            engine->master_position_.fetch_add(frames, std::memory_order_relaxed);
+                // ミキシング
+                self->timeline_.mix_audio_at(out, frame_count, audio_time);
+
+                // サンプル位置を進める
+                self->sample_position_.fetch_add(frame_count);
+            }
+            else {
+                std::memset(out, 0, frame_count * CHANNELS * sizeof(float));
+            }
+
             return paContinue;
         }
 
-        void mix_to_output(float* output, unsigned long frames) {
-            const size_t total_samples = frames * MASTER_CHANNELS;
-            std::memset(output, 0, total_samples * sizeof(float));
-
-            thread_local std::vector<float> temp_buffer(FRAMES_PER_BUFFER * MASTER_CHANNELS);
-            if (temp_buffer.size() < total_samples) {
-                temp_buffer.resize(total_samples);
-            }
-
-            // ���b�N�t���[�ŃA�N�e�B�u���X�g�𑖍�
-            for (auto& slot : active_sources_) {
-                AudioSource* source = slot.load(std::memory_order_acquire);
-                if (!source) continue;
-                if (!source->playing.load(std::memory_order_relaxed)) continue;
-
-                size_t generated = source->generator->generate(temp_buffer.data(), frames);
-
-                if (generated == 0) {
-                    source->playing.store(false, std::memory_order_relaxed);
-                    if (source->remove_when_finished.load(std::memory_order_relaxed)) {
-                        slot.store(nullptr, std::memory_order_release);
-                    }
-                    continue;
-                }
-
-                const float vol = source->volume.load(std::memory_order_relaxed);
-                const float pan = source->pan.load(std::memory_order_relaxed);
-                const float vol_l = vol * std::sqrt(0.5f * (1.0f - pan));
-                const float vol_r = vol * std::sqrt(0.5f * (1.0f + pan));
-
-                for (size_t i = 0; i < generated; ++i) {
-                    output[i * 2 + 0] += temp_buffer[i * 2 + 0] * vol_l;
-                    output[i * 2 + 1] += temp_buffer[i * 2 + 1] * vol_r;
-                }
-            }
-
-            for (size_t i = 0; i < total_samples; ++i) {
-                output[i] = std::clamp(output[i], -1.0f, 1.0f);
-            }
-        }
-
-    private:
+        Timeline& timeline_;
         PaStream* stream_ = nullptr;
-        bool initialized_ = false;
-        std::atomic<int64_t> master_position_{ 0 };
+        bool pa_initialized_ = false;
 
-        mutable std::mutex sources_mutex_;
-        std::unordered_map<SoundId, std::unique_ptr<AudioSource>> sources_;
-        SoundId next_id_ = 1;
-
-        // ���b�N�t���[�A�N�e�B�u���X�g
-        std::array<std::atomic<AudioSource*>, MAX_ACTIVE_SOURCES> active_sources_;
+        std::atomic<size_t> sample_position_{ 0 };  // 現在のサンプル位置
+        bool was_playing_ = false;                 // 前回の再生状態
     };
 
-} // namespace audio
+} // namespace nle

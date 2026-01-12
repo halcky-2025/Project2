@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <optional>
 #include <mutex>
 #include <algorithm>
@@ -1717,7 +1718,9 @@ public:
         int dropMinLive = 10;
     };
 
-    explicit FontAtlas(const Config& cfg = {}) : config_(cfg) {
+    FontAtlas() : config_() {
+    }
+    explicit FontAtlas(const Config & cfg) : config_(cfg) {
     }
     const GlyphInfo* findByImageId(ImageId id) const {
         std::lock_guard lock(mutex_);
@@ -1741,11 +1744,29 @@ public:
     //--- フォント管理 ---
     FontId registerFont(const char* name, const std::string& font, int size) {
         std::lock_guard lock(mutex_);
-        TTF_Font* f = TTF_OpenFont(font.c_str(), size);
+        TTF_Font* f = nullptr;
+#ifdef __ANDROID__
+        // Androidではアセットから読み込む
+        SDL_IOStream* io = SDL_IOFromFile(font.c_str(), "rb");
+        if (io) {
+            f = TTF_OpenFontIO(io, true, (float)size);
+            if (!f) {
+                SDL_Log("registerFont: TTF_OpenFontIO failed for %s: %s", font.c_str(), SDL_GetError());
+            }
+            else {
+                SDL_Log("registerFont: Loaded font %s size %d", font.c_str(), size);
+            }
+        }
+        else {
+            SDL_Log("registerFont: SDL_IOFromFile failed for %s: %s", font.c_str(), SDL_GetError());
+        }
+#else
+        f = TTF_OpenFont(font.c_str(), size);
+#endif
         FontId id = FontId(name, size);
         fonts_[id] = FontEntry{ f, name, {} };
 
-        // インデックス割り当て（追加）
+        // インデックス割り当て
         fontIdToIndex_[id] = nextFontIndex_++;
 
         return id;
