@@ -35,6 +35,9 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
     set(PLATFORM_ANDROID TRUE)
     set(PLATFORM_NAME "Android")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(PLATFORM_LINUX TRUE)
+    set(PLATFORM_NAME "Linux")
 else()
     message(FATAL_ERROR "Unsupported platform: ${CMAKE_SYSTEM_NAME}")
 endif()
@@ -353,6 +356,75 @@ if(PLATFORM_ANDROID)
 endif()
 
 # =============================================================================
+# Linux Target
+# =============================================================================
+if(PLATFORM_LINUX)
+    message(STATUS "Configuring Linux target")
+
+    set(LINUX_SOURCES
+        main5.cpp
+    )
+
+    add_executable(HopStar_Linux
+        ${LINUX_SOURCES}
+        ${COMMON_HEADERS}
+    )
+
+    target_include_directories(HopStar_Linux PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${BGFX_INCLUDE_DIR}
+        ${FFMPEG_INCLUDE_DIR}
+    )
+
+    target_link_libraries(HopStar_Linux PRIVATE
+        SDL3::SDL3
+        ${BGFX_LIBRARY}
+        ${BX_LIBRARY}
+        ${BIMG_LIBRARY}
+        SQLite::SQLite3
+        pthread
+        dl
+    )
+
+    # OpenGL for Linux
+    find_package(OpenGL REQUIRED)
+    target_link_libraries(HopStar_Linux PRIVATE OpenGL::GL)
+
+    # X11 for Linux window system
+    find_package(X11 REQUIRED)
+    target_link_libraries(HopStar_Linux PRIVATE ${X11_LIBRARIES})
+    target_include_directories(HopStar_Linux PRIVATE ${X11_INCLUDE_DIR})
+
+    if(HOPSTAR_ENABLE_FFMPEG)
+        target_link_libraries(HopStar_Linux PRIVATE
+            ${AVCODEC_LIBRARY}
+            ${AVFORMAT_LIBRARY}
+            ${AVUTIL_LIBRARY}
+            ${SWSCALE_LIBRARY}
+            ${SWRESAMPLE_LIBRARY}
+        )
+        target_compile_definitions(HopStar_Linux PRIVATE HOPSTAR_ENABLE_FFMPEG)
+    endif()
+
+    if(HOPSTAR_ENABLE_TORCH)
+        find_package(Torch REQUIRED)
+        target_link_libraries(HopStar_Linux PRIVATE ${TORCH_LIBRARIES})
+        target_compile_definitions(HopStar_Linux PRIVATE HOPSTAR_ENABLE_TORCH)
+    endif()
+
+    # Enable debug symbols for Debug builds
+    target_compile_options(HopStar_Linux PRIVATE
+        $<$<CONFIG:Debug>:-g -O0>
+        $<$<CONFIG:Release>:-O2>
+    )
+
+    set_target_properties(HopStar_Linux PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+    )
+
+endif()
+
+# =============================================================================
 # Installation
 # =============================================================================
 if(PLATFORM_MACOS)
@@ -365,6 +437,12 @@ endif()
 if(PLATFORM_IOS)
     install(TARGETS HopStar_iOS
         BUNDLE DESTINATION .
+    )
+endif()
+
+if(PLATFORM_LINUX)
+    install(TARGETS HopStar_Linux
+        RUNTIME DESTINATION bin
     )
 endif()
 

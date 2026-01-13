@@ -1776,7 +1776,16 @@ public:
             SDL_Log("registerFont: Loaded font %s size %d", bundlePath.c_str(), size);
         }
 #else
-        f = TTF_OpenFont(font.c_str(), size);
+        // Linux - getBundlePathを使用
+        std::string bundlePath = getBundlePath(font.c_str());
+        SDL_Log("registerFont: Loading font from: %s", bundlePath.c_str());
+        f = TTF_OpenFont(bundlePath.c_str(), size);
+        if (!f) {
+            SDL_Log("registerFont: TTF_OpenFont failed for %s: %s", bundlePath.c_str(), SDL_GetError());
+        }
+        else {
+            SDL_Log("registerFont: Loaded font %s size %d", bundlePath.c_str(), size);
+        }
 #endif
         FontId id = FontId(name, size);
         fonts_[id] = FontEntry{ f, name, {} };

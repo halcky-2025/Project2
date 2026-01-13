@@ -2159,7 +2159,13 @@ private:
             }
 #endif
 #else
-            pixels = stbi_load(path.c_str(), &w, &h, &channels, 4);
+            // Linux: Use bundle path
+            std::string bundlePath = getBundlePath(path.c_str());
+            SDL_Log("loadImage: Trying path: %s", bundlePath.c_str());
+            pixels = stbi_load(bundlePath.c_str(), &w, &h, &channels, 4);
+            if (!pixels) {
+                SDL_Log("loadImage: Failed to load: %s", bundlePath.c_str());
+            }
 #endif
 
             if (!pixels) return DecodedImage{};

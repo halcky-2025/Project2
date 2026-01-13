@@ -1,0 +1,8 @@
+[
+{
+  "directory": "/home/hayahiro/ドキュメント/GitHub/Project2/build",
+  "command": "/usr/bin/c++ -DBX_CONFIG_DEBUG=1 -DHOPSTAR_ENABLE_FFMPEG -I/home/hayahiro/ドキュメント/GitHub/Project2/linux/.. -I/home/hayahiro/ドキュメント/GitHub/Project2/linux/deps/SDL3/include -I/home/hayahiro/ドキュメント/GitHub/Project2/linux/deps/SDL3_ttf/include -I/home/hayahiro/ドキュメント/GitHub/Project2/linux/deps/bgfx/include -I/home/hayahiro/ドキュメント/GitHub/Project2/linux/deps/bx/include -I/home/hayahiro/ドキュメント/GitHub/Project2/linux/deps/bimg/include -I/home/hayahiro/ドキュメント/GitHub/Project2/linux/deps/libcoro/include -I/home/hayahiro/ドキュメント/GitHub/Project2/linux/deps/libcoro/build/include -I/home/hayahiro/ドキュメント/GitHub/Project2/linux/deps/nlohmann_json/include -g -std=gnu++20 -g -O0 -o CMakeFiles/HopStar_Linux.dir/home/hayahiro/ドキュメント/GitHub/Project2/main5.cpp.o -c /home/hayahiro/ドキュメント/GitHub/Project2/main5.cpp",
+  "file": "/home/hayahiro/ドキュメント/GitHub/Project2/main5.cpp",
+  "output": "CMakeFiles/HopStar_Linux.dir/home/hayahiro/ドキュメント/GitHub/Project2/main5.cpp.o"
+}
+]
