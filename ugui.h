@@ -1,7 +1,31 @@
-﻿#include "shader.h"
+#include "shader.h"
 #include <fstream>
 #include <chrono>
 #include <future>
+
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#if TARGET_OS_IOS || TARGET_OS_SIMULATOR
+#import <Foundation/Foundation.h>
+#ifndef BUNDLE_PATH_DEFINED
+#define BUNDLE_PATH_DEFINED
+// Helper to get bundle resource path on iOS (for shaders and resources)
+inline std::string getBundlePath(const char* filename) {
+    NSString* name = [[NSString alloc] initWithUTF8String:filename];
+    // Extract just the filename (last path component) for bundle lookup
+    NSString* lastComponent = [name lastPathComponent];
+    NSString* ext = [lastComponent pathExtension];
+    NSString* base = [lastComponent stringByDeletingPathExtension];
+    NSString* path = [[NSBundle mainBundle] pathForResource:base ofType:ext];
+    if (path) {
+        return std::string([path UTF8String]);
+    }
+    return std::string(filename); // fallback
+}
+#endif // BUNDLE_PATH_DEFINED
+#endif // TARGET_OS_IOS || TARGET_OS_SIMULATOR
+#endif // __APPLE__
+
 // 描画コマンド構造体
 
 #pragma once
@@ -473,7 +497,7 @@ bool initBgfx(SDL_Window* window) {
     SDL_PropertiesID props = SDL_GetWindowProperties(window);
     memset(&pd, 0, sizeof(pd));
 
-    int width = 800, height = 600;
+    __block int width = 800, height = 600;
 
 #if defined(__ANDROID__)
     void* nwh = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_ANDROID_WINDOW_POINTER, nullptr);
@@ -486,8 +510,68 @@ bool initBgfx(SDL_Window* window) {
     pd.nwh = hwnd;
 
 #elif defined(__APPLE__)
-    void* cocoa_win = SDL_GetPointerProperty(props, "SDL.window.cocoa.window", nullptr);
-    pd.nwh = cocoa_win;
+    #include <TargetConditionals.h>
+    #if TARGET_OS_IOS || TARGET_OS_SIMULATOR
+        // iOS: Metal layer from SDL
+        // bgfx init must be called from main thread for iOS
+        // Store metalView as static to prevent deallocation
+        static SDL_MetalView s_metalView = nullptr;
+        __block void* metalLayer = nullptr;
+        __block bool bgfxInitResult = false;
+
+        auto initBlock = ^{
+            s_metalView = SDL_Metal_CreateView(window);
+            metalLayer = SDL_Metal_GetLayer(s_metalView);
+            SDL_GetWindowSize(window, &width, &height);
+            SDL_Log("initBgfx: iOS metalView=%p, metalLayer=%p, size=%dx%d",
+                    s_metalView, metalLayer, width, height);
+
+            if (!metalLayer) {
+                SDL_Log("initBgfx: Failed to get Metal layer!");
+                bgfxInitResult = false;
+                return;
+            }
+
+            bgfx::PlatformData pdLocal;
+            memset(&pdLocal, 0, sizeof(pdLocal));
+            pdLocal.nwh = metalLayer;
+
+            // iOS single-thread mode: call renderFrame() before init()
+            // This prevents bgfx from creating internal render thread
+            bgfx::renderFrame();
+
+            bgfx::Init initLocal;
+            initLocal.platformData = pdLocal;
+            initLocal.type = bgfx::RendererType::Metal;
+            initLocal.resolution.width = width;
+            initLocal.resolution.height = height;
+            initLocal.resolution.reset = BGFX_RESET_VSYNC;
+            initLocal.resolution.formatDepthStencil = bgfx::TextureFormat::D24S8;
+            initLocal.debug = true;
+
+            bgfxInitResult = bgfx::init(initLocal);
+            if (bgfxInitResult) {
+                SDL_Log("bgfx initialized successfully");
+                // Force depth buffer creation via reset
+                bgfx::reset(width, height, BGFX_RESET_VSYNC, bgfx::TextureFormat::D24S8);
+                SDL_Log("bgfx reset with depth buffer");
+            } else {
+                SDL_Log("bgfx::init failed");
+            }
+        };
+
+        if ([NSThread isMainThread]) {
+            initBlock();
+        } else {
+            dispatch_sync(dispatch_get_main_queue(), initBlock);
+        }
+
+        return bgfxInitResult;
+    #else
+        // macOS
+        void* cocoa_win = SDL_GetPointerProperty(props, "SDL.window.cocoa.window", nullptr);
+        pd.nwh = cocoa_win;
+    #endif
 
 #elif defined(__linux__)
     // X11
@@ -511,10 +595,13 @@ bool initBgfx(SDL_Window* window) {
     init.platformData = pd;
 #ifdef __ANDROID__
     init.type = bgfx::RendererType::Vulkan;
+#elif TARGET_OS_IOS || TARGET_OS_SIMULATOR
+    init.type = bgfx::RendererType::Metal;
 #endif
     init.resolution.width = width;
     init.resolution.height = height;
     init.resolution.reset = BGFX_RESET_VSYNC;
+    init.resolution.formatDepthStencil = bgfx::TextureFormat::D24S8;  // Enable depth buffer
     init.debug = true;  // デバッグ情報を有効
 
     if (!bgfx::init(init)) {
@@ -550,6 +637,10 @@ public:
     HopStar() {
 	}
     void initFonts() {
+        // TTF初期化
+        if (!TTF_Init()) {
+            SDL_Log("TTF_Init failed: %s", SDL_GetError());
+        }
         // 複数のフォントを登録
         master.registerFont("sans", "fonts/NotoSansJP-Regular.ttf", 16);
         master.registerFont("sans", "fonts/NotoSansJP-Regular.ttf", 24);
@@ -679,15 +770,187 @@ public:
     }
     void start() {
         running_ = true;
+#if TARGET_OS_IOS || TARGET_OS_SIMULATOR
+        // iOS: Don't create thread, will be called from main thread via CADisplayLink
+        // Initialize on main thread
+        initOnMainThread();
+#else
         thread_ = std::thread(&RenderThread::run, this);
+#endif
     }
 
     void stop() {
         running_ = false;
+#if !(TARGET_OS_IOS || TARGET_OS_SIMULATOR)
         if (thread_.joinable()) {
             thread_.join();
         }
+#endif
     }
+
+#if TARGET_OS_IOS || TARGET_OS_SIMULATOR
+    bool initialized_ = false;
+    std::unique_ptr<nle::AudioOutput> audio_output_ios_;
+
+    void initOnMainThread() {
+        initBgfx(window_);
+        hoppy_->master.initialize();
+        hoppy_->initFonts();
+        initDone.set_value();
+
+        auto video_track = timeline_.add_video_track();
+        auto video_clip = video_track->add_clip();
+
+        std::string videoPath = getBundlePath("pyonpyon.mp4");
+        if (!video_clip->open(videoPath.c_str())) {
+            SDL_Log("Video file not found: %s", videoPath.c_str());
+            return;
+        }
+
+        video_clip->timeline_range.start = 0;
+        video_clip->timeline_range.end = video_clip->source_range.duration();
+
+        auto audio_track = timeline_.add_audio_track();
+        auto audio_clip = audio_track->add_clip();
+
+        if (audio_clip->open(videoPath.c_str())) {
+            audio_clip->timeline_range.start = 0;
+            audio_clip->timeline_range.end = audio_clip->source_range.duration();
+        }
+
+        audio_output_ios_ = std::make_unique<nle::AudioOutput>(timeline_);
+        if (!audio_output_ios_->initialize()) {
+            SDL_Log("Audio output init failed");
+        }
+
+        renderer_ = std::make_unique<nle::TimelineRenderer<ImageMaster>>(timeline_, hoppy_->master);
+        timeline_.play();
+
+        initialized_ = true;
+        SDL_Log("Render thread started");
+    }
+
+    RenderResources resources_ios_{};
+    bool resources_initialized_ = false;
+
+    void renderOneFrame() {
+        if (!running_ || !initialized_) return;
+
+        // Initialize resources once
+        if (!resources_initialized_) {
+            QuadVertex::init();
+            initRenderResources(resources_ios_);
+            resources_initialized_ = true;
+        }
+
+        // Process deferred GPU uploads from other threads
+        // Must happen on main thread in bgfx single-thread mode
+        hoppy_->loader.processGpuUploadsMainThread();
+
+        std::vector<LayerInfo>* layers = NULL;
+        uint64_t frameId = 0;
+        int token = -1;
+        RenderCommandQueue* queue = NULL;
+
+        // Non-blocking check for render data (iOS can't block main thread)
+        {
+            std::unique_lock<std::mutex> lock(hoppy_->m, std::try_to_lock);
+            if (lock.owns_lock() && hoppy_->render > 0) {
+                hoppy_->render--;
+                queue = hoppy_->target->commandQueue;
+                queue->acquire(&layers, frameId, token);
+            }
+        }
+
+        {
+            std::unique_lock<std::mutex> lock3(hoppy_->patternAtlas.m, std::try_to_lock);
+            if (lock3.owns_lock()) {
+                hoppy_->patternAtlas.reset();
+                hoppy_->patternAtlas.buildTextures();
+            }
+        }
+
+        if (layers != NULL) {
+            hoppy_->master.beginFrame();
+            for (auto& layer : *layers) {
+                renderLayer(NULL, layer, resources_ios_, hoppy_->master, hoppy_->patternAtlas);
+            }
+
+            renderer_->update();
+            auto render_items = renderer_->get_render_items();
+
+            // Setup view 30 for video rendering (with depth buffer)
+            if (!render_items.empty()) {
+                int winW, winH;
+                SDL_GetWindowSize(window_, &winW, &winH);
+                // Update layout size to match actual window size
+                width_ = winW;
+                height_ = winH;
+                bgfx::setViewFrameBuffer(30, BGFX_INVALID_HANDLE);
+                bgfx::setViewClear(30, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, 0x303030ff, 1.0f, 0);
+                bgfx::setViewRect(30, 0, 0, uint16_t(winW), uint16_t(winH));
+                float orthoProj[16];
+                bx::mtxOrtho(orthoProj, 0.0f, float(winW), float(winH), 0.0f, 0.0f, 100.0f, 0.0f, bgfx::getCaps()->homogeneousDepth);
+                bgfx::setViewTransform(30, NULL, orthoProj);
+            }
+
+            for (size_t i = 0; i < render_items.size(); i++) {
+                std::vector<UnifiedDrawCommand> commands;
+                std::vector<bgfx::TextureHandle> textures;
+
+                commands.reserve(render_items.size());
+                textures.reserve(render_items.size());
+
+                float base_z = 0.0f;
+                for (size_t j = 0; j < render_items.size(); j++) {
+                    const auto& item = render_items[j];
+                    auto resolved = hoppy_->master.resolve(item.image_id);
+
+                    if (!resolved.isReady()) continue;
+
+                    float px, py, pw, ph;
+                    calculate_layout_pixels(j, render_items.size(), item.clip, px, py, pw, ph);
+
+                    textures.push_back(resolved.resolved.texture);
+
+                    UnifiedDrawCommand cmd{};
+                    cmd.type = DrawCommandType::Image;
+                    cmd.viewId = 30;
+                    cmd.zIndex = base_z + j * 0.001f;
+                    cmd.texture = &textures.back();
+                    cmd.texture2 = &nulltex;
+
+                    cmd.x = px;
+                    cmd.y = py;
+                    cmd.width = pw;
+                    cmd.height = ph;
+
+                    cmd.angle = 0.0f;
+                    cmd.dataOffset = 0.0f;
+                    cmd.scrollX = 1.0f;
+                    cmd.scrollY = 1.0f;
+
+                    cmd.radius = 0.0f;
+                    cmd.aa = 1.0f;
+                    cmd.shadowX = 0.0f;
+                    cmd.shadowY = 0.0f;
+                    cmd.shadowBlur = 0.0f;
+                    cmd.borderWidth = 0.0f;
+
+                    cmd.shadowColor = 0x00000000;
+                    cmd.fillColor = 0xFFFFFFFF;
+                    cmd.borderColor = 0x00000000;
+                    std::vector<UnifiedDrawCommand*> single_batch = { &cmd };
+                    drawUnifiedBatch(single_batch, resources_ios_,
+                        BGFX_INVALID_HANDLE, BGFX_INVALID_HANDLE, 30);
+                }
+            }
+        }
+
+        bgfx::frame();
+        // bgfx::renderFrame() は init前の1回だけ。毎フレームは呼ばない
+    }
+#endif
     enum class LayoutMode {
         Stack,   // PiP形式
         Grid,    // グリッド
@@ -788,9 +1051,18 @@ public:
         auto video_track = timeline_.add_video_track();
         auto video_clip = video_track->add_clip();
 
-        if (!video_clip->open("pyonpyon.mp4")) {
+#ifdef __APPLE__
+        std::string videoPath = getBundlePath("pyonpyon.mp4");
+        if (!video_clip->open(videoPath.c_str())) {
+            SDL_Log("Video file not found: %s", videoPath.c_str());
             return;
         }
+#else
+        if (!video_clip->open("pyonpyon.mp4")) {
+            SDL_Log("Video file not found: pyonpyon.mp4");
+            return;
+        }
+#endif
 
         video_clip->timeline_range.start = 0;
         video_clip->timeline_range.end = video_clip->source_range.duration();
@@ -799,7 +1071,11 @@ public:
         auto audio_track = timeline_.add_audio_track();
         auto audio_clip = audio_track->add_clip();
 
+#ifdef __APPLE__
+        if (audio_clip->open(videoPath.c_str())) {
+#else
         if (audio_clip->open("pyonpyon.mp4")) {
+#endif
             audio_clip->timeline_range.start = 0;
             audio_clip->timeline_range.end = audio_clip->source_range.duration();
         }
@@ -928,6 +1204,7 @@ public:
                     }
                 }
                 frameN = bgfx::frame();
+                // bgfx::renderFrame() は init前の1回だけ。毎フレームは呼ばない
             }
         }
     }

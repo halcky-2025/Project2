@@ -4,6 +4,30 @@
 #include <map>
 #include <string>
 #include <algorithm>
+#include <fstream>
+
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#if TARGET_OS_IOS || TARGET_OS_SIMULATOR
+#import <Foundation/Foundation.h>
+#ifndef BUNDLE_PATH_DEFINED
+#define BUNDLE_PATH_DEFINED
+// Helper to get bundle resource path on iOS (for shaders and resources)
+inline std::string getBundlePath(const char* filename) {
+    NSString* name = [[NSString alloc] initWithUTF8String:filename];
+    // Extract just the filename (last path component) for bundle lookup
+    NSString* lastComponent = [name lastPathComponent];
+    NSString* ext = [lastComponent pathExtension];
+    NSString* base = [lastComponent stringByDeletingPathExtension];
+    NSString* path = [[NSBundle mainBundle] pathForResource:base ofType:ext];
+    if (path) {
+        return std::string([path UTF8String]);
+    }
+    return std::string(filename); // fallback
+}
+#endif
+#endif
+#endif
 
 // ============================================================
 // 共通定義
@@ -17,6 +41,7 @@ struct RenderResources {
     bgfx::UniformHandle param1Uniform = BGFX_INVALID_HANDLE;
     bgfx::ProgramHandle uniteProgram = BGFX_INVALID_HANDLE;
     bgfx::ProgramHandle pageProgram = BGFX_INVALID_HANDLE;
+    bgfx::TextureHandle placeholderTexture = BGFX_INVALID_HANDLE; // 1x1 white texture for placeholder
 };
 
 // 基底コマンド
@@ -203,10 +228,14 @@ inline void drawUnifiedBatch(
     bgfx::setIndexBuffer(resources.quadIB);
 
     // テクスチャ設定（ポインタをデリファレンス）
-    bgfx::TextureHandle tex = batchTexture;;
-    if (bgfx::isValid(*sorted[0]->texture))tex = *sorted[0]->texture;
+    bgfx::TextureHandle tex = batchTexture;
+    if (sorted[0]->texture && bgfx::isValid(*sorted[0]->texture)) tex = *sorted[0]->texture;
     bgfx::TextureHandle tex2 = batchTexture2;
-    if (bgfx::isValid(*sorted[0]->texture2)) tex2 = *sorted[0]->texture2;
+    if (sorted[0]->texture2 && bgfx::isValid(*sorted[0]->texture2)) tex2 = *sorted[0]->texture2;
+
+    // Use placeholder texture if tex or tex2 is invalid (Metal requires valid texture bindings)
+    if (!bgfx::isValid(tex)) tex = resources.placeholderTexture;
+    if (!bgfx::isValid(tex2)) tex2 = resources.placeholderTexture;
 
     bgfx::setTexture(0, resources.paletteUniform, tex);
     bgfx::setTexture(1, resources.widthsUniform, tex2);

@@ -1,0 +1,342 @@
+name: HopStar
+options:
+  bundleIdPrefix: com.hopstar
+  deploymentTarget:
+    iOS: "17.0"
+    macOS: "14.0"
+  xcodeVersion: "15.0"
+  generateEmptyDirectories: true
+  groupSortPosition: top
+
+settings:
+  base:
+    CLANG_CXX_LANGUAGE_STANDARD: c++20
+    CLANG_CXX_LIBRARY: libc++
+    GCC_C_LANGUAGE_STANDARD: c11
+    CLANG_ENABLE_MODULES: YES
+    CLANG_ENABLE_OBJC_ARC: YES
+    SWIFT_VERSION: "5.0"
+    ENABLE_BITCODE: NO
+    DEAD_CODE_STRIPPING: YES
+
+# =============================================================================
+# Targets
+# =============================================================================
+targets:
+
+  # ===========================================================================
+  # macOS Target
+  # ===========================================================================
+  HopStar-macOS:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+
+    sources:
+      - path: main4.mm
+        buildPhase: sources
+      - path: platform/apple/AppleBridge.mm
+        buildPhase: sources
+      - path: sqlite3.c
+        buildPhase: sources
+      - path: shaders/vs_unite2_mtl.bin
+        buildPhase: resources
+      - path: shaders/fs_unite2_mtl.bin
+        buildPhase: resources
+      - path: pyonpyon.mp4
+        buildPhase: resources
+      - path: 123.png
+        buildPhase: resources
+      - path: fonts/NotoSansJP-Regular.ttf
+        buildPhase: resources
+      - path: fonts/NotoSerifJP-Regular.ttf
+        buildPhase: resources
+      - path: fonts/RobotoMono-Regular.ttf
+        buildPhase: resources
+
+    settings:
+      base:
+        PRODUCT_NAME: HopStar
+        PRODUCT_BUNDLE_IDENTIFIER: com.hopstar.editor.macos
+        INFOPLIST_FILE: platform/apple/Info-macOS.plist
+        CODE_SIGN_STYLE: Automatic
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        COMBINE_HIDPI_IMAGES: YES
+        ENABLE_HARDENED_RUNTIME: NO
+        # C++ settings
+        CLANG_CXX_LANGUAGE_STANDARD: c++20
+        GCC_ENABLE_CPP_EXCEPTIONS: YES
+        GCC_ENABLE_CPP_RTTI: YES
+        DEFINES_MODULE: YES
+        # Preprocessor definitions
+        GCC_PREPROCESSOR_DEFINITIONS:
+          - "$(inherited)"
+          - "SDL_MAIN_HANDLED"
+          - "BX_CONFIG_DEBUG=0"
+          - "TARGET_OS_OSX=1"
+          - "HOPSTAR_ENABLE_FFMPEG"
+        # Header search paths
+        HEADER_SEARCH_PATHS:
+          - "$(inherited)"
+          - "$(PROJECT_DIR)"
+          - "$(PROJECT_DIR)/platform/apple"
+          - "$(PROJECT_DIR)/libs/SDL3/include"
+          - "$(PROJECT_DIR)/libs/SDL3_ttf/include"
+          - "$(PROJECT_DIR)/libs/SDL3_ttf/external/freetype/include"
+          - "$(PROJECT_DIR)/libs/SDL3_ttf/external/harfbuzz/src"
+          - "$(PROJECT_DIR)/libs/bgfx.cmake/bgfx/include"
+          - "$(PROJECT_DIR)/libs/bgfx.cmake/bx/include"
+          - "$(PROJECT_DIR)/libs/bgfx.cmake/bx/include/compat/osx"
+          - "$(PROJECT_DIR)/libs/bgfx.cmake/bimg/include"
+          - "$(PROJECT_DIR)/libs/portaudio/include"
+          - "$(PROJECT_DIR)/libs/nlohmann"
+          - "$(PROJECT_DIR)/libs/ffmpeg-kit/src/ffmpeg/build-macos-static/output/include"
+        # Library search paths
+        LIBRARY_SEARCH_PATHS:
+          - "$(inherited)"
+          - "$(PROJECT_DIR)/libs/SDL3/build-macos"
+          - "$(PROJECT_DIR)/libs/SDL3_ttf/build-macos"
+          - "$(PROJECT_DIR)/libs/SDL3_ttf/build-macos/external/freetype-build"
+          - "$(PROJECT_DIR)/libs/SDL3_ttf/build-macos/external/harfbuzz-build"
+          - "$(PROJECT_DIR)/libs/SDL3_ttf/build-macos/external/plutosvg-guild"
+          - "$(PROJECT_DIR)/libs/SDL3_ttf/build-macos/external/plutovg-build"
+          - "$(PROJECT_DIR)/libs/bgfx.cmake/build-macos/cmake/bgfx"
+          - "$(PROJECT_DIR)/libs/bgfx.cmake/build-macos/cmake/bimg"
+          - "$(PROJECT_DIR)/libs/bgfx.cmake/build-macos/cmake/bx"
+          - "$(PROJECT_DIR)/libs/portaudio/build-macos"
+          - "$(PROJECT_DIR)/libs/ffmpeg-kit/src/ffmpeg/build-macos-static/output/lib"
+        # Other linker flags
+        OTHER_LDFLAGS:
+          - "$(inherited)"
+          - "-lSDL3"
+          - "-lSDL3_ttf"
+          - "-lfreetype"
+          - "-lharfbuzz"
+          - "-lplutosvg"
+          - "-lplutovg"
+          - "-lbgfx"
+          - "-lbimg"
+          - "-lbx"
+          - "-lportaudio"
+          - "-lavformat"
+          - "-lavcodec"
+          - "-lswscale"
+          - "-lswresample"
+          - "-lavutil"
+          - "-lavfilter"
+          - "-liconv"
+          - "-lbz2"
+          - "-lz"
+          - "-framework Foundation"
+          - "-framework AppKit"
+          - "-framework Metal"
+          - "-framework MetalKit"
+          - "-framework QuartzCore"
+          - "-framework CoreGraphics"
+          - "-framework CoreVideo"
+          - "-framework CoreMedia"
+          - "-framework CoreAudio"
+          - "-framework AudioToolbox"
+          - "-framework AudioUnit"
+          - "-framework AVFoundation"
+          - "-framework VideoToolbox"
+          - "-framework CoreML"
+          - "-framework Vision"
+          - "-framework Photos"
+          - "-framework UserNotifications"
+          - "-framework IOKit"
+          - "-framework Carbon"
+          - "-framework ForceFeedback"
+          - "-framework GameController"
+          - "-framework CoreHaptics"
+          - "-framework UniformTypeIdentifiers"
+          - "-framework Security"
+          - "-framework CoreServices"
+          - "-framework CoreFoundation"
+
+    dependencies: []
+
+    info:
+      path: platform/apple/Info-macOS.plist
+      properties:
+        CFBundleName: HopStar
+        CFBundleDisplayName: HopStar
+        CFBundleIdentifier: com.hopstar.editor.macos
+        CFBundleVersion: "1"
+        CFBundleShortVersionString: "1.0"
+        NSHighResolutionCapable: true
+
+    entitlements:
+      path: platform/apple/HopStar-macOS.entitlements
+
+  # ===========================================================================
+  # iOS Target
+  # ===========================================================================
+  HopStar-iOS:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+
+    sources:
+      - path: main3.mm
+        buildPhase: sources
+      - path: platform/apple/AppDelegate.mm
+        buildPhase: sources
+      - path: platform/apple/AppleBridge-ObjC.m
+        buildPhase: sources
+      - path: platform/apple/portaudio_ios.mm
+        buildPhase: sources
+      - path: platform/apple/Dummy.swift
+        buildPhase: sources
+      - path: platform/apple/AppDelegate.h
+        buildPhase: headers
+      - path: platform/apple/AppleBridge-Swift.h
+        buildPhase: headers
+      - path: platform/apple/LaunchScreen.storyboard
+        buildPhase: resources
+      - path: shaders/vs_unite2_mtl.bin
+        buildPhase: resources
+      - path: shaders/fs_unite2_mtl.bin
+        buildPhase: resources
+      - path: pyonpyon.mp4
+        buildPhase: resources
+      - path: 123.png
+        buildPhase: resources
+      - path: fonts/NotoSansJP-Regular.ttf
+        buildPhase: resources
+      - path: fonts/NotoSerifJP-Regular.ttf
+        buildPhase: resources
+      - path: fonts/RobotoMono-Regular.ttf
+        buildPhase: resources
+
+    settings:
+      base:
+        PRODUCT_NAME: HopStar
+        PRODUCT_BUNDLE_IDENTIFIER: com.hopstar.editor.ios
+        INFOPLIST_FILE: platform/apple/Info-iOS.plist
+        CODE_SIGN_STYLE: Automatic
+        IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        # C++ settings
+        CLANG_CXX_LANGUAGE_STANDARD: c++20
+        GCC_ENABLE_CPP_EXCEPTIONS: YES
+        GCC_ENABLE_CPP_RTTI: YES
+        DEFINES_MODULE: YES
+        # Preprocessor definitions for bx/bgfx
+        GCC_PREPROCESSOR_DEFINITIONS:
+          - "$(inherited)"
+          - "BX_CONFIG_DEBUG=0"
+        # Header search paths (SDL3_ttf before stubs to use real TTF)
+        HEADER_SEARCH_PATHS:
+          - "$(inherited)"
+          - "$(PROJECT_DIR)/libs/SDL3_ttf/include"
+          - "$(PROJECT_DIR)/platform/apple/stubs"
+          - "$(PROJECT_DIR)"
+          - "$(PROJECT_DIR)/platform/apple"
+          - "$(PROJECT_DIR)/libs/SDL3/include"
+          - "$(PROJECT_DIR)/libs/bgfx.cmake/bgfx/include"
+          - "$(PROJECT_DIR)/libs/bgfx.cmake/bx/include"
+          - "$(PROJECT_DIR)/libs/bgfx.cmake/bx/include/compat/ios"
+          - "$(PROJECT_DIR)/libs/bgfx.cmake/bimg/include"
+          - "$(PROJECT_DIR)/libs/nlohmann"
+          - "$(PROJECT_DIR)/libs/ffmpeg-kit/prebuilt/apple-ios-arm64/ffmpeg/include"
+        # Framework search paths (iOS device)
+        FRAMEWORK_SEARCH_PATHS:
+          - "$(inherited)"
+          - "$(PROJECT_DIR)/libs/ffmpeg-kit/prebuilt/apple-ios-arm64/ffmpeg/framework"
+        # Library search paths (iOS device)
+        LIBRARY_SEARCH_PATHS:
+          - "$(inherited)"
+          - "$(PROJECT_DIR)/libs/SDL3/build-ios-device/Release-iphoneos"
+          - "$(PROJECT_DIR)/libs/SDL3_ttf/build-ios-device/Release-iphoneos"
+          - "$(PROJECT_DIR)/libs/bgfx.cmake/build-ios-device/cmake/bgfx/Release-iphoneos"
+          - "$(PROJECT_DIR)/libs/bgfx.cmake/build-ios-device/cmake/bimg/Release-iphoneos"
+          - "$(PROJECT_DIR)/libs/bgfx.cmake/build-ios-device/cmake/bx/Release-iphoneos"
+        # Other linker flags
+        OTHER_LDFLAGS:
+          - "$(inherited)"
+          - "-lSDL3"
+          - "-lSDL3_ttf"
+          - "-lbgfx"
+          - "-lbimg"
+          - "-lbx"
+          - "-framework Metal"
+          - "-framework MetalKit"
+          - "-framework QuartzCore"
+          - "-framework CoreGraphics"
+          - "-framework CoreVideo"
+          - "-framework CoreAudio"
+          - "-framework AudioToolbox"
+          - "-framework AVFoundation"
+          - "-framework GameController"
+          - "-framework CoreHaptics"
+          - "-framework CoreMotion"
+          - "-framework CoreBluetooth"
+          - "-framework VideoToolbox"
+          - "-framework CoreMedia"
+          - "-framework Security"
+          - "-liconv"
+          - "-lbz2"
+          - "-lz"
+          - "-lsqlite3"
+
+    dependencies:
+      - framework: libs/ffmpeg-kit/prebuilt/apple-ios-arm64/ffmpeg/framework/libavcodec.framework
+        embed: true
+      - framework: libs/ffmpeg-kit/prebuilt/apple-ios-arm64/ffmpeg/framework/libavformat.framework
+        embed: true
+      - framework: libs/ffmpeg-kit/prebuilt/apple-ios-arm64/ffmpeg/framework/libavutil.framework
+        embed: true
+      - framework: libs/ffmpeg-kit/prebuilt/apple-ios-arm64/ffmpeg/framework/libswresample.framework
+        embed: true
+      - framework: libs/ffmpeg-kit/prebuilt/apple-ios-arm64/ffmpeg/framework/libswscale.framework
+        embed: true
+      - framework: libs/ffmpeg-kit/prebuilt/apple-ios-arm64/ffmpeg/framework/libavfilter.framework
+        embed: true
+      - framework: libs/ffmpeg-kit/prebuilt/apple-ios-arm64/ffmpeg/framework/libavdevice.framework
+        embed: true
+
+    info:
+      path: platform/apple/Info-iOS.plist
+      properties:
+        CFBundleName: HopStar
+        CFBundleDisplayName: HopStar
+        CFBundleIdentifier: com.hopstar.editor.ios
+        CFBundleVersion: "1"
+        CFBundleShortVersionString: "1.0"
+        UILaunchStoryboardName: LaunchScreen
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+
+schemes:
+  HopStar-macOS:
+    build:
+      targets:
+        HopStar-macOS: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
+
+  HopStar-iOS:
+    build:
+      targets:
+        HopStar-iOS: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

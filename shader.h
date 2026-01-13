@@ -1,4 +1,5 @@
-﻿#include "shader2.h"
+﻿#pragma once
+#include "shader2.h"
 
 // ============================================================
 // LayerInfo（レイヤー管理）
@@ -698,6 +699,38 @@ bgfx::ShaderHandle loadShader(const char* filename) {
     SDL_Log("loadShader: Loaded %s (%lld bytes)", filename, (long long)size);
     const bgfx::Memory* mem = bgfx::copy(buffer.data(), static_cast<uint32_t>(size));
     return bgfx::createShader(mem);
+#elif TARGET_OS_IOS || TARGET_OS_SIMULATOR || TARGET_OS_MAC
+    // iOS/macOS: use NSBundle to get shader path (try bundle first, then fallback to relative path)
+    std::string bundlePath = getBundlePath(filename);
+    SDL_Log("loadShader: Trying bundle path: %s", bundlePath.c_str());
+    std::ifstream file(bundlePath, std::ios::binary | std::ios::ate);
+
+    // macOS: If bundle path failed, try relative path with "shaders/" prefix (for command line execution)
+#if TARGET_OS_MAC && !TARGET_OS_IOS
+    if (!file.is_open()) {
+        std::string relativePath = std::string("shaders/") + filename;
+        SDL_Log("loadShader: Bundle path failed, trying relative path: %s", relativePath.c_str());
+        file.open(relativePath, std::ios::binary | std::ios::ate);
+    }
+#endif
+
+    if (!file.is_open()) {
+        SDL_Log("loadShader: Failed to open shader file: %s", filename);
+        return BGFX_INVALID_HANDLE;
+    }
+
+    std::streamsize size = file.tellg();
+    file.seekg(0, std::ios::beg);
+
+    std::vector<char> buffer(size);
+    if (!file.read(buffer.data(), size)) {
+        SDL_Log("loadShader: Failed to read shader file: %s", bundlePath.c_str());
+        return BGFX_INVALID_HANDLE;
+    }
+
+    SDL_Log("loadShader: Loaded shader (%lld bytes)", (long long)size);
+    const bgfx::Memory* mem = bgfx::copy(buffer.data(), static_cast<uint32_t>(size));
+    return bgfx::createShader(mem);
 #else
     std::ifstream file(filename, std::ios::binary | std::ios::ate);
     if (!file.is_open()) {
@@ -722,8 +755,22 @@ void initRenderResources(RenderResources& resources) {
     resources.paletteUniform = bgfx::createUniform("s_palette", bgfx::UniformType::Sampler);
     resources.widthsUniform = bgfx::createUniform("s_widths", bgfx::UniformType::Sampler);
     resources.param1Uniform = bgfx::createUniform("u_param1", bgfx::UniformType::Vec4);
+
+    // Create 1x1 white placeholder texture (required for Metal - must have valid texture bindings)
+    uint32_t whitePixel = 0xFFFFFFFF;
+    resources.placeholderTexture = bgfx::createTexture2D(
+        1, 1, false, 1, bgfx::TextureFormat::RGBA8,
+        BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP,
+        bgfx::copy(&whitePixel, sizeof(whitePixel)));
+
+#if TARGET_OS_IOS || TARGET_OS_SIMULATOR || TARGET_OS_MAC
+    // Use Metal shaders on iOS/macOS (from bundle, or fallback to shaders/ directory on macOS)
+    bgfx::ShaderHandle vsu = loadShader("vs_unite2_mtl.bin");
+    bgfx::ShaderHandle fsu = loadShader("fs_unite2_mtl.bin");
+#else
     bgfx::ShaderHandle vsu = loadShader("vs_unite2.bin");
     bgfx::ShaderHandle fsu = loadShader("fs_unite2.bin");
+#endif
     resources.uniteProgram = bgfx::createProgram(vsu, fsu, true);
     // シェーダープログラムの登録は外部で行う
     // resources.programs[DrawCommandType::Rectangle] = loadProgram(...);
@@ -737,4 +784,5 @@ void destroyRenderResources(RenderResources& resources) {
     if (bgfx::isValid(resources.param1Uniform)) bgfx::destroy(resources.param1Uniform);
     if (bgfx::isValid(resources.uniteProgram)) bgfx::destroy(resources.uniteProgram);
     if (bgfx::isValid(resources.pageProgram)) bgfx::destroy(resources.pageProgram);
+    if (bgfx::isValid(resources.placeholderTexture)) bgfx::destroy(resources.placeholderTexture);
 }
