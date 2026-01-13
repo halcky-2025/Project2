@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>logFormatVersion</key>
+	<integer>11</integer>
+	<key>logs</key>
+	<dict>
+		<key>83660103-D6BE-44B7-A804-006D6D1C4B30</key>
+		<dict>
+			<key>className</key>
+			<string>IDECommandLineBuildLog</string>
+			<key>documentTypeString</key>
+			<string>&lt;nil&gt;</string>
+			<key>domainType</key>
+			<string>Xcode.IDEActivityLogDomainType.BuildLog</string>
+			<key>fileName</key>
+			<string>83660103-D6BE-44B7-A804-006D6D1C4B30.xcactivitylog</string>
+			<key>hasPrimaryLog</key>
+			<true/>
+			<key>primaryObservable</key>
+			<dict>
+				<key>highLevelStatus</key>
+				<string>W</string>
+				<key>totalNumberOfAnalyzerIssues</key>
+				<integer>0</integer>
+				<key>totalNumberOfErrors</key>
+				<integer>0</integer>
+				<key>totalNumberOfTestFailures</key>
+				<integer>0</integer>
+				<key>totalNumberOfWarnings</key>
+				<integer>98</integer>
+			</dict>
+			<key>schemeIdentifier-containerName</key>
+			<string>HopStar project</string>
+			<key>schemeIdentifier-schemeName</key>
+			<string>HopStar-iOS</string>
+			<key>schemeIdentifier-sharedScheme</key>
+			<integer>1</integer>
+			<key>signature</key>
+			<string>Building project HopStar with scheme HopStar-iOS</string>
+			<key>timeStartedRecording</key>
+			<real>789893735.66401505</real>
+			<key>timeStoppedRecording</key>
+			<real>789893741.70119298</real>
+			<key>title</key>
+			<string>Building project HopStar with scheme HopStar-iOS</string>
+			<key>uniqueIdentifier</key>
+			<string>83660103-D6BE-44B7-A804-006D6D1C4B30</string>
+		</dict>
+		<key>B8DE9442-CD24-412A-8F32-C1C7FB3C7F6C</key>
+		<dict>
+			<key>className</key>
+			<string>IDECommandLineBuildLog</string>
+			<key>documentTypeString</key>
+			<string>&lt;nil&gt;</string>
+			<key>domainType</key>
+			<string>Xcode.IDEActivityLogDomainType.BuildLog</string>
+			<key>fileName</key>
+			<string>B8DE9442-CD24-412A-8F32-C1C7FB3C7F6C.xcactivitylog</string>
+			<key>hasPrimaryLog</key>
+			<true/>
+			<key>primaryObservable</key>
+			<dict>
+				<key>highLevelStatus</key>
+				<string>W</string>
+				<key>totalNumberOfAnalyzerIssues</key>
+				<integer>0</integer>
+				<key>totalNumberOfErrors</key>
+				<integer>0</integer>
+				<key>totalNumberOfTestFailures</key>
+				<integer>0</integer>
+				<key>totalNumberOfWarnings</key>
+				<integer>98</integer>
+			</dict>
+			<key>schemeIdentifier-containerName</key>
+			<string>HopStar project</string>
+			<key>schemeIdentifier-schemeName</key>
+			<string>HopStar-iOS</string>
+			<key>schemeIdentifier-sharedScheme</key>
+			<integer>1</integer>
+			<key>signature</key>
+			<string>Building project HopStar with scheme HopStar-iOS</string>
+			<key>timeStartedRecording</key>
+			<real>789894216.64627397</real>
+			<key>timeStoppedRecording</key>
+			<real>789894218.47609699</real>
+			<key>title</key>
+			<string>Building project HopStar with scheme HopStar-iOS</string>
+			<key>uniqueIdentifier</key>
+			<string>B8DE9442-CD24-412A-8F32-C1C7FB3C7F6C</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

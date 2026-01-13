@@ -1,5 +1,11 @@
 ﻿#pragma once
 
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#endif
+
+#include <algorithm>
+
 #ifdef __ANDROID__
 #include <SDL3/SDL.h>
 #endif
@@ -818,18 +824,35 @@ public:
             bgfx::destroy(info.fbo);
         }
 
-        // �V�����e�N�X�`���쐬
+        // 新しいテクスチャ作成 (BGRA8 for Metal compatibility)
         bgfx::TextureHandle newHandle = bgfx::createTexture2D(
             newW, newH, false, 1,
-            bgfx::TextureFormat::RGBA8,
+            bgfx::TextureFormat::BGRA8,
             BGFX_TEXTURE_RT | BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP,
             nullptr);
 
         if (!bgfx::isValid(newHandle)) return false;
 
-        bgfx::FrameBufferHandle newFbo = bgfx::createFrameBuffer(1, &newHandle, true);
+        // Create depth texture for offscreen framebuffer (required for Metal depth testing)
+        bgfx::TextureHandle newDepthHandle = bgfx::createTexture2D(
+            newW, newH, false, 1,
+            bgfx::TextureFormat::D24S8,
+            BGFX_TEXTURE_RT, nullptr);
+
+        if (!bgfx::isValid(newDepthHandle)) {
+            bgfx::destroy(newHandle);
+            return false;
+        }
+
+        // Use bgfx::Attachment to properly attach color and depth
+        bgfx::Attachment att[2];
+        att[0].init(newHandle);      // color attachment
+        att[1].init(newDepthHandle); // depth attachment
+
+        bgfx::FrameBufferHandle newFbo = bgfx::createFrameBuffer(2, att, true);
         if (!bgfx::isValid(newFbo)) {
             bgfx::destroy(newHandle);
+            bgfx::destroy(newDepthHandle);
             return false;
         }
 
@@ -1385,16 +1408,33 @@ private:
     bool createOffscreenInternal(ImageId id, uint16_t w, uint16_t h, bool persistent) {
         std::lock_guard lock(standaloneMutex_);
 
+        // Use BGRA8 for Metal compatibility
         bgfx::TextureHandle handle = bgfx::createTexture2D(
-            w, h, false, 1, bgfx::TextureFormat::RGBA8,
+            w, h, false, 1, bgfx::TextureFormat::BGRA8,
             BGFX_TEXTURE_RT | BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP,
             nullptr);
 
         if (!bgfx::isValid(handle)) return false;
 
-        bgfx::FrameBufferHandle fbo = bgfx::createFrameBuffer(1, &handle, true);
+        // Create depth texture for offscreen framebuffer (required for Metal depth testing)
+        bgfx::TextureHandle depthHandle = bgfx::createTexture2D(
+            w, h, false, 1, bgfx::TextureFormat::D24S8,
+            BGFX_TEXTURE_RT, nullptr);
+
+        if (!bgfx::isValid(depthHandle)) {
+            bgfx::destroy(handle);
+            return false;
+        }
+
+        // Use bgfx::Attachment to properly attach color and depth
+        bgfx::Attachment att[2];
+        att[0].init(handle);      // color attachment
+        att[1].init(depthHandle); // depth attachment
+
+        bgfx::FrameBufferHandle fbo = bgfx::createFrameBuffer(2, att, true);
         if (!bgfx::isValid(fbo)) {
             bgfx::destroy(handle);
+            bgfx::destroy(depthHandle);
             return false;
         }
 
@@ -1951,6 +1991,28 @@ public:
     const PlacementPolicy& policy() const { return policy_; }
     PlacementPolicy& policy() { return policy_; }
 
+#if TARGET_OS_IOS || TARGET_OS_SIMULATOR
+    //=========================================================================
+    // iOS: Process queued GPU uploads on main thread
+    // Must be called from main thread in bgfx single-thread mode
+    //=========================================================================
+    void processGpuUploadsMainThread() {
+        std::vector<ImageId> toProcess;
+        {
+            std::lock_guard lock(gpuUploadQueueMutex_);
+            toProcess.swap(gpuUploadQueue_);
+        }
+
+        for (ImageId imageId : toProcess) {
+            std::lock_guard lock(cacheMutex_);
+            auto it = cache_.find(imageId);
+            if (it != cache_.end()) {
+                uploadToGpuInternal(it->second);
+            }
+        }
+    }
+#endif
+
 private:
     //=========================================================================
     // �z�u�挈��
@@ -2077,6 +2139,25 @@ private:
             if (read != fileData.size()) return DecodedImage{};
 
             pixels = stbi_load_from_memory(fileData.data(), (int)fileData.size(), &w, &h, &channels, 4);
+#elif TARGET_OS_IOS || TARGET_OS_SIMULATOR || TARGET_OS_MAC
+            // iOS/macOS: Use bundle path (macOS falls back to relative path)
+            std::string bundlePath = getBundlePath(path.c_str());
+            SDL_Log("loadImage: Trying bundle path: %s", bundlePath.c_str());
+            pixels = stbi_load(bundlePath.c_str(), &w, &h, &channels, 4);
+#if TARGET_OS_MAC && !TARGET_OS_IOS
+            // macOS: If bundle path failed, try relative path (for command line execution)
+            if (!pixels) {
+                SDL_Log("loadImage: Bundle path failed, trying relative path: %s", path.c_str());
+                pixels = stbi_load(path.c_str(), &w, &h, &channels, 4);
+            }
+#else
+            // iOS only: Swap R and B channels (RGBA -> BGRA) for Metal compatibility
+            if (pixels) {
+                for (int i = 0; i < w * h; ++i) {
+                    std::swap(pixels[i * 4 + 0], pixels[i * 4 + 2]);
+                }
+            }
+#endif
 #else
             pixels = stbi_load(path.c_str(), &w, &h, &channels, 4);
 #endif
@@ -2097,6 +2178,13 @@ private:
                 (const stbi_uc*)data, (int)size, &w, &h, &channels, 4);
             if (!pixels) return DecodedImage{};
 
+#if TARGET_OS_IOS || TARGET_OS_SIMULATOR
+            // iOS only: Swap R and B channels (RGBA -> BGRA) for Metal compatibility
+            for (int i = 0; i < w * h; ++i) {
+                std::swap(pixels[i * 4 + 0], pixels[i * 4 + 2]);
+            }
+#endif
+
             DecodedImage result;
             result.width = (uint16_t)w;
             result.height = (uint16_t)h;
@@ -2110,10 +2198,20 @@ private:
     // GPU �A�b�v���[�h - ImageMaster �ɓo�^
     //=========================================================================
     bool uploadToGpu(ImageId imageId) {
+#if TARGET_OS_IOS || TARGET_OS_SIMULATOR
+        // iOS: Queue the upload for main thread processing
+        // bgfx single-thread mode requires all API calls on main thread
+        {
+            std::lock_guard lock(gpuUploadQueueMutex_);
+            gpuUploadQueue_.push_back(imageId);
+        }
+        return true;  // Will be processed on main thread
+#else
         std::lock_guard lock(cacheMutex_);
         auto it = cache_.find(imageId);
         if (it == cache_.end()) return false;
         return uploadToGpuInternal(it->second);
+#endif
     }
 
     bool uploadToGpuInternal(CachedImage& cached) {
@@ -2302,4 +2400,10 @@ private:
     // �d�����[�h���p�R�[���o�b�N
     std::mutex pendingCallbacksMutex_;
     std::unordered_map<ImageId, std::vector<std::function<void(ImageId, bool)>>> pendingCallbacks_;
+
+#if TARGET_OS_IOS || TARGET_OS_SIMULATOR
+    // iOS: Queue for deferred GPU uploads (must be processed on main thread)
+    std::mutex gpuUploadQueueMutex_;
+    std::vector<ImageId> gpuUploadQueue_;
+#endif
 };

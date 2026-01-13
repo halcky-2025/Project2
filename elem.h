@@ -15,7 +15,7 @@
 
 
 enum Position {
-	Relative, Fixed, Absolute
+	Relative, Pos_Fixed, Absolute  // Fixed renamed to Pos_Fixed to avoid conflict with MacTypes.h
 };
 enum Layout {
     ocupay, none, left, right
@@ -38,10 +38,12 @@ enum LetterType {
 	_Space, _Equal
 };
 class FontAtlas;
+#ifndef __MACTYPES__  // Avoid conflict with MacTypes.h Point on Apple platforms
 typedef struct {
     int x;
     int y;
 } Point;
+#endif
 typedef struct CloneElement CloneElement;
 typedef struct Measure Measure;
 typedef struct Graphic Graphic;
@@ -75,23 +77,23 @@ enum class RenderGroupFlags : uint8_t {
 	Transient = 1 << 1,
 };
 struct FontId {
-	uint64_t name = 0;   // ƒtƒHƒ“ƒg–¼ or ƒpƒX
+	uint64_t name = 0;   // ï¿½tï¿½Hï¿½ï¿½ï¿½gï¿½ï¿½ or ï¿½pï¿½X
 	int size = 0;    
 	FontId(const char* n, int s) : size(s) {
 		size_t len = strnlen(n, 8);
 		memcpy(&name, n, len);
 	} 
 
-	// —LŒø«ƒ`ƒFƒbƒN
+	// ï¿½Lï¿½ï¿½ï¿½ï¿½ï¿½`ï¿½Fï¿½bï¿½N
 	bool valid() const { return name != 0 && size > 0; }
 
-	// ”äŠr‰‰Zqistd::map—pj
+	// ï¿½ï¿½rï¿½ï¿½ï¿½Zï¿½qï¿½istd::mapï¿½pï¿½j
 	bool operator<(const FontId& o) const {
 		if (name != o.name) return name < o.name;
 		return size < o.size;
 	}
 
-	// “™‰¿‰‰Zqistd::unordered_map—pj
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Zï¿½qï¿½istd::unordered_mapï¿½pï¿½j
 	bool operator==(const FontId& o) const {
 		return name == o.name && size == o.size;
 	}
@@ -100,18 +102,18 @@ struct FontId {
 		return !(*this == o);
 	}
 
-	// ƒfƒoƒbƒO—p•¶š—ñ
+	// ï¿½fï¿½oï¿½bï¿½Oï¿½pï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	std::string toString() const {
 		return name + "@" + std::to_string(size);
 	}
 	uint64_t computeHash() const {
-		// FNV-1a ƒnƒbƒVƒ…
+		// FNV-1a ï¿½nï¿½bï¿½Vï¿½ï¿½
 		uint64_t h = 14695981039346656037ULL;
 
 		h ^= name;
 		h *= 1099511628211ULL;
 
-		// size‚à¬‚º‚é
+		// sizeï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		h ^= static_cast<uint64_t>(size);
 		h *= 1099511628211ULL;
 		return h;
@@ -132,12 +134,12 @@ FontId getFont(const char* name, int size) {
 }
 enum class ImageIdDomain : uint8_t {
 	Invalid = 0x00,
-	File = 0x01,  // ƒtƒ@ƒCƒ‹ƒpƒX‚©‚ç¶¬
-	Memory = 0x02,  // ƒƒ‚ƒŠƒf[ƒ^‚©‚ç¶¬
-	Offscreen = 0x03,  // ƒIƒtƒXƒNƒŠ[ƒ“ƒeƒNƒXƒ`ƒƒ
-	Generated = 0x04,  // “®“I¶¬iproceduralj
-	FontGlyph = 0x05,  // FontAtlas ‚ÌƒOƒŠƒt/‰æ‘œ
-	Thumbnail = 0x06,  // ƒTƒ€ƒlƒCƒ‹ (Grid/Shelf)
+	File = 0x01,  // ï¿½tï¿½@ï¿½Cï¿½ï¿½ï¿½pï¿½Xï¿½ï¿½ï¿½ç¶ï¿½ï¿½
+	Memory = 0x02,  // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½fï¿½[ï¿½^ï¿½ï¿½ï¿½ç¶ï¿½ï¿½
+	Offscreen = 0x03,  // ï¿½Iï¿½tï¿½Xï¿½Nï¿½ï¿½ï¿½[ï¿½ï¿½ï¿½eï¿½Nï¿½Xï¿½`ï¿½ï¿½
+	Generated = 0x04,  // ï¿½ï¿½ï¿½Iï¿½ï¿½ï¿½ï¿½ï¿½iproceduralï¿½j
+	FontGlyph = 0x05,  // FontAtlas ï¿½ÌƒOï¿½ï¿½ï¿½t/ï¿½æ‘œ
+	Thumbnail = 0x06,  // ï¿½Tï¿½ï¿½ï¿½lï¿½Cï¿½ï¿½ (Grid/Shelf)
 };
 
 using ImageId = uint64_t;
@@ -159,7 +161,7 @@ inline constexpr bool isValidImageId(ImageId id) {
 }
 
 //=============================================================================
-// ImageId ¶¬
+// ImageId ï¿½ï¿½ï¿½ï¿½
 //=============================================================================
 
 class ImageIdGenerator {
@@ -192,7 +194,7 @@ public:
 	}
 };
 //=============================================================================
-// StandaloneTextureInfo - 1–‡ŠGƒeƒNƒXƒ`ƒƒî•ñ
+// StandaloneTextureInfo - 1ï¿½ï¿½ï¿½Gï¿½eï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½ï¿½ï¿½
 //=============================================================================
 
 enum class ImageOrigin : uint8_t {
@@ -312,14 +314,25 @@ void TreeElementRemove(ThreadGC* thgc, NewLocal* local, TreeElement* self) {
 void createSurface(Element* elem, int w, int h) {
 	const uint64_t flags = BGFX_TEXTURE_RT | BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP;
 
-	elem->texPing = bgfx::createTexture2D(w, h, false, 1, bgfx::TextureFormat::RGBA8, flags);
-	elem->texPong = bgfx::createTexture2D(w, h, false, 1, bgfx::TextureFormat::RGBA8, flags);
+	// Use BGRA8 for Metal compatibility
+	elem->texPing = bgfx::createTexture2D(w, h, false, 1, bgfx::TextureFormat::BGRA8, flags);
+	elem->texPong = bgfx::createTexture2D(w, h, false, 1, bgfx::TextureFormat::BGRA8, flags);
 
-	bgfx::TextureHandle texsPing[1] = { elem->texPing };
-	bgfx::TextureHandle texsPong[1] = { elem->texPong };
+	// Create depth textures for offscreen framebuffers (required for Metal depth testing)
+	bgfx::TextureHandle depthPing = bgfx::createTexture2D(w, h, false, 1, bgfx::TextureFormat::D24S8, BGFX_TEXTURE_RT);
+	bgfx::TextureHandle depthPong = bgfx::createTexture2D(w, h, false, 1, bgfx::TextureFormat::D24S8, BGFX_TEXTURE_RT);
 
-	elem->fbPing = bgfx::createFrameBuffer(1, texsPing, true);
-	elem->fbPong = bgfx::createFrameBuffer(1, texsPong, true);
+	// Use bgfx::Attachment to properly attach color and depth
+	bgfx::Attachment attPing[2];
+	attPing[0].init(elem->texPing);  // color attachment
+	attPing[1].init(depthPing);       // depth attachment
+
+	bgfx::Attachment attPong[2];
+	attPong[0].init(elem->texPong);  // color attachment
+	attPong[1].init(depthPong);       // depth attachment
+
+	elem->fbPing = bgfx::createFrameBuffer(2, attPing, true);
+	elem->fbPong = bgfx::createFrameBuffer(2, attPong, true);
 }
 Element;
 typedef struct HoppyWindow {
@@ -619,7 +632,7 @@ void ElementDraw(ThreadGC* thgc, Element* self, Graphic*g, Local* local, bool* s
 		if (dirtyarerate < 0.5f) {} //layer
 	}
 
-	//maker 9-slice ŠpŠÛ or background
+	//maker 9-slice ï¿½pï¿½ï¿½ or background
 	//make ui
 	//make shadow
 	if (self->atlas != NULL) graphic.atlas = self->atlas;
@@ -1243,7 +1256,7 @@ void LetterDraw(ThreadGC* thgc, Element* self, Graphic* g, Local* local, bool* s
 		for (int i = 0; i < 2; i++) {
 			Element* el = *(Element**)get_last(local->selects[i]->state->elements);
 			if (*((Element**)get_last(local->selects[i]->state->elements)) == self) {
-				// lŠpŒ`‚Ì’è‹`
+				// ï¿½lï¿½pï¿½`ï¿½Ì’ï¿½`
 				SDL_FRect rect;
 				rect.y = g->py + self->pos2.y; rect.h = self->size2.y;
 				if ((Element*)*get_last(local->selects[(i + 1) % 2]->state->elements) == self) {

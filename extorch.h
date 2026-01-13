@@ -1,3 +1,13 @@
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#endif
+
+#include <thread>
+#include <chrono>
+#include <iostream>
+
+#if !TARGET_OS_IOS && !TARGET_OS_SIMULATOR
+
 class CustomModuleImpl;
 
 
@@ -27,7 +37,7 @@ torch::nn::Conv2dImpl* createConv2d(int64_t in_channels, int64_t out_channels, i
     }
 }
 
-// Conv2d‚ÌƒvƒƒpƒeƒB‚ÉƒAƒNƒZƒX‚·‚éŠÖ”
+// Conv2dï¿½Ìƒvï¿½ï¿½ï¿½pï¿½eï¿½Bï¿½ÉƒAï¿½Nï¿½Zï¿½Xï¿½ï¿½ï¿½ï¿½Öï¿½
 int64_t getInChannels(torch::nn::Conv2dImpl* conv) {
     if (conv) {
         return conv->options.in_channels();
@@ -49,7 +59,7 @@ int64_t getKernelSize(torch::nn::Conv2dImpl* conv) {
     return 0;
 }
 
-// ƒEƒFƒCƒgƒf[ƒ^‚ÉƒAƒNƒZƒX‚·‚éŠÖ”
+// ï¿½Eï¿½Fï¿½Cï¿½gï¿½fï¿½[ï¿½^ï¿½ÉƒAï¿½Nï¿½Zï¿½Xï¿½ï¿½ï¿½ï¿½Öï¿½
 float* getWeightData(torch::nn::Conv2dImpl* conv) {
     if (conv && conv->weight.defined()) {
         return conv->weight.data_ptr<float>();
@@ -65,13 +75,13 @@ int64_t getWeightSize(torch::nn::Conv2dImpl* conv) {
 }
 
 
-// ƒtƒHƒ[ƒhŠÖ”
+// ï¿½tï¿½Hï¿½ï¿½ï¿½[ï¿½hï¿½Öï¿½
 void* forwardConv2d(torch::nn::Conv2dImpl* conv, void* input_tensor) {
     if (conv && input_tensor) {
         try {
             TensorWrapper* input_wrapper = static_cast<TensorWrapper*>(input_tensor);
             torch::Tensor output = conv->forward(input_wrapper->tensor);
-            // ŒvZƒOƒ‰ƒt‚ğ•Û‚·‚éƒ‰ƒbƒp[‚ğ•Ô‚·
+            // ï¿½vï¿½Zï¿½Oï¿½ï¿½ï¿½tï¿½ï¿½Ûï¿½ï¿½ï¿½ï¿½éƒ‰ï¿½bï¿½pï¿½[ï¿½ï¿½Ô‚ï¿½
             return new TensorWrapper(output);
         }
         catch (const c10::Error& e) {
@@ -137,7 +147,7 @@ void* forwardMaxPool2d(torch::nn::MaxPool2dImpl* pool, void* input_tensor) {
     return nullptr;
 }
 
-// ReLUŠÖ˜A‚ÌÀ‘•
+// ReLUï¿½Ö˜Aï¿½Ìï¿½ï¿½ï¿½
 torch::nn::ReLUImpl* createReLU(bool inplace) {
     try {
         auto options = torch::nn::ReLUOptions().inplace(inplace);
@@ -162,7 +172,7 @@ void* forwardReLU(torch::nn::ReLUImpl* relu, void* input_tensor) {
         try {
             TensorWrapper* input_wrapper = static_cast<TensorWrapper*>(input_tensor);
             torch::Tensor output = relu->forward(input_wrapper->tensor);
-            // ŒvZƒOƒ‰ƒt‚ğ•Û‚·‚éƒ‰ƒbƒp[‚ğ•Ô‚·
+            // ï¿½vï¿½Zï¿½Oï¿½ï¿½ï¿½tï¿½ï¿½Ûï¿½ï¿½ï¿½ï¿½éƒ‰ï¿½bï¿½pï¿½[ï¿½ï¿½Ô‚ï¿½
             return new TensorWrapper(output);
         }
         catch (const c10::Error& e) {
@@ -221,7 +231,7 @@ void* forwardFlatten(torch::nn::FlattenImpl* flatten, void* input_tensor) {
     return nullptr;
 }
 
-// Linear ‚ÌÀ‘•
+// Linear ï¿½Ìï¿½ï¿½ï¿½
 torch::nn::LinearImpl* createLinear(int64_t in_features, int64_t out_features, bool bias) {
     try {
         auto options = torch::nn::LinearOptions(in_features, out_features).bias(bias);
@@ -306,7 +316,7 @@ void* forwardLinear(torch::nn::LinearImpl* linear, void* input_tensor) {
     return nullptr;
 }
 
-// Sequential ‚ÌÀ‘•
+// Sequential ï¿½Ìï¿½ï¿½ï¿½
 torch::nn::SequentialImpl* createSequential() {
     try {
         auto seq = new torch::nn::SequentialImpl();
@@ -320,15 +330,15 @@ torch::nn::SequentialImpl* createSequential() {
 void addModuleToSequential(torch::nn::SequentialImpl* seq, const char* name, void* module) {
     if (seq && module && name) {
         try {
-            // module_handle ‚ğ³‚µ‚¢Œ^‚ÉƒLƒƒƒXƒg
+            // module_handle ï¿½ğ³‚ï¿½ï¿½ï¿½ï¿½^ï¿½ÉƒLï¿½ï¿½ï¿½Xï¿½g
             auto* holder = static_cast<torch::nn::AnyModule*>(module);
-            // AnyModule ‚ÌƒNƒ[ƒ“iƒ€[ƒu‰Â”\‚ÈƒIƒuƒWƒFƒNƒgj‚ğ“¾‚é
+            // AnyModule ï¿½ÌƒNï¿½ï¿½ï¿½[ï¿½ï¿½ï¿½iï¿½ï¿½ï¿½[ï¿½uï¿½Â”\ï¿½ÈƒIï¿½uï¿½Wï¿½Fï¿½Nï¿½gï¿½jï¿½ğ“¾‚ï¿½
             torch::nn::AnyModule cloned = holder->clone();
-            // push_back ‚Éƒ€[ƒu‚·‚é
+            // push_back ï¿½Éƒï¿½ï¿½[ï¿½uï¿½ï¿½ï¿½ï¿½
             seq->push_back(std::string(name), std::move(cloned));
         }
         catch (...) {
-            // ƒGƒ‰[ˆ—
+            // ï¿½Gï¿½ï¿½ï¿½[ï¿½ï¿½ï¿½ï¿½
         }
     }
 }
@@ -364,17 +374,17 @@ void* forwardSequential(torch::nn::SequentialImpl* seq, void* input_tensor) {
 void registerModule(torch::nn::Module* parent, const char* name, torch::nn::Module* child) {  
    if (parent && child && name) {  
        try {  
-           // C³: `register_module` ‚Ì‘æ2ˆø”‚Í `t       orch::nn::Module` ‚ÌQÆ‚Å‚Í‚È‚­A`std::shared_ptr<torch::nn::Module>` ‚ğŠú‘Ò‚µ‚Ü‚·  
+           // ï¿½Cï¿½ï¿½: `register_module` ï¿½Ì‘ï¿½2ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ `t       orch::nn::Module` ï¿½ÌQï¿½Æ‚Å‚Í‚È‚ï¿½ï¿½A`std::shared_ptr<torch::nn::Module>` ï¿½ï¿½ï¿½ï¿½ï¿½Ò‚ï¿½ï¿½Ü‚ï¿½  
            parent->register_module(name, std::shared_ptr<torch::nn::Module>(child));  
        }  
        catch (...) {  
-           // ƒGƒ‰[ˆ—  
+           // ï¿½Gï¿½ï¿½ï¿½[ï¿½ï¿½ï¿½ï¿½  
        }  
    }  
 }
 
 using ForwardType = void* (*)(void*, void*);
-// ƒJƒXƒ^ƒ€ƒ‚ƒWƒ…[ƒ‹‚ÌƒtƒHƒ[ƒhŠÖ”‚ÌƒR[ƒ‹ƒoƒbƒNŒ^
+// ï¿½Jï¿½Xï¿½^ï¿½ï¿½ï¿½ï¿½ï¿½Wï¿½ï¿½ï¿½[ï¿½ï¿½ï¿½Ìƒtï¿½Hï¿½ï¿½ï¿½[ï¿½hï¿½Öï¿½ï¿½ÌƒRï¿½[ï¿½ï¿½ï¿½oï¿½bï¿½Nï¿½^
 using ForwardCallback = void* (*)(void*, void*);
 class CustomModuleImpl : public torch::nn::Module {
 public:
@@ -383,21 +393,21 @@ public:
             torch_cuda_dll = LoadLibraryA("torch_cuda.dll");
             cuda = true;
         }
-        // ƒfƒtƒHƒ‹ƒgƒRƒ“ƒXƒgƒ‰ƒNƒ^
+        // ï¿½fï¿½tï¿½Hï¿½ï¿½ï¿½gï¿½Rï¿½ï¿½ï¿½Xï¿½gï¿½ï¿½ï¿½Nï¿½^
     }
-    // ƒtƒHƒ[ƒhŠÖ”
+    // ï¿½tï¿½Hï¿½ï¿½ï¿½[ï¿½hï¿½Öï¿½
     torch::Tensor forward(torch::Tensor x) {
-        // “ü—Íƒeƒ“ƒ\ƒ‹‚ğƒ‰ƒbƒp[‚É“ü‚ê‚é
+        // ï¿½ï¿½ï¿½Íƒeï¿½ï¿½ï¿½\ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½bï¿½pï¿½[ï¿½É“ï¿½ï¿½ï¿½ï¿½
         TensorWrapper* wrapper = new TensorWrapper(x);
 
-        // ˆ—‚ğÀs
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½s
         void* result = forwardfunc(obj, wrapper);
 
-        // ƒ‰ƒbƒp[‚©‚çŒ‹‰Êƒeƒ“ƒ\ƒ‹‚ğæ‚èo‚·
+        // ï¿½ï¿½ï¿½bï¿½pï¿½[ï¿½ï¿½ï¿½çŒ‹ï¿½Êƒeï¿½ï¿½ï¿½\ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½oï¿½ï¿½
         TensorWrapper* output_wrapper = static_cast<TensorWrapper*>(result);
         torch::Tensor output = output_wrapper->tensor;
 
-        // ƒƒ‚ƒŠ‰ğ•ú
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         delete wrapper;
         delete output_wrapper;
 
@@ -474,7 +484,7 @@ using CreateMaxPool2dType = torch::nn::MaxPool2dImpl* (*)(int64_t, int64_t, int6
 using GetMaxPoolKernelSizeType = int64_t(*)(torch::nn::MaxPool2dImpl*);
 using ForwardMaxPool2dType = void* (*)(torch::nn::MaxPool2dImpl*, void*);
 
-// ReLU—p‚ÌŠÖ”ƒ|ƒCƒ“ƒ^Œ^
+// ReLUï¿½pï¿½ÌŠÖï¿½ï¿½|ï¿½Cï¿½ï¿½ï¿½^ï¿½^
 using CreateReLUType = torch::nn::ReLUImpl* (*)(bool);
 using GetReLUInplaceType = bool(*)(torch::nn::ReLUImpl*);
 using ForwardReLUType = void* (*)(torch::nn::ReLUImpl*, void*);
@@ -511,15 +521,15 @@ using CreateAdamOptionsType = torch::optim::AdamOptions* (*)(float);
 using OptimizerZeroGradType = void (*)(torch::optim::Adam*);
 using OptimizerStepType = void (*)(torch::optim::Adam*);
 
-// ƒeƒ“ƒ\ƒ‹‘€ìŠÖ˜A‚ÌŠÖ”ƒ|ƒCƒ“ƒ^Œ^
+// ï¿½eï¿½ï¿½ï¿½\ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö˜Aï¿½ÌŠÖï¿½ï¿½|ï¿½Cï¿½ï¿½ï¿½^ï¿½^
 using TensorToCUDAType = void* (*)(void*);
 using TensorRequiresGradType = void* (*)(void*, bool);
 using TensorBackwardType = void (*)(void*);
 
-// ‘¹¸ŒvZŠÖ˜A‚ÌŠÖ”ƒ|ƒCƒ“ƒ^Œ^
+// ï¿½ï¿½ï¿½ï¿½ï¿½vï¿½Zï¿½Ö˜Aï¿½ÌŠÖï¿½ï¿½|ï¿½Cï¿½ï¿½ï¿½^ï¿½^
 using CrossEntropyType = void* (*)(void*, void*);
 
-// ƒeƒ“ƒ\ƒ‹ƒAƒNƒZƒXŠÖ˜Ai•K—v‚É‰‚¶‚Ä’Ç‰Áj
+// ï¿½eï¿½ï¿½ï¿½\ï¿½ï¿½ï¿½Aï¿½Nï¿½Zï¿½Xï¿½Ö˜Aï¿½iï¿½Kï¿½vï¿½É‰ï¿½ï¿½ï¿½ï¿½Ä’Ç‰ï¿½ï¿½j
 using TensorUnsqueezeType = void* (*)(void*, int64_t);
 using TensorItemIntType = int (*)(void*);
 using TensorItemFloatType = float (*)(void*);
@@ -583,7 +593,7 @@ CustomModuleImpl* ReadDll(ThreadGC* thgc) {
         FreeLibrary(h);
         return NULL;
     }
-    // 3) ©‘O‚ÌŠÖ”‚ğ‘ã“ü
+    // 3) ï¿½ï¿½ï¿½Oï¿½ÌŠÖï¿½ï¿½ï¿½ï¿½ï¿½
     *conv2d = createConv2d;
     auto getinchannels = reinterpret_cast<GetInChannelsType*>(GetProcAddress(h, "GetInChannels"));
     if (!getinchannels) {
@@ -591,7 +601,7 @@ CustomModuleImpl* ReadDll(ThreadGC* thgc) {
         FreeLibrary(h);
         return NULL;
     }
-    // 3) ©‘O‚ÌŠÖ”‚ğ‘ã“ü
+    // 3) ï¿½ï¿½ï¿½Oï¿½ÌŠÖï¿½ï¿½ï¿½ï¿½ï¿½
     *getinchannels = getInChannels;
 
     auto getoutchannels = reinterpret_cast<GetInChannelsType*>(GetProcAddress(h, "GetOutChannels"));
@@ -600,7 +610,7 @@ CustomModuleImpl* ReadDll(ThreadGC* thgc) {
         FreeLibrary(h);
         return NULL;
     }
-    // 3) ©‘O‚ÌŠÖ”‚ğ‘ã“ü
+    // 3) ï¿½ï¿½ï¿½Oï¿½ÌŠÖï¿½ï¿½ï¿½ï¿½ï¿½
     *getinchannels = getOutChannels;
     auto getkernelsize = reinterpret_cast<GetInChannelsType*>(GetProcAddress(h, "GetKernelSize"));
     if (!getkernelsize) {
@@ -608,16 +618,16 @@ CustomModuleImpl* ReadDll(ThreadGC* thgc) {
         FreeLibrary(h);
         return NULL;
     }
-    // 3) ©‘O‚ÌŠÖ”‚ğ‘ã“ü
+    // 3) ï¿½ï¿½ï¿½Oï¿½ÌŠÖï¿½ï¿½ï¿½ï¿½ï¿½
     *getkernelsize = getKernelSize;
-    // Conv2d‚ÌƒEƒFƒCƒgƒf[ƒ^‚ÉƒAƒNƒZƒX‚·‚éŠÖ”
+    // Conv2dï¿½ÌƒEï¿½Fï¿½Cï¿½gï¿½fï¿½[ï¿½^ï¿½ÉƒAï¿½Nï¿½Zï¿½Xï¿½ï¿½ï¿½ï¿½Öï¿½
     auto getweightdata = reinterpret_cast<GetWeightDataType*>(GetProcAddress(h, "GetWeightData"));
     if (!getweightdata) {
         std::cerr << "GetProcAddress for 'getweightdata' failed: " << GetLastError() << "\n";
         FreeLibrary(h);
         return NULL;
     }
-    // 3) ©‘O‚ÌŠÖ”‚ğ‘ã“ü
+    // 3) ï¿½ï¿½ï¿½Oï¿½ÌŠÖï¿½ï¿½ï¿½ï¿½ï¿½
     *getweightdata = getWeightData;
     auto getweightsize = reinterpret_cast<GetInChannelsType*>(GetProcAddress(h, "GetWeightSize"));
     if (!getweightsize) {
@@ -625,17 +635,17 @@ CustomModuleImpl* ReadDll(ThreadGC* thgc) {
         FreeLibrary(h);
         return NULL;
     }
-    // 3) ©‘O‚ÌŠÖ”‚ğ‘ã“ü
+    // 3) ï¿½ï¿½ï¿½Oï¿½ÌŠÖï¿½ï¿½ï¿½ï¿½ï¿½
     *getweightsize = getWeightSize;
 
-    // Conv2d‚ğƒtƒHƒ[ƒh‚·‚éŠÖ”
+    // Conv2dï¿½ï¿½ï¿½tï¿½Hï¿½ï¿½ï¿½[ï¿½hï¿½ï¿½ï¿½ï¿½Öï¿½
     auto forwardconv2d = reinterpret_cast<ForwardConv2dType*>(GetProcAddress(h, "ForwardConv2d"));
     if (!forwardconv2d) {
         std::cerr << "GetProcAddress for 'forwardconv2d' failed: " << GetLastError() << "\n";
         FreeLibrary(h);
         return NULL;
     }
-    // 3) ©‘O‚ÌŠÖ”‚ğ‘ã“ü
+    // 3) ï¿½ï¿½ï¿½Oï¿½ÌŠÖï¿½ï¿½ï¿½ï¿½ï¿½
     *forwardconv2d = forwardConv2d;
 
     auto createMaxpool = reinterpret_cast<CreateMaxPool2dType*>(GetProcAddress(h, "CreateMaxPool2d"));
@@ -678,7 +688,7 @@ CustomModuleImpl* ReadDll(ThreadGC* thgc) {
     }
     *forwardMaxpool = forwardMaxPool2d;
 
-    // ReLUŠÖ˜A‚ÌŠÖ”İ’è
+    // ReLUï¿½Ö˜Aï¿½ÌŠÖï¿½ï¿½İ’ï¿½
     auto createRelu = reinterpret_cast<CreateReLUType*>(GetProcAddress(h, "CreateReLU"));
     if (!createRelu) {
         std::cerr << "GetProcAddress for 'createRelu' failed: " << GetLastError() << "\n";
@@ -735,7 +745,7 @@ CustomModuleImpl* ReadDll(ThreadGC* thgc) {
     }
     *forwardFlattenPtr = forwardFlatten;
 
-    // Linear ŠÖ˜A‚ÌŠÖ”İ’è
+    // Linear ï¿½Ö˜Aï¿½ÌŠÖï¿½ï¿½İ’ï¿½
     auto createLinearPtr = reinterpret_cast<CreateLinearType*>(GetProcAddress(h, "CreateLinear"));
     if (!createLinearPtr) {
         std::cerr << "GetProcAddress for 'createLinearPtr' failed: " << GetLastError() << "\n";
@@ -808,9 +818,9 @@ CustomModuleImpl* ReadDll(ThreadGC* thgc) {
     }
     *forwardLinearPtr = forwardLinear;
 
-    // ‚»‚Ì‘¼‚Ì Linear ŠÖ”‚à“¯—l‚Éİ’è...
+    // ï¿½ï¿½ï¿½Ì‘ï¿½ï¿½ï¿½ Linear ï¿½Öï¿½ï¿½ï¿½ï¿½ï¿½ï¿½lï¿½Éİ’ï¿½...
 
-    // Sequential ŠÖ˜A‚ÌŠÖ”İ’è
+    // Sequential ï¿½Ö˜Aï¿½ÌŠÖï¿½ï¿½İ’ï¿½
     auto createSequentialPtr = reinterpret_cast<CreateSequentialType*>(GetProcAddress(h, "CreateSequential"));
     if (!createSequentialPtr) {
         std::cerr << "GetProcAddress for 'createSequentialPtr' failed: " << GetLastError() << "\n";
@@ -851,9 +861,9 @@ CustomModuleImpl* ReadDll(ThreadGC* thgc) {
     }
     *forwardSequentialPtr = forwardSequential;
 
-    // ‚»‚Ì‘¼‚Ì Sequential ŠÖ”‚à“¯—l‚Éİ’è...
+    // ï¿½ï¿½ï¿½Ì‘ï¿½ï¿½ï¿½ Sequential ï¿½Öï¿½ï¿½ï¿½ï¿½ï¿½ï¿½lï¿½Éİ’ï¿½...
 
-    // Module ŠÖ˜A‚Ì”Ä—pŠÖ”
+    // Module ï¿½Ö˜Aï¿½Ì”Ä—pï¿½Öï¿½
     auto registerModulePtr = reinterpret_cast<RegisterModuleType*>(GetProcAddress(h, "RegisterModule"));
     if (!registerModulePtr) {
         std::cerr << "GetProcAddress for 'registerModulePtr' failed: " << GetLastError() << "\n";
@@ -862,7 +872,7 @@ CustomModuleImpl* ReadDll(ThreadGC* thgc) {
     }
     *registerModulePtr = registerModule;
 
-    // ƒJƒXƒ^ƒ€ƒ‚ƒWƒ…[ƒ‹ŠÖ˜A
+    // ï¿½Jï¿½Xï¿½^ï¿½ï¿½ï¿½ï¿½ï¿½Wï¿½ï¿½ï¿½[ï¿½ï¿½ï¿½Ö˜A
     auto createTorchModulePtr = reinterpret_cast<CreateTorchModuleType*>(GetProcAddress(h, "CreateTorchModule"));
     if (!createTorchModulePtr) {
         std::cerr << "GetProcAddress for 'createTorchModulePtr' failed: " << GetLastError() << "\n";
@@ -959,7 +969,7 @@ CustomModuleImpl* ReadDll(ThreadGC* thgc) {
     }
     *optimizerStepPtr = optimizerStep;
 
-    // ƒeƒ“ƒ\ƒ‹‘€ìŠÖ˜A
+    // ï¿½eï¿½ï¿½ï¿½\ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö˜A
     auto tensorToCUDAPtr = reinterpret_cast<TensorToCUDAType*>(GetProcAddress(h, "TensorToCUDA"));
     if (!tensorToCUDAPtr) {
         std::cerr << "GetProcAddress for 'TensorToCUDA' failed: " << GetLastError() << "\n";
@@ -984,7 +994,7 @@ CustomModuleImpl* ReadDll(ThreadGC* thgc) {
     }
     *tensorBackwardPtr = tensorBackward;
 
-    // ‘¹¸ŒvZŠÖ˜A
+    // ï¿½ï¿½ï¿½ï¿½ï¿½vï¿½Zï¿½Ö˜A
     auto crossEntropyPtr = reinterpret_cast<CrossEntropyType*>(GetProcAddress(h, "CrossEntropy"));
     if (!crossEntropyPtr) {
         std::cerr << "GetProcAddress for 'CrossEntropy' failed: " << GetLastError() << "\n";
@@ -1372,7 +1382,23 @@ CustomModuleImpl* ReadDll(ThreadGC* thgc) {
     std::cout << nn << std::endl;
     return NULL;
 }
+
+#endif // !TARGET_OS_IOS && !TARGET_OS_SIMULATOR
+
+// Timing function needed by GoThread - shared for all platforms
+#if TARGET_OS_IOS || TARGET_OS_SIMULATOR
+uint64_t now_us() {
+    using namespace std::chrono;
+    return duration_cast<microseconds>(steady_clock::now().time_since_epoch()).count();
+}
+#endif
+
+// GoThread - shared code for all platforms
+#if TARGET_OS_IOS || TARGET_OS_SIMULATOR
+void* GoThread(ThreadGC* thgc) {
+#else
 CustomModuleImpl* GoThread(ThreadGC* thgc) {
+#endif
 
     GC_register_class(thgc, _String, "Str", sizeof(String), NULL, NULL);
     GC_register_class(thgc, _List, "List", sizeof(List), ListCheck, NULL);
@@ -1431,7 +1457,7 @@ CustomModuleImpl* GoThread(ThreadGC* thgc) {
         auto ms = std::chrono::duration<double, std::milli>(end - start).count();
         if (12.0 - ms > 0) std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(12.0 - ms)));
     }
-    // 2) ƒGƒNƒXƒ|[ƒg–¼ "add" ‚ğŠÖ”ƒ|ƒCƒ“ƒ^‚Æ‚µ‚Äæ“¾
+    // 2) ï¿½Gï¿½Nï¿½Xï¿½|ï¿½[ï¿½gï¿½ï¿½ "add" ï¿½ï¿½ï¿½Öï¿½ï¿½|ï¿½Cï¿½ï¿½ï¿½^ï¿½Æ‚ï¿½ï¿½Äæ“¾
     /*using BaseFunc = CustomModuleImpl * (*)();
     BaseFunc test = reinterpret_cast<BaseFunc>(
         GetProcAddress(h, "test")
@@ -1442,13 +1468,16 @@ CustomModuleImpl* GoThread(ThreadGC* thgc) {
 void runGoThreadAsync(ThreadGC* thgc) {
     std::thread([thgc]() {
         initDone.get_future().wait();
+#if TARGET_OS_IOS || TARGET_OS_SIMULATOR
+        GoThread(thgc);
+#else
         CustomModuleImpl* result = GoThread(thgc);
         if (result) {
-            // Œ‹‰Ê‚ğg—p
             std::cout << "GoThread completed successfully" << std::endl;
         }
         else {
             std::cerr << "GoThread failed" << std::endl;
         }
+#endif
         }).detach();
 }

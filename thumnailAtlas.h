@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#endif
+
 #include <bgfx/bgfx.h>
 #include <cstdint>
 #include <vector>
@@ -42,12 +46,12 @@ struct PendingUpload {
     std::vector<uint8_t> data;
 };
 //=============================================================================
-// ‹éŒ`ó‘Ô
+// ï¿½ï¿½`ï¿½ï¿½ï¿½
 //=============================================================================
 enum class RectState : uint8_t { Empty, Loading, Ready };
 
 //=============================================================================
-// Mipmap¶¬ƒwƒ‹ƒp[
+// Mipmapï¿½ï¿½ï¿½ï¿½ï¿½wï¿½ï¿½ï¿½pï¿½[
 //=============================================================================
 inline void generateMipmaps(bgfx::TextureHandle texture,
     const uint8_t* srcData,
@@ -91,7 +95,7 @@ inline void generateMipmaps(bgfx::TextureHandle texture,
 }
 
 //=============================================================================
-// ƒvƒŒ[ƒXƒzƒ‹ƒ_[¶¬ƒwƒ‹ƒp[
+// ï¿½vï¿½ï¿½ï¿½[ï¿½Xï¿½zï¿½ï¿½ï¿½_ï¿½[ï¿½ï¿½ï¿½ï¿½ï¿½wï¿½ï¿½ï¿½pï¿½[
 //=============================================================================
 inline std::vector<uint8_t> createPlaceholderPixels(uint16_t size) {
     std::vector<uint8_t> gray(size * size * 4, 0x80);
@@ -102,20 +106,20 @@ inline std::vector<uint8_t> createPlaceholderPixels(uint16_t size) {
 }
 
 //=============================================================================
-// Gridİ’è
+// Gridï¿½İ’ï¿½
 //=============================================================================
 struct GridPageConfig {
     uint16_t atlasWidth = 2048;
     uint16_t atlasHeight = 2048;
-    uint16_t tileSize = 128;            // ƒ^ƒCƒ‹ƒTƒCƒYi³•ûŒ`j
-    uint16_t contentSize = 124;         // ÀÛ‚ÌƒRƒ“ƒeƒ“ƒcƒTƒCƒY
+    uint16_t tileSize = 128;            // ï¿½^ï¿½Cï¿½ï¿½ï¿½Tï¿½Cï¿½Yï¿½iï¿½ï¿½ï¿½ï¿½ï¿½`ï¿½j
+    uint16_t contentSize = 124;         // ï¿½ï¿½ï¿½Û‚ÌƒRï¿½ï¿½ï¿½eï¿½ï¿½ï¿½cï¿½Tï¿½Cï¿½Y
     uint8_t maxMipLevels = 4;
     uint64_t loadingTimeoutFrames = 300;
     bgfx::TextureFormat::Enum format = bgfx::TextureFormat::RGBA8;
 };
 
 //=============================================================================
-// Grid‹éŒ`î•ñ
+// Gridï¿½ï¿½`ï¿½ï¿½ï¿½
 //=============================================================================
 struct GridRectInfo {
     ThumbnailId id = 0;
@@ -188,7 +192,7 @@ public:
     void createPlaceholder() {
         if (m_freeList.empty()) return;
 
-        m_freeList.pop_back();  // rect 0 ‚ğœŠO
+        m_freeList.pop_back();  // rect 0 ï¿½ï¿½ï¿½ï¿½ï¿½O
         auto& r = m_rects[0];
         r.state = RectState::Ready;
         r.generation = 1;
@@ -273,12 +277,12 @@ public:
             uint32_t victimIdx = m_lruTail;
 
             while (victimIdx != kInvalidIndex) {
-                // ƒvƒŒ[ƒXƒzƒ‹ƒ_[•ÛŒì
+                // ï¿½vï¿½ï¿½ï¿½[ï¿½Xï¿½zï¿½ï¿½ï¿½_ï¿½[ï¿½ÛŒï¿½
                 if (victimIdx == 0 && m_hasPlaceholder) {
                     victimIdx = m_rects[victimIdx].lruPrev;
                     continue;
                 }
-                // Loading’†‚Åƒ^ƒCƒ€ƒAƒEƒg‚µ‚Ä‚¢‚È‚¢‚à‚Ì‚Í”ò‚Î‚·
+                // Loadingï¿½ï¿½ï¿½Åƒ^ï¿½Cï¿½ï¿½ï¿½Aï¿½Eï¿½gï¿½ï¿½ï¿½Ä‚ï¿½ï¿½È‚ï¿½ï¿½ï¿½ï¿½Ì‚Í”ï¿½Î‚ï¿½
                 auto& r = m_rects[victimIdx];
                 if (r.state == RectState::Loading) {
                     uint64_t elapsed = m_currentFrame - r.lastAccessFrame;
@@ -430,7 +434,7 @@ public:
         std::lock_guard<std::mutex> lock(m_mutex);
         outNeedsLoad = false;
 
-        // Šù‘¶ƒ`ƒFƒbƒN
+        // ï¿½ï¿½ï¿½ï¿½ï¿½`ï¿½Fï¿½bï¿½N
         auto it = m_idToHandle.find(id);
         if (it != m_idToHandle.end()) {
             auto& h = it->second;
@@ -443,7 +447,7 @@ public:
             }
         }
 
-        // ‹ó‚«‚ª‚ ‚éƒy[ƒW‚ğ’T‚·
+        // ï¿½ó‚«‚ï¿½ï¿½ï¿½ï¿½ï¿½yï¿½[ï¿½Wï¿½ï¿½Tï¿½ï¿½
         ThumbnailGridPage* targetPage = nullptr;
         for (auto& page : m_pages) {
             if (page->canAllocate()) {
@@ -452,7 +456,7 @@ public:
             }
         }
 
-        // ‚È‚¯‚ê‚Î eviction
+        // ï¿½È‚ï¿½ï¿½ï¿½ï¿½ eviction
         if (!targetPage) {
             for (auto& page : m_pages) {
                 std::vector<ThumbnailId> evictedIds;
@@ -468,7 +472,7 @@ public:
             }
         }
 
-        // ‚»‚ê‚Å‚à‚È‚¯‚ê‚ÎVƒy[ƒW
+        // ï¿½ï¿½ï¿½ï¿½Å‚ï¿½ï¿½È‚ï¿½ï¿½ï¿½ÎVï¿½yï¿½[ï¿½W
         if (!targetPage && m_pages.size() < m_config.maxPages) {
             targetPage = createNewPage();
         }
@@ -496,7 +500,7 @@ public:
         auto& page = m_pages[handle.pageIndex];
         if (!page->isLoading(handle.rectIndex, handle.generation)) return false;
 
-        // ƒTƒCƒYƒ`ƒFƒbƒN
+        // ï¿½Tï¿½Cï¿½Yï¿½`ï¿½Fï¿½bï¿½N
         uint16_t contentSize = m_config.contentSize;
         assert(w <= contentSize && h <= contentSize);
 
@@ -663,16 +667,16 @@ private:
 struct ShelfPageConfig {
     uint16_t atlasWidth = 2048;
     uint16_t atlasHeight = 2048;
-    uint16_t rowHeight = 160;           // s‚Ì‚‚³iƒpƒfƒBƒ“ƒO‚İj
-    uint16_t contentHeight = 144;       // ÀÛ‚ÌƒRƒ“ƒeƒ“ƒc‚‚³
-    uint16_t maxContentWidth = 512;     // Å‘åƒRƒ“ƒeƒ“ƒc•
+    uint16_t rowHeight = 160;           // ï¿½sï¿½Ìï¿½ï¿½ï¿½ï¿½iï¿½pï¿½fï¿½Bï¿½ï¿½ï¿½Oï¿½ï¿½ï¿½İj
+    uint16_t contentHeight = 144;       // ï¿½ï¿½ï¿½Û‚ÌƒRï¿½ï¿½ï¿½eï¿½ï¿½ï¿½cï¿½ï¿½ï¿½ï¿½
+    uint16_t maxContentWidth = 512;     // ï¿½Å‘ï¿½Rï¿½ï¿½ï¿½eï¿½ï¿½ï¿½cï¿½ï¿½
     uint8_t maxMipLevels = 4;
     uint64_t loadingTimeoutFrames = 300;
     bgfx::TextureFormat::Enum format = bgfx::TextureFormat::RGBA8;
 };
 
 //=============================================================================
-// Shelf‹éŒ`î•ñ
+// Shelfï¿½ï¿½`ï¿½ï¿½ï¿½
 //=============================================================================
 struct ShelfRectInfo {
     ThumbnailId id = 0;
@@ -685,7 +689,7 @@ struct ShelfRectInfo {
 };
 
 //=============================================================================
-// Shelfisjî•ñ
+// Shelfï¿½iï¿½sï¿½jï¿½ï¿½ï¿½
 //=============================================================================
 struct ShelfInfo {
     uint16_t y = 0;
@@ -693,7 +697,7 @@ struct ShelfInfo {
     uint32_t firstRectIndex = kInvalidIndex;
     uint32_t rectCount = 0;
 
-    // s’PˆÊLRU
+    // ï¿½sï¿½Pï¿½ï¿½LRU
     uint32_t lruPrev = kInvalidIndex;
     uint32_t lruNext = kInvalidIndex;
     uint64_t lastAccessFrame = 0;
@@ -750,7 +754,7 @@ public:
         uint16_t padding = (m_config.rowHeight - m_config.contentHeight) / 2;
         uint16_t size = m_config.contentHeight;
 
-        // Å‰‚Ìs‚ÉƒvƒŒ[ƒXƒzƒ‹ƒ_[
+        // ï¿½Åï¿½ï¿½Ìsï¿½Éƒvï¿½ï¿½ï¿½[ï¿½Xï¿½zï¿½ï¿½ï¿½_ï¿½[
         uint32_t shelfIdx = allocateShelfSlot();
         auto& shelf = m_shelves[shelfIdx];
         shelf.y = 0;
@@ -786,15 +790,15 @@ public:
         uint16_t padding = (m_config.rowHeight - m_config.contentHeight) / 2;
         uint16_t cellWidth = contentWidth + padding * 2;
 
-        // Šù‘¶‚Ìs‚É“ü‚é‚©
+        // ï¿½ï¿½ï¿½ï¿½ï¿½Ìsï¿½É“ï¿½ï¿½é‚©
         for (const auto& shelf : m_shelves) {
             if (shelf.usedWidth > 0 && shelf.usedWidth + cellWidth <= m_config.atlasWidth) {
                 return true;
             }
         }
-        // ‹ó‚«s‚ª‚ ‚é‚©
+        // ï¿½ó‚«sï¿½ï¿½ï¿½ï¿½ï¿½é‚©
         if (!m_freeShelfList.empty()) return true;
-        // V‚µ‚¢s‚ªì‚ê‚é‚©
+        // ï¿½Vï¿½ï¿½ï¿½ï¿½ï¿½sï¿½ï¿½ï¿½ï¿½ï¿½é‚©
         return m_usedShelfCount < m_maxShelves;
     }
 
@@ -806,7 +810,7 @@ public:
         uint16_t padding = (m_config.rowHeight - m_config.contentHeight) / 2;
         uint16_t cellWidth = contentWidth + padding * 2;
 
-        // 1. Šù‘¶‚Ìs‚Å‹ó‚«‚ª‚ ‚é‚©’T‚·
+        // 1. ï¿½ï¿½ï¿½ï¿½ï¿½Ìsï¿½Å‹ó‚«‚ï¿½ï¿½ï¿½ï¿½é‚©ï¿½Tï¿½ï¿½
         for (uint32_t si = 0; si < m_shelves.size(); ++si) {
             auto& shelf = m_shelves[si];
             if (shelf.usedWidth > 0 && shelf.usedWidth + cellWidth <= m_config.atlasWidth) {
@@ -815,7 +819,7 @@ public:
             }
         }
 
-        // 2. ‹ó‚«s‚ª‚ ‚ê‚Îg‚¤
+        // 2. ï¿½ó‚«sï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Îgï¿½ï¿½
         if (!m_freeShelfList.empty()) {
             uint32_t si = m_freeShelfList.back();
             m_freeShelfList.pop_back();
@@ -828,7 +832,7 @@ public:
                 cellWidth, padding, outRectIndex, outGeneration);
         }
 
-        // 3. V‚µ‚¢s‚ğì¬
+        // 3. ï¿½Vï¿½ï¿½ï¿½ï¿½ï¿½sï¿½ï¿½ï¿½ì¬
         if (m_usedShelfCount >= m_maxShelves) return false;
 
         uint32_t si = allocateShelfSlot();
@@ -881,7 +885,7 @@ public:
         auto& r = m_rects[rectIndex];
         if (r.generation != generation) return;
 
-        // s’PˆÊLRU
+        // ï¿½sï¿½Pï¿½ï¿½LRU
         if (r.shelfIndex != kInvalidIndex && r.shelfIndex < m_shelves.size()) {
             shelfLruMoveToFront(r.shelfIndex);
             m_shelves[r.shelfIndex].lastAccessFrame = m_currentFrame;
@@ -898,21 +902,21 @@ public:
         return true;
     }
 
-    // s’PˆÊeviction
+    // ï¿½sï¿½Pï¿½ï¿½eviction
     uint32_t evictLRU(uint32_t maxToEvict, std::vector<ThumbnailId>* outEvictedIds = nullptr) {
         uint32_t evicted = 0;
 
         while (evicted < maxToEvict && m_shelfLruTail != kInvalidIndex) {
             uint32_t victimShelfIdx = m_shelfLruTail;
 
-            // “KØ‚Èvictim‚ğ’T‚·
+            // ï¿½Kï¿½Ø‚ï¿½victimï¿½ï¿½Tï¿½ï¿½
             while (victimShelfIdx != kInvalidIndex) {
-                // ƒvƒŒ[ƒXƒzƒ‹ƒ_[s‚Í”ò‚Î‚·
+                // ï¿½vï¿½ï¿½ï¿½[ï¿½Xï¿½zï¿½ï¿½ï¿½_ï¿½[ï¿½sï¿½Í”ï¿½Î‚ï¿½
                 if (victimShelfIdx == 0 && m_hasPlaceholder) {
                     victimShelfIdx = m_shelves[victimShelfIdx].lruPrev;
                     continue;
                 }
-                // Loading’†‚Åƒ^ƒCƒ€ƒAƒEƒg‚µ‚Ä‚¢‚È‚¢s‚Í”ò‚Î‚·
+                // Loadingï¿½ï¿½ï¿½Åƒ^ï¿½Cï¿½ï¿½ï¿½Aï¿½Eï¿½gï¿½ï¿½ï¿½Ä‚ï¿½ï¿½È‚ï¿½ï¿½sï¿½Í”ï¿½Î‚ï¿½
                 auto& shelf = m_shelves[victimShelfIdx];
                 bool hasActiveLoading = false;
                 for (uint32_t i = shelf.firstRectIndex;
@@ -933,7 +937,7 @@ public:
             }
             if (victimShelfIdx == kInvalidIndex) break;
 
-            // s‚ğŠÛ‚²‚Æ”pŠü
+            // ï¿½sï¿½ï¿½ï¿½Û‚ï¿½ï¿½Æ”pï¿½ï¿½
             auto& shelf = m_shelves[victimShelfIdx];
             for (uint32_t i = shelf.firstRectIndex;
                 i < shelf.firstRectIndex + shelf.rectCount && i < m_rects.size(); ++i) {
@@ -948,7 +952,7 @@ public:
                 }
             }
 
-            // s‚ğLRU‚©‚çŠO‚µ‚ÄfreeƒŠƒXƒg‚Ö
+            // ï¿½sï¿½ï¿½LRUï¿½ï¿½ï¿½ï¿½Oï¿½ï¿½ï¿½ï¿½freeï¿½ï¿½ï¿½Xï¿½gï¿½ï¿½
             shelfLruRemove(victimShelfIdx);
             shelf.usedWidth = 0;
             shelf.rectCount = 0;
@@ -1128,7 +1132,7 @@ public:
         std::lock_guard<std::mutex> lock(m_mutex);
         outNeedsLoad = false;
 
-        // Šù‘¶ƒ`ƒFƒbƒN
+        // ï¿½ï¿½ï¿½ï¿½ï¿½`ï¿½Fï¿½bï¿½N
         auto it = m_idToHandle.find(id);
         if (it != m_idToHandle.end()) {
             auto& h = it->second;
@@ -1141,7 +1145,7 @@ public:
             }
         }
 
-        // ‹ó‚«‚ª‚ ‚éƒy[ƒW‚ğ’T‚·
+        // ï¿½ó‚«‚ï¿½ï¿½ï¿½ï¿½ï¿½yï¿½[ï¿½Wï¿½ï¿½Tï¿½ï¿½
         ThumbnailShelfPage* targetPage = nullptr;
         for (auto& page : m_pages) {
             if (page->canAllocate(contentWidth, contentHeight)) {
@@ -1150,7 +1154,7 @@ public:
             }
         }
 
-        // ‚È‚¯‚ê‚Î eviction
+        // ï¿½È‚ï¿½ï¿½ï¿½ï¿½ eviction
         if (!targetPage) {
             for (auto& page : m_pages) {
                 std::vector<ThumbnailId> evictedIds;
@@ -1166,7 +1170,7 @@ public:
             }
         }
 
-        // ‚»‚ê‚Å‚à‚È‚¯‚ê‚ÎVƒy[ƒW
+        // ï¿½ï¿½ï¿½ï¿½Å‚ï¿½ï¿½È‚ï¿½ï¿½ï¿½ÎVï¿½yï¿½[ï¿½W
         if (!targetPage && m_pages.size() < m_config.maxPages) {
             targetPage = createNewPage();
         }
@@ -1194,7 +1198,7 @@ public:
         auto& page = m_pages[handle.pageIndex];
         if (!page->isLoading(handle.rectIndex, handle.generation)) return false;
 
-        // ƒTƒCƒYƒ`ƒFƒbƒN
+        // ï¿½Tï¿½Cï¿½Yï¿½`ï¿½Fï¿½bï¿½N
         uint16_t rx, ry, rw, rh;
         if (!page->getRectInfo(handle.rectIndex, rx, ry, rw, rh)) return false;
         assert(w <= rw && h <= rh);
@@ -1432,7 +1436,7 @@ struct PackHint {
 };
 
 //=============================================================================
-// AtlasPageStats: ƒy[ƒW‚Ì“Œvî•ñi–À‚Ì‚İj
+// AtlasPageStats: ï¿½yï¿½[ï¿½Wï¿½Ì“ï¿½ï¿½vï¿½ï¿½ï¿½iï¿½ï¿½ï¿½ï¿½ï¿½Ì‚İj
 //=============================================================================
 struct AtlasPageStats {
     int liveCount = 0;
@@ -1484,7 +1488,7 @@ private:
 };
 
 //=============================================================================
-// AtlasPage: ‹L˜^ŒWi”»’f‚µ‚È‚¢j
+// AtlasPage: ï¿½Lï¿½^ï¿½Wï¿½iï¿½ï¿½ï¿½fï¿½ï¿½ï¿½È‚ï¿½ï¿½j
 //=============================================================================
 class FontAtlasPage {
 public:
@@ -1518,16 +1522,16 @@ public:
     FontAtlasPage& operator=(const FontAtlasPage&) = delete;
     FontAtlasPage& operator=(FontAtlasPage&&) = delete;
 
-    // ƒAƒNƒZƒTi“Ç‚İæ‚èê—pj
+    // ï¿½Aï¿½Nï¿½Zï¿½Tï¿½iï¿½Ç‚İï¿½ï¿½ï¿½pï¿½j
     bgfx::TextureHandle& handle() { return tex_; }
     uint16_t pageIndex() const { return pageIndex_; }
     AtlasAffinity affinity() const { return affinity_; }
     const AtlasPageStats& stats() const { return stats_; }
-    AtlasPageStats& stats() { return stats_; }  // ŠO•”‚©‚çXV—p
+    AtlasPageStats& stats() { return stats_; }  // ï¿½Oï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Xï¿½Vï¿½p
     int width() const { return W_; }
     int height() const { return H_; }
 
-    // ƒqƒ“ƒg‚Æ‚Ì“K‡”»’èi–Àƒx[ƒXj
+    // ï¿½qï¿½ï¿½ï¿½gï¿½Æ‚Ì“Kï¿½ï¿½ï¿½ï¿½ï¿½ï¿½iï¿½ï¿½ï¿½ï¿½ï¿½xï¿½[ï¿½Xï¿½j
     bool matchesHint(const PackHint& hint) const {
         if (affinity_ != hint.affinity) return false;
         if (hint.groupId != INVALID_GROUP &&
@@ -1538,7 +1542,7 @@ public:
         return true;
     }
 
-    // ƒpƒbƒLƒ“ƒOi–À‚Ì‹L˜^‚Ì‚İj
+    // ï¿½pï¿½bï¿½Lï¿½ï¿½ï¿½Oï¿½iï¿½ï¿½ï¿½ï¿½ï¿½Ì‹Lï¿½^ï¿½Ì‚İj
     GlyphInfo tryPack(int w, int h, const uint8_t* srcPixels,
         int pitch, bool immediate, RenderGroupId groupId) {
         GlyphInfo gi{};
@@ -1570,7 +1574,7 @@ public:
         const int dx = px + pad_;
         const int dy = py + pad_;
 
-        // CPUƒoƒbƒtƒ@‚ÖƒRƒs[
+        // CPUï¿½oï¿½bï¿½tï¿½@ï¿½ÖƒRï¿½sï¿½[
         uint8_t* dstBase = pixels_.data() + (size_t)dy * W_ * 4 + (size_t)dx * 4;
         for (int row = 0; row < h; ++row) {
             std::memcpy(dstBase + (size_t)row * W_ * 4,
@@ -1587,7 +1591,7 @@ public:
         gi.v1 = float(dy + h) / float(H_);
         gi.pageIndex = pageIndex_;
 
-        // “ŒvXVi–À‚Ì‹L˜^j
+        // ï¿½ï¿½ï¿½vï¿½Xï¿½Vï¿½iï¿½ï¿½ï¿½ï¿½ï¿½Ì‹Lï¿½^ï¿½j
         stats_.incrementLive(groupId);
 
         if (immediate) {
@@ -1652,7 +1656,7 @@ public:
 };
 
 //=============================================================================
-// RenderGroup: »‘¢’PˆÊiõ–½ŠÇ—‚Ìå‘Ìj
+// RenderGroup: ï¿½ï¿½ï¿½ï¿½ï¿½Pï¿½Êiï¿½ï¿½ï¿½ï¿½ï¿½Ç—ï¿½ï¿½Ìï¿½Ìj
 //=============================================================================
 
 inline RenderGroupFlags operator|(RenderGroupFlags a, RenderGroupFlags b) {
@@ -1695,7 +1699,7 @@ struct RenderGroup {
     }
 };
 
-// FontIdHash ‚ğ’Ç‰ÁiGlyphKeyHash ‚Ì‹ß‚­‚É”z’uj
+// FontIdHash ï¿½ï¿½Ç‰ï¿½ï¿½iGlyphKeyHash ï¿½Ì‹ß‚ï¿½ï¿½É”zï¿½uï¿½j
 struct FontIdHash {
     size_t operator()(const FontId& id) const {
         return std::hash<uint64_t>{}(id.computeHash());
@@ -1703,7 +1707,7 @@ struct FontIdHash {
 };
 
 //=============================================================================
-// FontAtlas: C³”ÅifontIdToIndex_ ’Ç‰Áj
+// FontAtlas: ï¿½Cï¿½ï¿½ï¿½ÅifontIdToIndex_ ï¿½Ç‰ï¿½ï¿½j
 //=============================================================================
 class FontAtlas {
 public:
@@ -1725,11 +1729,11 @@ public:
     const GlyphInfo* findByImageId(ImageId id) const {
         std::lock_guard lock(mutex_);
 
-        // imageMap_iaddImage ‚Å’Ç‰Á‚µ‚½‰æ‘œj
+        // imageMap_ï¿½iaddImage ï¿½Å’Ç‰ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½æ‘œï¿½j
         auto it = imageMap_.find(id);
         if (it != imageMap_.end()) return &it->second;
 
-        // ƒOƒŠƒt
+        // ï¿½Oï¿½ï¿½ï¿½t
         auto it2 = imageIdToGlyph_.find(id);
         if (it2 != imageIdToGlyph_.end()) return it2->second;
 
@@ -1741,12 +1745,12 @@ public:
         addWhitePixel();
     }
     std::unordered_map<ImageId, GlyphInfo*> imageIdToGlyph_;
-    //--- ƒtƒHƒ“ƒgŠÇ— ---
+    //--- ï¿½tï¿½Hï¿½ï¿½ï¿½gï¿½Ç—ï¿½ ---
     FontId registerFont(const char* name, const std::string& font, int size) {
         std::lock_guard lock(mutex_);
         TTF_Font* f = nullptr;
 #ifdef __ANDROID__
-        // Android‚Å‚ÍƒAƒZƒbƒg‚©‚ç“Ç‚İ‚Ş
+        // Androidï¿½Å‚ÍƒAï¿½Zï¿½bï¿½gï¿½ï¿½ï¿½ï¿½Ç‚İï¿½ï¿½ï¿½
         SDL_IOStream* io = SDL_IOFromFile(font.c_str(), "rb");
         if (io) {
             f = TTF_OpenFontIO(io, true, (float)size);
@@ -1760,19 +1764,30 @@ public:
         else {
             SDL_Log("registerFont: SDL_IOFromFile failed for %s: %s", font.c_str(), SDL_GetError());
         }
+#elif defined(__APPLE__)
+        // Apple (iOS/macOS)ã§ã¯ãƒãƒ³ãƒ‰ãƒ«ã‹ã‚‰èª­ã¿è¾¼ã‚€
+        std::string bundlePath = getBundlePath(font.c_str());
+        SDL_Log("registerFont: Loading font from bundle: %s", bundlePath.c_str());
+        f = TTF_OpenFont(bundlePath.c_str(), size);
+        if (!f) {
+            SDL_Log("registerFont: TTF_OpenFont failed for %s: %s", bundlePath.c_str(), SDL_GetError());
+        }
+        else {
+            SDL_Log("registerFont: Loaded font %s size %d", bundlePath.c_str(), size);
+        }
 #else
         f = TTF_OpenFont(font.c_str(), size);
 #endif
         FontId id = FontId(name, size);
         fonts_[id] = FontEntry{ f, name, {} };
 
-        // ƒCƒ“ƒfƒbƒNƒXŠ„‚è“–‚Ä
+        // ï¿½Cï¿½ï¿½ï¿½fï¿½bï¿½Nï¿½Xï¿½ï¿½ï¿½è“–ï¿½ï¿½
         fontIdToIndex_[id] = nextFontIndex_++;
 
         return id;
     }
 
-    // FontId ¨ ˜A”ÔƒCƒ“ƒfƒbƒNƒXæ“¾i’Ç‰Áj
+    // FontId ï¿½ï¿½ ï¿½Aï¿½ÔƒCï¿½ï¿½ï¿½fï¿½bï¿½Nï¿½Xï¿½æ“¾ï¿½iï¿½Ç‰ï¿½ï¿½j
     uint32_t getFontIndex(FontId font) const {
         std::lock_guard lock(mutex_);
         auto it = fontIdToIndex_.find(font);
@@ -1788,7 +1803,7 @@ public:
         }
     }
 
-    //--- ƒOƒŠƒtæ“¾ ---
+    //--- ï¿½Oï¿½ï¿½ï¿½tï¿½æ“¾ ---
     const GlyphInfo& getOrAddGlyph(FontId font, uint32_t codepoint,
         RenderGroup* group = nullptr,
         SDL_Color color = { 255, 255, 255, 255 }) {
@@ -1804,7 +1819,7 @@ public:
         return addGlyph(font, codepoint, color, hint, group);
     }
 
-    //--- ‰æ‘œ’Ç‰Á ---
+    //--- ï¿½æ‘œï¿½Ç‰ï¿½ ---
     const GlyphInfo& addImage(ImageId id, SDL_Surface* surface,
         RenderGroup* group = nullptr, bool pinned = false) {
         std::lock_guard lock(mutex_);
@@ -1834,7 +1849,7 @@ public:
 
         if (pinned) gi.flags = gi.flags | GlyphFlags::Pinned;
         gi.lastUsedFrame = currentFrame_;
-        gi.imageId = id;  // ’Ç‰Á
+        gi.imageId = id;  // ï¿½Ç‰ï¿½
         if (group) group->trackImage(id);
 
         auto [it, _] = imageMap_.emplace(id, gi);
@@ -1997,7 +2012,7 @@ public:
         gi.u1 = float(gi.atlasX + 1) / float(config_.pageW);
         gi.v1 = float(gi.atlasY + 1) / float(config_.pageH);
         gi.flags = GlyphFlags::Pinned;
-        gi.imageId = WHITE_PIXEL_ID;  // ’Ç‰Á
+        gi.imageId = WHITE_PIXEL_ID;  // ï¿½Ç‰ï¿½
         imageMap_[WHITE_PIXEL_ID] = gi;
     }
 
@@ -2078,7 +2093,7 @@ public:
             gi.bearingX = minx;
             gi.bearingY = maxy;
             gi.lastUsedFrame = currentFrame_;
-            // •ƒ[ƒ‚Å‚à ImageId ‚ğİ’è
+            // ï¿½ï¿½ï¿½[ï¿½ï¿½ï¿½Å‚ï¿½ ImageId ï¿½ï¿½İ’ï¿½
             uint32_t fontIndex = fontIdToIndex_[font];
             uint64_t localId = (uint64_t(fontIndex) << 24) | (cp & 0x00FFFFFF);
             gi.imageId = ImageIdGenerator::forFontGlyph(localId);
@@ -2112,7 +2127,7 @@ public:
         gi.bearingY = 0;
         gi.lastUsedFrame = currentFrame_;
 
-        // ImageId ‚ğİ’è
+        // ImageId ï¿½ï¿½İ’ï¿½
         uint32_t fontIndex = fontIdToIndex_[font];
         uint64_t localId = (uint64_t(fontIndex) << 24) | (cp & 0x00FFFFFF);
         gi.imageId = ImageIdGenerator::forFontGlyph(localId);
@@ -2133,8 +2148,8 @@ public:
     mutable std::mutex mutex_;
     std::vector<FontAtlasPage> pages_;
     std::unordered_map<FontId, FontEntry, FontIdHash> fonts_;
-    std::unordered_map<FontId, uint32_t, FontIdHash> fontIdToIndex_;  // ’Ç‰Á
-    uint32_t nextFontIndex_ = 1;  // ’Ç‰Á: 0‚Í–³Œø’l
+    std::unordered_map<FontId, uint32_t, FontIdHash> fontIdToIndex_;  // ï¿½Ç‰ï¿½
+    uint32_t nextFontIndex_ = 1;  // ï¿½Ç‰ï¿½: 0ï¿½Í–ï¿½ï¿½ï¿½ï¿½l
     std::unordered_map<GlyphKey, GlyphInfo, GlyphKeyHash> glyphMap_;
     std::unordered_map<ImageId, GlyphInfo> imageMap_;
 
@@ -2167,10 +2182,10 @@ public:
         auto it = groups_.find(id);
         if (it == groups_.end()) return;
 
-        // Atlas‚Édead’Ê’m
+        // Atlasï¿½ï¿½deadï¿½Ê’m
         atlas_.onGroupDestroyed(it->second);
 
-        // SurfaceƒŠƒXƒg‚©‚çíœ
+        // Surfaceï¿½ï¿½ï¿½Xï¿½gï¿½ï¿½ï¿½ï¿½íœ
         auto& sv = surfaceGroups_[it->second.surfaceId];
         sv.erase(std::remove(sv.begin(), sv.end(), id), sv.end());
 

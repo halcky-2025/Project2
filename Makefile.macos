@@ -1,0 +1,268 @@
+# =============================================================================
+# HopStar macOS Makefile (Self-contained - No Homebrew dependencies)
+# =============================================================================
+
+# Compiler settings
+CXX := clang++
+CC := clang
+OBJCXX := clang++
+
+# Target
+TARGET := HopStar_macOS
+
+# Directories
+PROJECT_DIR := $(shell pwd)
+LIBS_DIR := $(PROJECT_DIR)/libs
+
+# SDL3
+SDL3_DIR := $(LIBS_DIR)/SDL3
+SDL3_BUILD := $(SDL3_DIR)/build-macos
+SDL3_INCLUDE := $(SDL3_DIR)/include
+SDL3_LIB := $(SDL3_BUILD)/libSDL3.a
+
+# SDL3_ttf
+SDL3_TTF_DIR := $(LIBS_DIR)/SDL3_ttf
+SDL3_TTF_BUILD := $(SDL3_TTF_DIR)/build-macos
+SDL3_TTF_INCLUDE := $(SDL3_TTF_DIR)/include
+SDL3_TTF_LIB := $(SDL3_TTF_BUILD)/libSDL3_ttf.a
+
+# FreeType (built by SDL3_ttf)
+FREETYPE_DIR := $(SDL3_TTF_DIR)/external/freetype
+FREETYPE_BUILD := $(SDL3_TTF_BUILD)/external/freetype-build
+FREETYPE_INCLUDE := $(FREETYPE_DIR)/include
+FREETYPE_LIB := $(FREETYPE_BUILD)/libfreetype.a
+
+# HarfBuzz (built by SDL3_ttf)
+HARFBUZZ_DIR := $(SDL3_TTF_DIR)/external/harfbuzz
+HARFBUZZ_BUILD := $(SDL3_TTF_BUILD)/external/harfbuzz-build
+HARFBUZZ_INCLUDE := $(HARFBUZZ_DIR)/src
+HARFBUZZ_LIB := $(HARFBUZZ_BUILD)/libharfbuzz.a
+
+# PlutoSVG/PlutoVG (built by SDL3_ttf)
+PLUTOSVG_LIB := $(SDL3_TTF_BUILD)/external/plutosvg-guild/libplutosvg.a
+PLUTOVG_LIB := $(SDL3_TTF_BUILD)/external/plutovg-build/libplutovg.a
+
+# bgfx
+BGFX_DIR := $(LIBS_DIR)/bgfx.cmake
+BGFX_BUILD := $(BGFX_DIR)/build-macos
+BGFX_INCLUDE := $(BGFX_DIR)/bgfx/include
+BX_INCLUDE := $(BGFX_DIR)/bx/include
+BIMG_INCLUDE := $(BGFX_DIR)/bimg/include
+BGFX_LIB := $(BGFX_BUILD)/cmake/bgfx/libbgfx.a
+BX_LIB := $(BGFX_BUILD)/cmake/bx/libbx.a
+BIMG_LIB := $(BGFX_BUILD)/cmake/bimg/libbimg.a
+
+# PortAudio
+PORTAUDIO_DIR := $(LIBS_DIR)/portaudio
+PORTAUDIO_BUILD := $(PORTAUDIO_DIR)/build-macos
+PORTAUDIO_INCLUDE := $(PORTAUDIO_DIR)/include
+PORTAUDIO_LIB := $(PORTAUDIO_BUILD)/libportaudio.a
+
+# nlohmann json
+JSON_INCLUDE := $(LIBS_DIR)/nlohmann
+
+# FFmpeg (built from source - no Homebrew dependency)
+FFMPEG_DIR := $(LIBS_DIR)/ffmpeg-kit/src/ffmpeg
+FFMPEG_BUILD := $(FFMPEG_DIR)/build-macos-static/output
+FFMPEG_INCLUDE := $(FFMPEG_BUILD)/include
+FFMPEG_LIB_DIR := $(FFMPEG_BUILD)/lib
+FFMPEG_LIBS := $(FFMPEG_LIB_DIR)/libavformat.a $(FFMPEG_LIB_DIR)/libavcodec.a $(FFMPEG_LIB_DIR)/libswscale.a $(FFMPEG_LIB_DIR)/libswresample.a $(FFMPEG_LIB_DIR)/libavutil.a $(FFMPEG_LIB_DIR)/libavfilter.a
+
+# Compiler flags
+CXXFLAGS := -std=c++20 -O2 -g
+CXXFLAGS += -DSDL_MAIN_HANDLED
+CXXFLAGS += -DBX_CONFIG_DEBUG=0
+CXXFLAGS += -DTARGET_OS_OSX=1
+CXXFLAGS += -DHOPSTAR_ENABLE_FFMPEG
+
+# Include paths
+INCLUDES := -I$(PROJECT_DIR)
+INCLUDES += -I$(PROJECT_DIR)/platform/apple
+INCLUDES += -I$(SDL3_INCLUDE)
+INCLUDES += -I$(SDL3_TTF_INCLUDE)
+INCLUDES += -I$(FREETYPE_INCLUDE)
+INCLUDES += -I$(HARFBUZZ_INCLUDE)
+INCLUDES += -I$(BGFX_INCLUDE)
+INCLUDES += -I$(BX_INCLUDE)
+INCLUDES += -I$(BX_INCLUDE)/compat/osx
+INCLUDES += -I$(BIMG_INCLUDE)
+INCLUDES += -I$(PORTAUDIO_INCLUDE)
+INCLUDES += -I$(JSON_INCLUDE)
+INCLUDES += -I$(FFMPEG_INCLUDE)
+
+# Objective-C++ flags
+OBJCXXFLAGS := $(CXXFLAGS) -fobjc-arc
+
+# Libraries (project internal)
+LIBS := $(SDL3_LIB)
+LIBS += $(SDL3_TTF_LIB)
+LIBS += $(FREETYPE_LIB)
+LIBS += $(HARFBUZZ_LIB)
+LIBS += $(PLUTOSVG_LIB)
+LIBS += $(PLUTOVG_LIB)
+LIBS += $(BGFX_LIB)
+LIBS += $(BIMG_LIB)
+LIBS += $(BX_LIB)
+LIBS += $(PORTAUDIO_LIB)
+
+# FFmpeg libraries (built from source)
+LIBS += $(FFMPEG_LIBS)
+
+# System libraries
+LIBS += -lc++
+LIBS += -lpthread
+LIBS += -liconv
+LIBS += -lbz2
+LIBS += -lz
+
+# Apple Frameworks
+FRAMEWORKS := -framework Foundation
+FRAMEWORKS += -framework AppKit
+FRAMEWORKS += -framework Metal
+FRAMEWORKS += -framework MetalKit
+FRAMEWORKS += -framework QuartzCore
+FRAMEWORKS += -framework CoreGraphics
+FRAMEWORKS += -framework CoreVideo
+FRAMEWORKS += -framework CoreMedia
+FRAMEWORKS += -framework CoreAudio
+FRAMEWORKS += -framework AudioToolbox
+FRAMEWORKS += -framework AudioUnit
+FRAMEWORKS += -framework AVFoundation
+FRAMEWORKS += -framework VideoToolbox
+FRAMEWORKS += -framework CoreML
+FRAMEWORKS += -framework Vision
+FRAMEWORKS += -framework Photos
+FRAMEWORKS += -framework UserNotifications
+FRAMEWORKS += -framework IOKit
+FRAMEWORKS += -framework Carbon
+FRAMEWORKS += -framework ForceFeedback
+FRAMEWORKS += -framework GameController
+FRAMEWORKS += -framework CoreHaptics
+FRAMEWORKS += -framework UniformTypeIdentifiers
+FRAMEWORKS += -framework Security
+FRAMEWORKS += -framework CoreServices
+FRAMEWORKS += -framework CoreFoundation
+
+# Source files
+SOURCES := main4.mm
+SOURCES += platform/apple/AppleBridge.mm
+SOURCES += sqlite3.c
+
+# Object files
+OBJECTS := $(patsubst %.mm,build/%.o,$(filter %.mm,$(SOURCES)))
+OBJECTS += $(patsubst %.c,build/%.o,$(filter %.c,$(SOURCES)))
+
+# Build directory
+BUILD_DIR := build
+
+# Default target
+all: check-deps $(BUILD_DIR) $(TARGET)
+
+# Check dependencies exist
+check-deps:
+	@test -f $(SDL3_LIB) || (echo "Error: SDL3 not built. Run: make -f Makefile.macos deps" && exit 1)
+	@test -f $(BGFX_LIB) || (echo "Error: bgfx not built. Run: make -f Makefile.macos deps" && exit 1)
+	@test -f $(SDL3_TTF_LIB) || (echo "Error: SDL3_ttf not built. Run: make -f Makefile.macos deps" && exit 1)
+	@test -f $(PORTAUDIO_LIB) || (echo "Error: PortAudio not built. Run: make -f Makefile.macos deps" && exit 1)
+	@test -f $(FFMPEG_LIB_DIR)/libavcodec.a || (echo "Error: FFmpeg not built. Run: make -f Makefile.macos deps" && exit 1)
+
+# Build all dependencies
+deps:
+	@echo "=========================================="
+	@echo "Building all dependencies for macOS..."
+	@echo "=========================================="
+	@echo ""
+	@echo "Building SDL3..."
+	cd $(SDL3_DIR) && mkdir -p build-macos && cd build-macos && \
+		cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 \
+		-DBUILD_SHARED_LIBS=OFF && make -j4
+	@echo ""
+	@echo "Building bgfx..."
+	cd $(BGFX_DIR) && mkdir -p build-macos && cd build-macos && \
+		cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 && make -j4
+	@echo ""
+	@echo "Building SDL3_ttf (includes FreeType, HarfBuzz, PlutoSVG)..."
+	cd $(SDL3_TTF_DIR) && mkdir -p build-macos && cd build-macos && \
+		cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 \
+		-DSDL3_DIR=$(SDL3_BUILD) -DSDLTTF_VENDORED=ON -DBUILD_SHARED_LIBS=OFF && make -j4
+	@echo ""
+	@echo "Building PortAudio..."
+	cd $(PORTAUDIO_DIR) && mkdir -p build-macos && cd build-macos && \
+		cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 \
+		-DBUILD_SHARED_LIBS=OFF && make -j4
+	@echo ""
+	@echo "Building FFmpeg (static libraries)..."
+	cd $(FFMPEG_DIR) && rm -f config.h 2>/dev/null; \
+		mkdir -p build-macos-static && cd build-macos-static && \
+		../configure --prefix=$$(pwd)/output --enable-static --disable-shared \
+		--disable-programs --disable-doc --disable-debug --enable-pic \
+		--enable-videotoolbox --enable-audiotoolbox \
+		--arch=arm64 --target-os=darwin \
+		--extra-cflags="-arch arm64 -mmacosx-version-min=10.15" \
+		--extra-ldflags="-arch arm64 -mmacosx-version-min=10.15" && \
+		make -j4 && make install
+	@echo ""
+	@echo "=========================================="
+	@echo "All dependencies built successfully!"
+	@echo "=========================================="
+
+# Create build directory
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
+	mkdir -p $(BUILD_DIR)/platform/apple
+
+# Compile Objective-C++ files
+build/%.o: %.mm
+	@mkdir -p $(dir $@)
+	$(OBJCXX) $(OBJCXXFLAGS) $(INCLUDES) -c $< -o $@
+
+# Compile C files
+build/%.o: %.c
+	@mkdir -p $(dir $@)
+	$(CC) -O2 -g -c $< -o $@
+
+# Link
+$(TARGET): $(OBJECTS)
+	$(OBJCXX) $(OBJECTS) $(LIBS) $(FRAMEWORKS) -o $@
+	@echo ""
+	@echo "=========================================="
+	@echo "Build complete: $(TARGET)"
+	@echo "=========================================="
+
+# Clean
+clean:
+	rm -rf $(BUILD_DIR)
+	rm -f $(TARGET)
+
+# Clean all including dependencies
+clean-all: clean
+	rm -rf $(SDL3_BUILD)
+	rm -rf $(BGFX_BUILD)
+	rm -rf $(SDL3_TTF_BUILD)
+	rm -rf $(PORTAUDIO_BUILD)
+	rm -rf $(FFMPEG_DIR)/build-macos-static
+
+# Run
+run: $(TARGET)
+	./$(TARGET)
+
+# Help
+help:
+	@echo "HopStar macOS Build System (Self-contained, no Homebrew required)"
+	@echo ""
+	@echo "Targets:"
+	@echo "  all       - Build the application (default)"
+	@echo "  deps      - Build all dependencies (SDL3, bgfx, SDL3_ttf, PortAudio, FFmpeg)"
+	@echo "  clean     - Remove build artifacts"
+	@echo "  clean-all - Remove build artifacts and all dependency builds"
+	@echo "  run       - Build and run the application"
+	@echo "  help      - Show this help message"
+	@echo ""
+	@echo "First time setup:"
+	@echo "  1. make -f Makefile.macos deps   # Build all dependencies (takes ~10 minutes)"
+	@echo "  2. make -f Makefile.macos        # Build the application"
+	@echo ""
+	@echo "All dependencies are built from source within the project."
+	@echo "No external package managers (Homebrew, etc.) are required."
+
+.PHONY: all check-deps deps clean clean-all run help

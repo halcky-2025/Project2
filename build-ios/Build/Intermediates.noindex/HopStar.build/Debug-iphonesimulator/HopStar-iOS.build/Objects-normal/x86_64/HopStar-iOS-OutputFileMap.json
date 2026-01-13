@@ -1,0 +1,18 @@
+{
+  "" : {
+    "diagnostics" : "/Users/hayakawa/Desktop/studio-hopstarbb/Project2/build-ios/Build/Intermediates.noindex/HopStar.build/Debug-iphonesimulator/HopStar-iOS.build/Objects-normal/x86_64/HopStar-iOS-master.dia",
+    "emit-module-dependencies" : "/Users/hayakawa/Desktop/studio-hopstarbb/Project2/build-ios/Build/Intermediates.noindex/HopStar.build/Debug-iphonesimulator/HopStar-iOS.build/Objects-normal/x86_64/HopStar-iOS-master-emit-module.d",
+    "emit-module-diagnostics" : "/Users/hayakawa/Desktop/studio-hopstarbb/Project2/build-ios/Build/Intermediates.noindex/HopStar.build/Debug-iphonesimulator/HopStar-iOS.build/Objects-normal/x86_64/HopStar-iOS-master-emit-module.dia",
+    "swift-dependencies" : "/Users/hayakawa/Desktop/studio-hopstarbb/Project2/build-ios/Build/Intermediates.noindex/HopStar.build/Debug-iphonesimulator/HopStar-iOS.build/Objects-normal/x86_64/HopStar-iOS-master.swiftdeps"
+  },
+  "/Users/hayakawa/Desktop/studio-hopstarbb/Project2/platform/apple/Dummy.swift" : {
+    "const-values" : "/Users/hayakawa/Desktop/studio-hopstarbb/Project2/build-ios/Build/Intermediates.noindex/HopStar.build/Debug-iphonesimulator/HopStar-iOS.build/Objects-normal/x86_64/Dummy.swiftconstvalues",
+    "dependencies" : "/Users/hayakawa/Desktop/studio-hopstarbb/Project2/build-ios/Build/Intermediates.noindex/HopStar.build/Debug-iphonesimulator/HopStar-iOS.build/Objects-normal/x86_64/Dummy.d",
+    "diagnostics" : "/Users/hayakawa/Desktop/studio-hopstarbb/Project2/build-ios/Build/Intermediates.noindex/HopStar.build/Debug-iphonesimulator/HopStar-iOS.build/Objects-normal/x86_64/Dummy.dia",
+    "index-unit-output-path" : "/HopStar.build/Debug-iphonesimulator/HopStar-iOS.build/Objects-normal/x86_64/Dummy.o",
+    "llvm-bc" : "/Users/hayakawa/Desktop/studio-hopstarbb/Project2/build-ios/Build/Intermediates.noindex/HopStar.build/Debug-iphonesimulator/HopStar-iOS.build/Objects-normal/x86_64/Dummy.bc",
+    "object" : "/Users/hayakawa/Desktop/studio-hopstarbb/Project2/build-ios/Build/Intermediates.noindex/HopStar.build/Debug-iphonesimulator/HopStar-iOS.build/Objects-normal/x86_64/Dummy.o",
+    "swift-dependencies" : "/Users/hayakawa/Desktop/studio-hopstarbb/Project2/build-ios/Build/Intermediates.noindex/HopStar.build/Debug-iphonesimulator/HopStar-iOS.build/Objects-normal/x86_64/Dummy.swiftdeps",
+    "swiftmodule" : "/Users/hayakawa/Desktop/studio-hopstarbb/Project2/build-ios/Build/Intermediates.noindex/HopStar.build/Debug-iphonesimulator/HopStar-iOS.build/Objects-normal/x86_64/Dummy~partial.swiftmodule"
+  }
+}
