@@ -497,7 +497,11 @@ bool initBgfx(SDL_Window* window) {
     SDL_PropertiesID props = SDL_GetWindowProperties(window);
     memset(&pd, 0, sizeof(pd));
 
+#ifdef __APPLE__
     __block int width = 800, height = 600;
+#else
+    int width = 800, height = 600;
+#endif
 
 #if defined(__ANDROID__)
     void* nwh = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_ANDROID_WINDOW_POINTER, nullptr);
@@ -584,16 +588,22 @@ bool initBgfx(SDL_Window* window) {
     if (wl_surface) {            // Wayland 優先
         pd.ndt = wl_display;
         pd.nwh = wl_surface;
+        pd.type = bgfx::NativeWindowHandleType::Wayland;
+        SDL_Log("initBgfx: Using Wayland");
     }
     else {                     // X11
         pd.ndt = x11_display;
         pd.nwh = (void*)(uintptr_t)x11_window;
+        pd.type = bgfx::NativeWindowHandleType::Default;
+        SDL_Log("initBgfx: Using X11 display=%p window=0x%lx", x11_display, (unsigned long)x11_window);
     }
+    SDL_GetWindowSize(window, &width, &height);
+    SDL_Log("initBgfx: Linux window size=%dx%d", width, height);
 #endif
 
     bgfx::Init init;
     init.platformData = pd;
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(__linux__)
     init.type = bgfx::RendererType::Vulkan;
 #elif TARGET_OS_IOS || TARGET_OS_SIMULATOR
     init.type = bgfx::RendererType::Metal;
@@ -609,6 +619,13 @@ bool initBgfx(SDL_Window* window) {
         return false;
     }
     SDL_Log("bgfx initialized successfully");
+
+    // Force first black frame to prevent flicker on X11
+    bgfx::setViewClear(0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, 0x000000ff, 1.0f, 0);
+    bgfx::setViewRect(0, 0, 0, width, height);
+    bgfx::touch(0);
+    bgfx::frame();
+    SDL_Log("First black frame sent");
 
     return true;
 }
@@ -681,7 +698,7 @@ public:
         std::lock_guard lock2(m);
         auto* q = target->commandQueue;
 
-        auto currentTime = std::chrono::high_resolution_clock::now();
+        auto currentTime = std::chrono::steady_clock::now();
         float deltaTime = std::chrono::duration<float>(currentTime - lastTime_).count();
         lastTime_ = currentTime;
         time += deltaTime;
@@ -740,7 +757,7 @@ public:
     int invalidate = 1;
     bool update = true;
     float time = 0;
-    std::chrono::steady_clock::time_point lastTime_ = std::chrono::high_resolution_clock::now();
+    std::chrono::steady_clock::time_point lastTime_ = std::chrono::steady_clock::now();
 };
 int addPattern(ThreadGC* thgc, std::vector<float>& colors, std::vector<float>& widthes) {
     return thgc->hoppy->patternAtlas.addPattern(colors, widthes);
@@ -958,6 +975,7 @@ public:
     };
 	nle::Timeline timeline_;
     std::unique_ptr<nle::TimelineRenderer<ImageMaster>> renderer_;
+    std::unique_ptr<nle::AudioOutput> audio_output_;
     size_t selected_track_ = 0;
     int width_ = 1280, height_ = 720;
     LayoutMode layout_mode_ = LayoutMode::Stack;
@@ -1048,42 +1066,39 @@ public:
         hoppy_->master.initialize();
         hoppy_->initFonts();
         initDone.set_value();
+        videoLoaded_ = false;
+        std::string videoPath = getBundlePath("pyonpyon.mp4");
         auto video_track = timeline_.add_video_track();
         auto video_clip = video_track->add_clip();
 
-#ifdef __APPLE__
-        std::string videoPath = getBundlePath("pyonpyon.mp4");
-        if (!video_clip->open(videoPath.c_str())) {
-            SDL_Log("Video file not found: %s", videoPath.c_str());
-            return;
+        if (video_clip->open(videoPath.c_str())) {
+            video_clip->timeline_range.start = 0;
+            video_clip->timeline_range.end = video_clip->source_range.duration();
+            videoLoaded_ = true;
+            SDL_Log("Video loaded successfully: %s", videoPath.c_str());
+        } else {
+            SDL_Log("Video file not found: %s (continuing without video)", videoPath.c_str());
         }
-#else
-        if (!video_clip->open("pyonpyon.mp4")) {
-            SDL_Log("Video file not found: pyonpyon.mp4");
-            return;
-        }
-#endif
-
-        video_clip->timeline_range.start = 0;
-        video_clip->timeline_range.end = video_clip->source_range.duration();
 
         // オーディオトラック（同じファイルから音声を抽出）
         auto audio_track = timeline_.add_audio_track();
         auto audio_clip = audio_track->add_clip();
 
-#ifdef __APPLE__
-        if (audio_clip->open(videoPath.c_str())) {
-#else
-        if (audio_clip->open("pyonpyon.mp4")) {
-#endif
+        if (videoLoaded_ && audio_clip->open(videoPath.c_str())) {
             audio_clip->timeline_range.start = 0;
             audio_clip->timeline_range.end = audio_clip->source_range.duration();
+            SDL_Log("Audio clip loaded successfully");
+        } else {
+            SDL_Log("Audio clip failed to load or video not loaded");
         }
-        auto audio_output_ = std::make_unique<nle::AudioOutput>(timeline_);
+        audio_output_ = std::make_unique<nle::AudioOutput>(timeline_);
         if (!audio_output_->initialize()) {
+            SDL_Log("AudioOutput initialization failed");
         }
         renderer_ = std::make_unique <nle::TimelineRenderer<ImageMaster >>(timeline_, hoppy_->master);
-        timeline_.play();
+        if (videoLoaded_) {
+            timeline_.play();
+        }
         /*auto id = engine.load("banban.mp3");
         engine.play(id);*/
         /*std::wstring wpath = L"おどれ！！マグロっ子.mp3";
@@ -1143,64 +1158,68 @@ public:
                 rendered = true;
                 // layers構築処理
                 auto end = std::chrono::high_resolution_clock::now();
-                renderer_->update();
-                auto render_items = renderer_->get_render_items();
 
-                // レイヤー順に描画（下から上へ）
-                for (size_t i = 0; i < render_items.size(); i++) {
-                    std::vector<UnifiedDrawCommand> commands;
-                    std::vector<bgfx::TextureHandle> textures;  // テクスチャハンドルを保持
+                // Only process video renderer if video was loaded
+                if (videoLoaded_) {
+                    renderer_->update();
+                    auto render_items = renderer_->get_render_items();
 
-                    commands.reserve(render_items.size());
-                    textures.reserve(render_items.size());
-
-                    float base_z = 0.0f;
+                    // レイヤー順に描画（下から上へ）
                     for (size_t i = 0; i < render_items.size(); i++) {
-                        const auto& item = render_items[i];
-                        auto resolved = hoppy_->master.resolve(item.image_id);
+                        std::vector<UnifiedDrawCommand> commands;
+                        std::vector<bgfx::TextureHandle> textures;  // テクスチャハンドルを保持
 
-                        if (!resolved.isReady()) continue;
+                        commands.reserve(render_items.size());
+                        textures.reserve(render_items.size());
 
-                        // レイアウト計算（ピクセル座標）
-                        float px, py, pw, ph;
-                        calculate_layout_pixels(i, render_items.size(), item.clip, px, py, pw, ph);
+                        float base_z = 0.0f;
+                        for (size_t i = 0; i < render_items.size(); i++) {
+                            const auto& item = render_items[i];
+                            auto resolved = hoppy_->master.resolve(item.image_id);
 
-                        // テクスチャを保存
-                        textures.push_back(resolved.resolved.texture);
+                            if (!resolved.isReady()) continue;
 
-                        UnifiedDrawCommand cmd{};
-                        cmd.type = DrawCommandType::Image;
-                        cmd.viewId = 0;
-                        cmd.zIndex = base_z + i * 0.001f;
-                        cmd.texture = &textures.back();
-                        cmd.texture2 = &nulltex;
+                            // レイアウト計算（ピクセル座標）
+                            float px, py, pw, ph;
+                            calculate_layout_pixels(i, render_items.size(), item.clip, px, py, pw, ph);
 
-                        // 位置とサイズ（ピクセル座標）
-                        cmd.x = px;
-                        cmd.y = py;
-                        cmd.width = pw;
-                        cmd.height = ph;
+                            // テクスチャを保存
+                            textures.push_back(resolved.resolved.texture);
 
-                        // Image モード: UV座標
-                        cmd.angle = 0.0f;      // uvMin.x
-                        cmd.dataOffset = 0.0f; // uvMin.y
-                        cmd.scrollX = 1.0f;    // uvMax.x
-                        cmd.scrollY = 1.0f;    // uvMax.y
+                            UnifiedDrawCommand cmd{};
+                            cmd.type = DrawCommandType::Image;
+                            cmd.viewId = 0;
+                            cmd.zIndex = base_z + i * 0.001f;
+                            cmd.texture = &textures.back();
+                            cmd.texture2 = &nulltex;
 
-                        // 角丸、シャドウなし
-                        cmd.radius = 0.0f;
-                        cmd.aa = 1.0f;
-                        cmd.shadowX = 0.0f;
-                        cmd.shadowY = 0.0f;
-                        cmd.shadowBlur = 0.0f;
-                        cmd.borderWidth = 0.0f;
+                            // 位置とサイズ（ピクセル座標）
+                            cmd.x = px;
+                            cmd.y = py;
+                            cmd.width = pw;
+                            cmd.height = ph;
 
-                        cmd.shadowColor = 0x00000000;
-                        cmd.fillColor = 0xFFFFFFFF;
-                        cmd.borderColor = 0x00000000;
-                        std::vector<UnifiedDrawCommand*> single_batch = { &cmd };
-                        drawUnifiedBatch(single_batch, resources,
-                            BGFX_INVALID_HANDLE, BGFX_INVALID_HANDLE, 30);
+                            // Image モード: UV座標
+                            cmd.angle = 0.0f;      // uvMin.x
+                            cmd.dataOffset = 0.0f; // uvMin.y
+                            cmd.scrollX = 1.0f;    // uvMax.x
+                            cmd.scrollY = 1.0f;    // uvMax.y
+
+                            // 角丸、シャドウなし
+                            cmd.radius = 0.0f;
+                            cmd.aa = 1.0f;
+                            cmd.shadowX = 0.0f;
+                            cmd.shadowY = 0.0f;
+                            cmd.shadowBlur = 0.0f;
+                            cmd.borderWidth = 0.0f;
+
+                            cmd.shadowColor = 0x00000000;
+                            cmd.fillColor = 0xFFFFFFFF;
+                            cmd.borderColor = 0x00000000;
+                            std::vector<UnifiedDrawCommand*> single_batch = { &cmd };
+                            drawUnifiedBatch(single_batch, resources,
+                                BGFX_INVALID_HANDLE, BGFX_INVALID_HANDLE, 30);
+                        }
                     }
                 }
                 frameN = bgfx::frame();
@@ -1212,6 +1231,7 @@ public:
     SDL_Window* window_;
     std::thread thread_;
     std::atomic<bool> running_;
+    bool videoLoaded_ = false;
 };
 FontAtlas* getAtlas(ThreadGC* thgc) {
     return &thgc->hoppy->master.fontAtlas();

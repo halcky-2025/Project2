@@ -44,7 +44,27 @@
       "Bash(xxd:*)",
       "WebSearch",
       "WebFetch(domain:github.com)",
-      "Bash(MTL_DEBUG_LAYER=0 MTL_SHADER_VALIDATION=0 ./HopStar_macOS:*)"
+      "Bash(MTL_DEBUG_LAYER=0 MTL_SHADER_VALIDATION=0 ./HopStar_macOS:*)",
+      "Bash(dpkg:*)",
+      "Bash(apt list:*)",
+      "Bash(sudo apt update:*)",
+      "Bash(sudo apt install:*)",
+      "Bash(apt-cache search:*)",
+      "Bash(../bx/tools/bin/linux/genie:*)",
+      "Bash(./build/bin/HopStar_Linux:*)",
+      "Bash(timeout 10 gdb:*)",
+      "Bash(gdb:*)",
+      "Bash(timeout 5 ./HopStar_Linux:*)",
+      "Bash(echo:*)",
+      "Bash(ldd:*)",
+      "Bash(LD_LIBRARY_PATH=/home/hayahiro/ドキュメント/GitHub/Project2/linux/deps/SDL3/build:/home/hayahiro/ドキュメント/GitHub/Project2/linux/deps/SDL3_ttf/build:$LD_LIBRARY_PATH ./bin/HopStar_Linux:*)",
+      "Bash(LD_LIBRARY_PATH=/home/hayahiro/ドキュメント/GitHub/Project2/linux/deps/SDL3/build:/home/hayahiro/ドキュメント/GitHub/Project2/linux/deps/SDL3_ttf/build:$LD_LIBRARY_PATH SDL_VIDEO_DEBUG=1 ./bin/HopStar_Linux:*)",
+      "Bash(LD_LIBRARY_PATH=/home/hayahiro/ドキュメント/GitHub/Project2/linux/deps/SDL3/build:/home/hayahiro/ドキュメント/GitHub/Project2/linux/deps/SDL3_ttf/build:$LD_LIBRARY_PATH timeout:*)",
+      "Bash(LD_LIBRARY_PATH=/home/hayahiro/ドキュメント/GitHub/Project2/linux/deps/SDL3/build:/home/hayahiro/ドキュメント/GitHub/Project2/linux/deps/SDL3_ttf/build:$LD_LIBRARY_PATH gdb:*)",
+      "Bash(LD_LIBRARY_PATH=/home/hayahiro/ドキュメント/GitHub/Project2/linux/deps/SDL3/build:/home/hayahiro/ドキュメント/GitHub/Project2/linux/deps/SDL3_ttf/build:$LD_LIBRARY_PATH SDL_VIDEODRIVER=x11 timeout:*)",
+      "Bash(LD_LIBRARY_PATH=/home/hayahiro/ドキュメント/GitHub/Project2/linux/deps/SDL3/build:/home/hayahiro/ドキュメント/GitHub/Project2/linux/deps/SDL3_ttf/build:$LD_LIBRARY_PATH MALLOC_CHECK_=3 timeout 10 gdb:*)",
+      "Bash(LD_LIBRARY_PATH=/home/hayahiro/ドキュメント/GitHub/Project2/linux/deps/SDL3/build:/home/hayahiro/ドキュメント/GitHub/Project2/linux/deps/SDL3_ttf/build:$LD_LIBRARY_PATH MALLOC_CHECK_=0 timeout 10 ./bin/HopStar_Linux:*)",
+      "Bash(timeout 10:*)"
     ]
   }
 }

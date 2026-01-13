@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include "shader2.h"
+#include <cfloat>
 
 // ============================================================
 // LayerInfo（レイヤー管理）
@@ -732,8 +733,20 @@ bgfx::ShaderHandle loadShader(const char* filename) {
     const bgfx::Memory* mem = bgfx::copy(buffer.data(), static_cast<uint32_t>(size));
     return bgfx::createShader(mem);
 #else
-    std::ifstream file(filename, std::ios::binary | std::ios::ate);
+    // Linux/Windows: try getBundlePath first, then shaders/ subdirectory
+    std::string shaderPath = getBundlePath(filename);
+    SDL_Log("loadShader: Trying path: %s", shaderPath.c_str());
+    std::ifstream file(shaderPath, std::ios::binary | std::ios::ate);
+
     if (!file.is_open()) {
+        // Try shaders/ subdirectory
+        shaderPath = std::string("shaders/") + filename;
+        SDL_Log("loadShader: Trying fallback path: %s", shaderPath.c_str());
+        file.open(shaderPath, std::ios::binary | std::ios::ate);
+    }
+
+    if (!file.is_open()) {
+        SDL_Log("loadShader: Failed to open shader file: %s", filename);
         return BGFX_INVALID_HANDLE;
     }
 
@@ -742,9 +755,11 @@ bgfx::ShaderHandle loadShader(const char* filename) {
 
     std::vector<char> buffer(size);
     if (!file.read(buffer.data(), size)) {
+        SDL_Log("loadShader: Failed to read shader file: %s", shaderPath.c_str());
         return BGFX_INVALID_HANDLE;
     }
 
+    SDL_Log("loadShader: Loaded %s (%lld bytes)", shaderPath.c_str(), (long long)size);
     const bgfx::Memory* mem = bgfx::copy(buffer.data(), static_cast<uint32_t>(size));
     return bgfx::createShader(mem);
 #endif
@@ -767,6 +782,10 @@ void initRenderResources(RenderResources& resources) {
     // Use Metal shaders on iOS/macOS (from bundle, or fallback to shaders/ directory on macOS)
     bgfx::ShaderHandle vsu = loadShader("vs_unite2_mtl.bin");
     bgfx::ShaderHandle fsu = loadShader("fs_unite2_mtl.bin");
+#elif defined(__linux__)
+    // Use SPIR-V shaders on Linux (Vulkan)
+    bgfx::ShaderHandle vsu = loadShader("vs_unite2_spv.bin");
+    bgfx::ShaderHandle fsu = loadShader("fs_unite2_spv.bin");
 #else
     bgfx::ShaderHandle vsu = loadShader("vs_unite2.bin");
     bgfx::ShaderHandle fsu = loadShader("fs_unite2.bin");
