@@ -1,13 +1,14 @@
 #include <vector>
 #include <string>
 #include <map>
+#include "platform_io.h"
 
-// glTF 2.0 ƒf[ƒ^\‘¢
+// glTF 2.0 ï¿½fï¿½[ï¿½^ï¿½\ï¿½ï¿½
 struct Node {
     std::string name;
     int parent = -1;
     float translation[3] = { 0, 0, 0 };
-    float rotation[4] = { 0, 0, 0, 1 };  // ƒNƒH[ƒ^ƒjƒIƒ“ [x, y, z, w]
+    float rotation[4] = { 0, 0, 0, 1 };  // ï¿½Nï¿½Hï¿½[ï¿½^ï¿½jï¿½Iï¿½ï¿½ [x, y, z, w]
     float scale[3] = { 1, 1, 1 };
     std::vector<int> children;
     int skinIndex = -1;
@@ -16,8 +17,8 @@ struct Node {
 
 struct Skin {
     std::string name;
-    std::vector<int> joints;  // ƒWƒ‡ƒCƒ“ƒg‚Ìƒm[ƒhƒCƒ“ƒfƒbƒNƒX
-    std::vector<float> inverseBindMatrices;  // 16—v‘f * joints”
+    std::vector<int> joints;  // ï¿½Wï¿½ï¿½ï¿½Cï¿½ï¿½ï¿½gï¿½Ìƒmï¿½[ï¿½hï¿½Cï¿½ï¿½ï¿½fï¿½bï¿½Nï¿½X
+    std::vector<float> inverseBindMatrices;  // 16ï¿½vï¿½f * jointsï¿½ï¿½
     int skeletonRoot = -1;
 };
 
@@ -42,14 +43,14 @@ struct Animation {
     float duration = 0.0f;
 };
 
-// ƒAƒjƒ[ƒVƒ‡ƒ“ƒVƒXƒeƒ€
+// ï¿½Aï¿½jï¿½ï¿½ï¿½[ï¿½Vï¿½ï¿½ï¿½ï¿½ï¿½Vï¿½Xï¿½eï¿½ï¿½
 class GltfAnimator {
 private:
     std::vector<Node> nodes;
     std::vector<Skin> skins;
     std::vector<Animation> animations;
-    std::vector<float> nodeMatrices;  // Šeƒm[ƒh‚Ìƒ[ƒJƒ‹¨ƒ[ƒ‹ƒh•ÏŠ·
-    std::vector<float> skinMatrices;   // ƒXƒLƒjƒ“ƒO—p‚ÌÅIƒ}ƒgƒŠƒbƒNƒX
+    std::vector<float> nodeMatrices;  // ï¿½eï¿½mï¿½[ï¿½hï¿½Ìƒï¿½ï¿½[ï¿½Jï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½[ï¿½ï¿½ï¿½hï¿½ÏŠï¿½
+    std::vector<float> skinMatrices;   // ï¿½Xï¿½Lï¿½jï¿½ï¿½ï¿½Oï¿½pï¿½ÌÅIï¿½}ï¿½gï¿½ï¿½ï¿½bï¿½Nï¿½X
 
     float currentTime = 0.0f;
     int currentAnimation = 0;
@@ -62,7 +63,7 @@ public:
         animations = a;
         nodeMatrices.resize(nodes.size() * 16);
 
-        // šƒm[ƒhƒ}ƒgƒŠƒbƒNƒX‚ğ’PˆÊs—ñ‚Å‰Šú‰»š
+        // ï¿½ï¿½ï¿½mï¿½[ï¿½hï¿½}ï¿½gï¿½ï¿½ï¿½bï¿½Nï¿½Xï¿½ï¿½Pï¿½Êsï¿½ï¿½Åï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         for (size_t i = 0; i < nodes.size(); i++) {
             float* mtx = &nodeMatrices[i * 16];
             bx::mtxIdentity(mtx);
@@ -71,14 +72,14 @@ public:
         if (!skins.empty()) {
             skinMatrices.resize(skins[0].joints.size() * 16);
 
-            // šƒXƒLƒ“ƒ}ƒgƒŠƒbƒNƒX‚à’PˆÊs—ñ‚Å‰Šú‰»š
+            // ï¿½ï¿½ï¿½Xï¿½Lï¿½ï¿½ï¿½}ï¿½gï¿½ï¿½ï¿½bï¿½Nï¿½Xï¿½ï¿½ï¿½Pï¿½Êsï¿½ï¿½Åï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
             for (size_t i = 0; i < skins[0].joints.size(); i++) {
                 float* mtx = &skinMatrices[i * 16];
                 bx::mtxIdentity(mtx);
             }
         }
 
-        // šd—vF‰Šúƒ|[ƒY‚ğŒvZš
+        // ï¿½ï¿½ï¿½dï¿½vï¿½Fï¿½ï¿½ï¿½ï¿½ï¿½|ï¿½[ï¿½Yï¿½ï¿½ï¿½vï¿½Zï¿½ï¿½
         updateNodeHierarchy();
         if (!skins.empty()) {
             updateSkinMatrices();
@@ -88,27 +89,27 @@ public:
             nodes.size(), skins.empty() ? 0 : skins[0].joints.size());
     }
 
-    // ƒAƒjƒ[ƒVƒ‡ƒ“XV
+    // ï¿½Aï¿½jï¿½ï¿½ï¿½[ï¿½Vï¿½ï¿½ï¿½ï¿½ï¿½Xï¿½V
     void update(float deltaTime) {
         if (animations.empty()) return;
 
         Animation& anim = animations[currentAnimation];
         currentTime += deltaTime;
 
-        // ƒ‹[ƒvˆ—
+        // ï¿½ï¿½ï¿½[ï¿½vï¿½ï¿½ï¿½ï¿½
         if (currentTime > anim.duration) {
             currentTime = fmod(currentTime, anim.duration);
         }
 
-        // ƒAƒjƒ[ƒVƒ‡ƒ“ƒ`ƒƒƒ“ƒlƒ‹‚ğ“K—p
+        // ï¿½Aï¿½jï¿½ï¿½ï¿½[ï¿½Vï¿½ï¿½ï¿½ï¿½ï¿½`ï¿½ï¿½ï¿½ï¿½ï¿½lï¿½ï¿½ï¿½ï¿½Kï¿½p
         for (const auto& channel : anim.channels) {
             applyAnimation(channel, anim.samplers[channel.samplerIndex]);
         }
 
-        // ƒm[ƒhŠK‘w‚ğXV
+        // ï¿½mï¿½[ï¿½hï¿½Kï¿½wï¿½ï¿½ï¿½Xï¿½V
         updateNodeHierarchy();
 
-        // ƒXƒLƒ“ƒ}ƒgƒŠƒbƒNƒX‚ğŒvZ
+        // ï¿½Xï¿½Lï¿½ï¿½ï¿½}ï¿½gï¿½ï¿½ï¿½bï¿½Nï¿½Xï¿½ï¿½ï¿½vï¿½Z
         if (!skins.empty()) {
             updateSkinMatrices();
         }
@@ -143,19 +144,19 @@ private:
         int idx0 = 0, idx1 = 0;
         float t = 0.0f;
 
-        // Å‰‚ÌƒL[ƒtƒŒ[ƒ€‚æ‚è‘O‚Ìê‡
+        // ï¿½Åï¿½ï¿½ÌƒLï¿½[ï¿½tï¿½ï¿½ï¿½[ï¿½ï¿½ï¿½ï¿½ï¿½Oï¿½Ìê‡
         if (currentTime <= sampler.inputTimes[0]) {
             idx0 = 0;
             idx1 = 0;
             t = 0.0f;
         }
-        // ÅŒã‚ÌƒL[ƒtƒŒ[ƒ€‚æ‚èŒã‚Ìê‡
+        // ï¿½ÅŒï¿½ÌƒLï¿½[ï¿½tï¿½ï¿½ï¿½[ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ìê‡
         else if (currentTime >= sampler.inputTimes.back()) {
             idx0 = sampler.inputTimes.size() - 1;
             idx1 = idx0;
             t = 0.0f;
         }
-        // ’†ŠÔ‚Ìê‡
+        // ï¿½ï¿½ï¿½Ô‚Ìê‡
         else {
             for (size_t i = 0; i < sampler.inputTimes.size() - 1; i++) {
                 if (currentTime >= sampler.inputTimes[i] &&
@@ -171,12 +172,12 @@ private:
             }
         }
 
-        // “¯‚¶ƒCƒ“ƒfƒbƒNƒX‚Ìê‡‚Í•âŠÔ‚µ‚È‚¢
+        // ï¿½ï¿½ï¿½ï¿½ï¿½Cï¿½ï¿½ï¿½fï¿½bï¿½Nï¿½Xï¿½Ìê‡ï¿½Í•ï¿½Ô‚ï¿½ï¿½È‚ï¿½
         if (idx0 == idx1) {
             t = 0.0f;
         }
 
-        // •âŠÔ‚µ‚Ä’l‚ğ“K—p
+        // ï¿½ï¿½Ô‚ï¿½ï¿½Ä’lï¿½ï¿½Kï¿½p
         switch (channel.path) {
         case AnimationChannel::TRANSLATION: {
             float v0[3] = {
@@ -230,7 +231,7 @@ private:
     }
 
     void updateNodeHierarchy() {
-        // ƒ‹[ƒgƒm[ƒh‚©‚çŠK‘w“I‚ÉXV
+        // ï¿½ï¿½ï¿½[ï¿½gï¿½mï¿½[ï¿½hï¿½ï¿½ï¿½ï¿½Kï¿½wï¿½Iï¿½ÉXï¿½V
         for (size_t i = 0; i < nodes.size(); i++) {
             if (nodes[i].parent == -1) {
                 updateNodeRecursive(i);
@@ -243,7 +244,7 @@ private:
         Node& node = nodes[nodeIndex];
         float* nodeMtx = &nodeMatrices[nodeIndex * 16];
 
-        // TRSs—ñ‚ğ\’z
+        // TRSï¿½sï¿½ï¿½ï¿½ï¿½\ï¿½z
         float mtxT[16], mtxR[16], mtxS[16];
         bx::mtxTranslate(mtxT, node.translation[0], node.translation[1], node.translation[2]);
         quatToMatrix(mtxR, node.rotation);
@@ -253,27 +254,27 @@ private:
         bx::mtxMul(temp, mtxR, mtxS);
         bx::mtxMul(localMtx, mtxT, temp);
 
-        // e‚Ì•ÏŠ·‚ğ“K—p
+        // ï¿½eï¿½Ì•ÏŠï¿½ï¿½ï¿½Kï¿½p
         if (node.parent >= 0) {
             float* parentMtx = &nodeMatrices[node.parent * 16];
             float worldMtx[16];
             bx::mtxMul(worldMtx, parentMtx, localMtx);
 
-            // bgfx‚Í—ñ—Dæ‚È‚Ì‚Å“]’u
+            // bgfxï¿½Í—ï¿½Dï¿½ï¿½È‚Ì‚Å“]ï¿½u
             bx::mtxTranspose(nodeMtx, worldMtx);
         }
         else {
-            // bgfx‚Í—ñ—Dæ‚È‚Ì‚Å“]’u
+            // bgfxï¿½Í—ï¿½Dï¿½ï¿½È‚Ì‚Å“]ï¿½u
             bx::mtxTranspose(nodeMtx, localMtx);
         }
 
-        // qƒm[ƒh‚ğÄ‹A“I‚Éˆ—
+        // ï¿½qï¿½mï¿½[ï¿½hï¿½ï¿½ï¿½Ä‹Aï¿½Iï¿½Éï¿½ï¿½ï¿½
         for (int childIdx : node.children) {
             updateNodeRecursive(childIdx);
         }
     }
 
-    // ƒNƒH[ƒ^ƒjƒIƒ“‚©‚ç4x4‰ñ“]s—ñ‚Ö‚Ì•ÏŠ·
+    // ï¿½Nï¿½Hï¿½[ï¿½^ï¿½jï¿½Iï¿½ï¿½ï¿½ï¿½ï¿½ï¿½4x4ï¿½ï¿½]ï¿½sï¿½ï¿½Ö‚Ì•ÏŠï¿½
     void quatToMatrix(float* mtx, const float* q) {
         float x = q[0], y = q[1], z = q[2], w = q[3];
         float x2 = x * x, y2 = y * y, z2 = z * z;
@@ -311,17 +312,17 @@ private:
             float* jointMtxTransposed = &nodeMatrices[jointNode * 16];
             const float* invBindMtxTransposed = &skin.inverseBindMatrices[i * 16];
 
-            // —¼•û‚Æ‚àŠù‚É“]’uÏ‚İ‚È‚Ì‚ÅA‚»‚Ì‚Ü‚ÜæZ
+            // ï¿½ï¿½ï¿½ï¿½ï¿½Æ‚ï¿½ï¿½ï¿½ï¿½É“]ï¿½uï¿½Ï‚İ‚È‚Ì‚ÅAï¿½ï¿½ï¿½Ì‚Ü‚Üï¿½Z
             float* skinMtx = &skinMatrices[i * 16];
             bx::mtxMul(skinMtx, jointMtxTransposed, invBindMtxTransposed);
         }
     }
 
-    // ‹…–ÊüŒ`•âŠÔ
+    // ï¿½ï¿½ï¿½Êï¿½ï¿½`ï¿½ï¿½ï¿½
     void quatSlerp(float* result, const float* q0, const float* q1, float t) {
         float dot = q0[0] * q1[0] + q0[1] * q1[1] + q0[2] * q1[2] + q0[3] * q1[3];
 
-        // Å’ZŒo˜H‚ğ‘I‘ğ
+        // ï¿½Å’Zï¿½oï¿½Hï¿½ï¿½Iï¿½ï¿½
         float q1_adj[4];
         if (dot < 0.0f) {
             q1_adj[0] = -q1[0];
@@ -337,7 +338,7 @@ private:
             q1_adj[3] = q1[3];
         }
 
-        // üŒ`•âŠÔ‚Å‹ß—
+        // ï¿½ï¿½ï¿½`ï¿½ï¿½Ô‚Å‹ßï¿½
         if (dot > 0.9995f) {
             result[0] = q0[0] + t * (q1_adj[0] - q0[0]);
             result[1] = q0[1] + t * (q1_adj[1] - q0[1]);
@@ -356,7 +357,7 @@ private:
             result[3] = w0 * q0[3] + w1 * q1_adj[3];
         }
 
-        // ³‹K‰»
+        // ï¿½ï¿½ï¿½Kï¿½ï¿½
         float len = sqrtf(result[0] * result[0] + result[1] * result[1] +
             result[2] * result[2] + result[3] * result[3]);
         if (len > 0) {
@@ -370,9 +371,9 @@ private:
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-// JSONƒ‰ƒCƒuƒ‰ƒŠ‚Ì‘I‘ği‚Ç‚¿‚ç‚©1‚Âj
+// JSONï¿½ï¿½ï¿½Cï¿½uï¿½ï¿½ï¿½ï¿½ï¿½Ì‘Iï¿½ï¿½ï¿½iï¿½Ç‚ï¿½ï¿½ç‚©1ï¿½Âj
 #define TINYGLTF_NO_EXTERNAL_IMAGE
-// tinygltf ‚ğg—p‚µ‚½ƒ[ƒ_[
+// tinygltf ï¿½ï¿½ï¿½gï¿½pï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½[ï¿½_ï¿½[
 #include "tiny_gltf.h"
 
 class GltfLoader {
@@ -382,17 +383,17 @@ public:
         tinygltf::TinyGLTF loader;
         std::string err, warn;
 
-        // ƒtƒ@ƒCƒ‹Šg’£q‚ğæ“¾i‘å•¶š¬•¶š‚ğ‹æ•Ê‚µ‚È‚¢j
+        // ï¿½tï¿½@ï¿½Cï¿½ï¿½ï¿½gï¿½ï¿½ï¿½qï¿½ï¿½ï¿½æ“¾ï¿½iï¿½å•¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê‚ï¿½ï¿½È‚ï¿½ï¿½j
         std::string ext = getFileExtension(filename);
 
         bool ret = false;
         if (ext == "glb") {
-            // ƒoƒCƒiƒŠŒ`®(.glb)
+            // ï¿½oï¿½Cï¿½iï¿½ï¿½ï¿½`ï¿½ï¿½(.glb)
             printf("Loading binary glTF file: %s\n", filename.c_str());
             ret = loader.LoadBinaryFromFile(model, &err, &warn, filename);
         }
         else if (ext == "gltf") {
-            // ASCII/JSONŒ`®(.gltf)
+            // ASCII/JSONï¿½`ï¿½ï¿½(.gltf)
             printf("Loading ASCII glTF file: %s\n", filename.c_str());
             ret = loader.LoadASCIIFromFile(model, &err, &warn, filename);
         }
@@ -416,13 +417,13 @@ public:
         printf("  Animations: %zu\n", model->animations.size());
         printf("  Skins: %zu\n", model->skins.size());
 
-        // ƒm[ƒh‚ğƒ[ƒh
+        // ï¿½mï¿½[ï¿½hï¿½ï¿½ï¿½ï¿½ï¿½[ï¿½h
         std::vector<Node> nodes = loadNodes(*model);
 
-        // ƒXƒLƒ“‚ğƒ[ƒh
+        // ï¿½Xï¿½Lï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½[ï¿½h
         std::vector<Skin> skins = loadSkins(*model);
 
-        // ƒAƒjƒ[ƒVƒ‡ƒ“‚ğƒ[ƒh
+        // ï¿½Aï¿½jï¿½ï¿½ï¿½[ï¿½Vï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½[ï¿½h
         std::vector<Animation> animations = loadAnimations(*model);
 
         animator.init(nodes, skins, animations);
@@ -430,7 +431,7 @@ public:
     }
 
 private:
-    // ƒtƒ@ƒCƒ‹Šg’£q‚ğæ“¾i¬•¶š‚É•ÏŠ·j
+    // ï¿½tï¿½@ï¿½Cï¿½ï¿½ï¿½gï¿½ï¿½ï¿½qï¿½ï¿½ï¿½æ“¾ï¿½iï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½É•ÏŠï¿½ï¿½j
     std::string getFileExtension(const std::string& filename) {
         size_t pos = filename.find_last_of('.');
         if (pos == std::string::npos) {
@@ -438,7 +439,7 @@ private:
         }
 
         std::string ext = filename.substr(pos + 1);
-        // ¬•¶š‚É•ÏŠ·
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½É•ÏŠï¿½
         std::transform(ext.begin(), ext.end(), ext.begin(),
             [](unsigned char c) { return std::tolower(c); });
         return ext;
@@ -460,7 +461,7 @@ private:
                 node.translation[2] = (float)gltfNode.translation[2];
             }
 
-            // Rotation (ƒNƒH[ƒ^ƒjƒIƒ“)
+            // Rotation (ï¿½Nï¿½Hï¿½[ï¿½^ï¿½jï¿½Iï¿½ï¿½)
             if (gltfNode.rotation.size() == 4) {
                 node.rotation[0] = (float)gltfNode.rotation[0];
                 node.rotation[1] = (float)gltfNode.rotation[1];
@@ -475,9 +476,9 @@ private:
                 node.scale[2] = (float)gltfNode.scale[2];
             }
 
-            // Matrix (’¼Ús—ñ‚ªw’è‚³‚ê‚Ä‚¢‚éê‡)
+            // Matrix (ï¿½ï¿½ï¿½Úsï¿½ñ‚ªwï¿½è‚³ï¿½ï¿½Ä‚ï¿½ï¿½ï¿½ê‡)
             if (gltfNode.matrix.size() == 16) {
-                // s—ñ‚©‚çTRS‚ğ’Šo
+                // ï¿½sï¿½ñ‚©‚ï¿½TRSï¿½ğ’Šo
                 extractTRS(gltfNode.matrix, node);
             }
 
@@ -488,7 +489,7 @@ private:
             nodes.push_back(node);
         }
 
-        // eqŠÖŒW‚ğİ’è
+        // ï¿½eï¿½qï¿½ÖŒWï¿½ï¿½İ’ï¿½
         for (size_t i = 0; i < nodes.size(); i++) {
             for (int childIdx : nodes[i].children) {
                 if (childIdx >= 0 && childIdx < (int)nodes.size()) {
@@ -500,14 +501,14 @@ private:
         return nodes;
     }
 
-    // s—ñ‚©‚çTRS‚ğ’ŠoiŠÈˆÕ”Åj
+    // ï¿½sï¿½ñ‚©‚ï¿½TRSï¿½ğ’Šoï¿½iï¿½ÈˆÕ”Åj
     void extractTRS(const std::vector<double>& matrix, Node& node) {
-        // •½sˆÚ“®
+        // ï¿½ï¿½ï¿½sï¿½Ú“ï¿½
         node.translation[0] = (float)matrix[12];
         node.translation[1] = (float)matrix[13];
         node.translation[2] = (float)matrix[14];
 
-        // ƒXƒP[ƒ‹‚ğ’Šo
+        // ï¿½Xï¿½Pï¿½[ï¿½ï¿½ï¿½ğ’Šo
         float sx = sqrtf(matrix[0] * matrix[0] + matrix[1] * matrix[1] + matrix[2] * matrix[2]);
         float sy = sqrtf(matrix[4] * matrix[4] + matrix[5] * matrix[5] + matrix[6] * matrix[6]);
         float sz = sqrtf(matrix[8] * matrix[8] + matrix[9] * matrix[9] + matrix[10] * matrix[10]);
@@ -516,7 +517,7 @@ private:
         node.scale[1] = sy;
         node.scale[2] = sz;
 
-        // ‰ñ“]s—ñiƒXƒP[ƒ‹‚ğœ‹j
+        // ï¿½ï¿½]ï¿½sï¿½ï¿½iï¿½Xï¿½Pï¿½[ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½j
         if (sx > 0 && sy > 0 && sz > 0) {
             float m[9] = {
                 (float)(matrix[0] / sx), (float)(matrix[1] / sx), (float)(matrix[2] / sx),
@@ -527,7 +528,7 @@ private:
         }
     }
 
-    // 3x3‰ñ“]s—ñ‚©‚çƒNƒH[ƒ^ƒjƒIƒ“‚Ö‚Ì•ÏŠ·
+    // 3x3ï¿½ï¿½]ï¿½sï¿½ñ‚©‚ï¿½Nï¿½Hï¿½[ï¿½^ï¿½jï¿½Iï¿½ï¿½ï¿½Ö‚Ì•ÏŠï¿½
     void matrixToQuat(const float* m, float* q) {
         float trace = m[0] + m[4] + m[8];
 
@@ -571,7 +572,7 @@ private:
             skin.joints = gltfSkin.joints;
             skin.skeletonRoot = gltfSkin.skeleton;
 
-            // ‹tƒoƒCƒ“ƒhs—ñ‚ğæ“¾
+            // ï¿½tï¿½oï¿½Cï¿½ï¿½ï¿½hï¿½sï¿½ï¿½ï¿½ï¿½æ“¾
             if (gltfSkin.inverseBindMatrices >= 0) {
                 const tinygltf::Accessor& accessor =
                     model.accessors[gltfSkin.inverseBindMatrices];
@@ -586,12 +587,12 @@ private:
                 int matrixCount = accessor.count;
                 skin.inverseBindMatrices.resize(matrixCount * 16);
 
-                // glTF‚Ì—ñ—Dæs—ñ‚ğ“]’u
+                // glTFï¿½Ì—ï¿½Dï¿½ï¿½sï¿½ï¿½ï¿½]ï¿½u
                 for (int i = 0; i < matrixCount; i++) {
                     const float* src = &matrices[i * 16];
                     float* dst = &skin.inverseBindMatrices[i * 16];
 
-                    // “]’uƒRƒs[
+                    // ï¿½]ï¿½uï¿½Rï¿½sï¿½[
                     for (int row = 0; row < 4; row++) {
                         for (int col = 0; col < 4; col++) {
                             dst[row * 4 + col] = src[col * 4 + row];
@@ -613,21 +614,21 @@ private:
             Animation anim;
             anim.name = gltfAnim.name.empty() ? "Animation" : gltfAnim.name;
 
-            // ƒTƒ“ƒvƒ‰[‚ğƒ[ƒh
+            // ï¿½Tï¿½ï¿½ï¿½vï¿½ï¿½ï¿½[ï¿½ï¿½ï¿½ï¿½ï¿½[ï¿½h
             for (const auto& gltfSampler : gltfAnim.samplers) {
                 AnimationSampler sampler;
 
-                // “ü—Í
+                // ï¿½ï¿½ï¿½Íï¿½ï¿½ï¿½
                 const tinygltf::Accessor& inputAccessor =
                     model.accessors[gltfSampler.input];
                 sampler.inputTimes = getAccessorData<float>(model, inputAccessor);
 
-                // o—Í’l
+                // ï¿½oï¿½Í’l
                 const tinygltf::Accessor& outputAccessor =
                     model.accessors[gltfSampler.output];
                 sampler.outputValues = getAccessorData<float>(model, outputAccessor);
 
-                // •âŠÔ•û–@
+                // ï¿½ï¿½Ô•ï¿½ï¿½@
                 if (gltfSampler.interpolation == "LINEAR") {
                     sampler.interpolation = AnimationSampler::LINEAR;
                 }
@@ -641,7 +642,7 @@ private:
                 anim.samplers.push_back(sampler);
             }
 
-            // ƒ`ƒƒƒ“ƒlƒ‹‚ğƒ[ƒh
+            // ï¿½`ï¿½ï¿½ï¿½ï¿½ï¿½lï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½[ï¿½h
             for (const auto& gltfChannel : gltfAnim.channels) {
                 AnimationChannel channel;
                 channel.samplerIndex = gltfChannel.sampler;
@@ -660,7 +661,7 @@ private:
                 anim.channels.push_back(channel);
             }
 
-            // ƒAƒjƒ[ƒVƒ‡ƒ“’·‚ğŒvZ
+            // ï¿½Aï¿½jï¿½ï¿½ï¿½[ï¿½Vï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½vï¿½Z
             for (const auto& sampler : anim.samplers) {
                 if (!sampler.inputTimes.empty()) {
                     anim.duration = std::max(anim.duration,
@@ -704,7 +705,7 @@ private:
     }
 };
 
-// g—p—á
+// ï¿½gï¿½pï¿½ï¿½
 struct GltfMesh {
     bgfx::VertexBufferHandle vbh = BGFX_INVALID_HANDLE;
     bgfx::IndexBufferHandle ibh = BGFX_INVALID_HANDLE;
@@ -714,14 +715,14 @@ struct GltfMesh {
     struct Vertex {
         float x, y, z;
         float nx, ny, nz;
-        float u, v;  // UVÀ•W’Ç‰Á
+        float u, v;  // UVï¿½ï¿½ï¿½Wï¿½Ç‰ï¿½
         int16_t joints[4];
         float weights[4];
     };
 };
 class GltfMeshLoader {
 public:
-    // tinygltf::Model‚©‚çƒƒbƒVƒ…‚ğ“Ç‚İ‚Ş
+    // tinygltf::Modelï¿½ï¿½ï¿½çƒï¿½bï¿½Vï¿½ï¿½ï¿½ï¿½Ç‚İï¿½ï¿½ï¿½
     std::vector<GltfMesh> loadMeshes(const tinygltf::Model& model) {
         std::vector<GltfMesh> meshes;
 
@@ -755,7 +756,7 @@ private:
         const tinygltf::Primitive& primitive) {
         GltfMesh mesh;
 
-        // ˆÊ’uƒf[ƒ^‚ğæ“¾
+        // ï¿½Ê’uï¿½fï¿½[ï¿½^ï¿½ï¿½ï¿½æ“¾
         auto posIt = primitive.attributes.find("POSITION");
         if (posIt == primitive.attributes.end()) {
             printf("      ERROR: No POSITION attribute\n");
@@ -768,7 +769,7 @@ private:
 
         printf("      Vertices: %d\n", vertexCount);
 
-        // –@üƒf[ƒ^iƒIƒvƒVƒ‡ƒ“j
+        // ï¿½@ï¿½ï¿½ï¿½fï¿½[ï¿½^ï¿½iï¿½Iï¿½vï¿½Vï¿½ï¿½ï¿½ï¿½ï¿½j
         std::vector<float> normals;
         auto normIt = primitive.attributes.find("NORMAL");
         if (normIt != primitive.attributes.end()) {
@@ -776,7 +777,7 @@ private:
             normals = getAccessorData<float>(model, normAccessor);
         }
         else {
-            // –@ü‚ª‚È‚¢ê‡‚Í“K“–‚È’l‚Å–„‚ß‚é
+            // ï¿½@ï¿½ï¿½ï¿½ï¿½ï¿½È‚ï¿½ï¿½ê‡ï¿½Í“Kï¿½ï¿½ï¿½È’lï¿½Å–ï¿½ï¿½ß‚ï¿½
             normals.resize(vertexCount * 3);
             for (int i = 0; i < vertexCount; i++) {
                 normals[i * 3 + 0] = 0.0f;
@@ -785,7 +786,7 @@ private:
             }
         }
 
-        // ššš ‚±‚±‚ÉUVÀ•W‚Ì“Ç‚İ‚İ‚ğ’Ç‰Á ššš
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½UVï¿½ï¿½ï¿½Wï¿½Ì“Ç‚İï¿½ï¿½İ‚ï¿½Ç‰ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         std::vector<float> texcoords;
         auto texIt = primitive.attributes.find("TEXCOORD_0");
         if (texIt != primitive.attributes.end()) {
@@ -794,12 +795,12 @@ private:
             printf("      Has texture coordinates\n");
         }
         else {
-            // UV‚ª‚È‚¢ê‡‚Íƒ_ƒ~[ƒf[ƒ^
+            // UVï¿½ï¿½ï¿½È‚ï¿½ï¿½ê‡ï¿½Íƒ_ï¿½~ï¿½[ï¿½fï¿½[ï¿½^
             texcoords.resize(vertexCount * 2, 0.0f);
             printf("      No texture coordinates, using default\n");
         }
         printf("      Has skinning data\n");
-        // ƒWƒ‡ƒCƒ“ƒgEƒEƒFƒCƒgiƒXƒLƒjƒ“ƒO—pAƒIƒvƒVƒ‡ƒ“j
+        // ï¿½Wï¿½ï¿½ï¿½Cï¿½ï¿½ï¿½gï¿½Eï¿½Eï¿½Fï¿½Cï¿½gï¿½iï¿½Xï¿½Lï¿½jï¿½ï¿½ï¿½Oï¿½pï¿½Aï¿½Iï¿½vï¿½Vï¿½ï¿½ï¿½ï¿½ï¿½j
         std::vector<uint16_t> joints;
         std::vector<float> weights;
 
@@ -813,12 +814,12 @@ private:
             const tinygltf::Accessor& jointsAccessor = model.accessors[jointsIt->second];
             const tinygltf::Accessor& weightsAccessor = model.accessors[weightsIt->second];
 
-            // ƒWƒ‡ƒCƒ“ƒgƒf[ƒ^‚Ì“Ç‚İ‚İ
+            // ï¿½Wï¿½ï¿½ï¿½Cï¿½ï¿½ï¿½gï¿½fï¿½[ï¿½^ï¿½Ì“Ç‚İï¿½ï¿½ï¿½
             if (jointsAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
                 joints = getAccessorData<uint16_t>(model, jointsAccessor);
             }
             else {
-                // UNSIGNED_BYTE‚Ìê‡
+                // UNSIGNED_BYTEï¿½Ìê‡
                 std::vector<uint8_t> joints8 = getAccessorData<uint8_t>(model, jointsAccessor);
                 joints.resize(joints8.size());
                 for (size_t i = 0; i < joints8.size(); i++) {
@@ -829,7 +830,7 @@ private:
             weights = getAccessorData<float>(model, weightsAccessor);
         }
         else {
-            // ƒXƒLƒjƒ“ƒO‚È‚µ‚Ìê‡‚Íƒ_ƒ~[ƒf[ƒ^
+            // ï¿½Xï¿½Lï¿½jï¿½ï¿½ï¿½Oï¿½È‚ï¿½ï¿½Ìê‡ï¿½Íƒ_ï¿½~ï¿½[ï¿½fï¿½[ï¿½^
             joints.resize(vertexCount * 4, 0);
             weights.resize(vertexCount * 4);
             for (int i = 0; i < vertexCount; i++) {
@@ -850,7 +851,7 @@ private:
             vertices[i].ny = normals[i * 3 + 1];
             vertices[i].nz = normals[i * 3 + 2];
 
-            // ššš UVÀ•W‚ğİ’è ššš
+            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ UVï¿½ï¿½ï¿½Wï¿½ï¿½İ’ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
             vertices[i].u = texcoords[i * 2 + 0];
             vertices[i].v = texcoords[i * 2 + 1];
 
@@ -865,22 +866,22 @@ private:
             vertices[i].weights[3] = weights[i * 4 + 3];
         }
 
-        // ’¸“_ƒŒƒCƒAƒEƒg
+        // ï¿½ï¿½ï¿½_ï¿½ï¿½ï¿½Cï¿½Aï¿½Eï¿½g
         bgfx::VertexLayout layout;
         layout.begin()
             .add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
             .add(bgfx::Attrib::Normal, 3, bgfx::AttribType::Float)
-            .add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)  // UV’Ç‰Á
+            .add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)  // UVï¿½Ç‰ï¿½
             .add(bgfx::Attrib::Indices, 4, bgfx::AttribType::Int16)
             .add(bgfx::Attrib::Weight, 4, bgfx::AttribType::Float)
             .end();
 
-        // ’¸“_ƒoƒbƒtƒ@‚ğì¬
+        // ï¿½ï¿½ï¿½_ï¿½oï¿½bï¿½tï¿½@ï¿½ï¿½ï¿½ì¬
         const bgfx::Memory* vbMem = bgfx::copy(vertices.data(),
             vertices.size() * sizeof(GltfMesh::Vertex));
         mesh.vbh = bgfx::createVertexBuffer(vbMem, layout);
 
-        // ƒCƒ“ƒfƒbƒNƒXƒoƒbƒtƒ@
+        // ï¿½Cï¿½ï¿½ï¿½fï¿½bï¿½Nï¿½Xï¿½oï¿½bï¿½tï¿½@
         if (primitive.indices >= 0) {
             const tinygltf::Accessor& indexAccessor = model.accessors[primitive.indices];
             mesh.indexCount = indexAccessor.count;
@@ -929,9 +930,9 @@ private:
         size_t count = accessor.count * componentCount;
         std::vector<T> result(count);
 
-        // ƒXƒgƒ‰ƒCƒh‚ğl—¶
+        // ï¿½Xï¿½gï¿½ï¿½ï¿½Cï¿½hï¿½ï¿½ï¿½lï¿½ï¿½
         if (bufferView.byteStride > 0 && bufferView.byteStride != sizeof(T) * componentCount) {
-            // ƒCƒ“ƒ^[ƒŠ[ƒu‚³‚ê‚½ƒf[ƒ^
+            // ï¿½Cï¿½ï¿½ï¿½^ï¿½[ï¿½ï¿½ï¿½[ï¿½uï¿½ï¿½ï¿½ê‚½ï¿½fï¿½[ï¿½^
             const uint8_t* src = reinterpret_cast<const uint8_t*>(data);
             for (size_t i = 0; i < accessor.count; i++) {
                 const T* elem = reinterpret_cast<const T*>(src + i * bufferView.byteStride);
@@ -941,14 +942,14 @@ private:
             }
         }
         else {
-            // ˜A‘±ƒf[ƒ^
+            // ï¿½Aï¿½ï¿½ï¿½fï¿½[ï¿½^
             memcpy(result.data(), data, count * sizeof(T));
         }
 
         return result;
     }
 };
-// glTFƒŒƒ“ƒ_ƒ‰[ƒNƒ‰ƒX
+// glTFï¿½ï¿½ï¿½ï¿½ï¿½_ï¿½ï¿½ï¿½[ï¿½Nï¿½ï¿½ï¿½X
 class GltfRenderer {
 private:
     GltfAnimator animator;
@@ -969,7 +970,7 @@ private:
 
             const tinygltf::Image& image = model.images[gltfTexture.source];
 
-            // ‰æ‘œƒf[ƒ^‚©‚çbgfxƒeƒNƒXƒ`ƒƒ‚ğì¬
+            // ï¿½æ‘œï¿½fï¿½[ï¿½^ï¿½ï¿½ï¿½ï¿½bgfxï¿½eï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½ï¿½ï¿½ì¬
             const bgfx::Memory* mem = bgfx::copy(
                 image.image.data(),
                 image.image.size()
@@ -991,8 +992,8 @@ private:
         }
     }
 public:
-    bool loadModel(const char* filepath) {
-        // glTFƒtƒ@ƒCƒ‹‚ğƒ[ƒh
+    bool loadModel(const char* filepath, HopStarIO::Location shaderLocation) {
+        // glTF file load
         GltfLoader loader;
 		tinygltf::Model* model = loader.loadFromFile(filepath, animator);
         if (model == NULL) {
@@ -1000,18 +1001,18 @@ public:
             return false;
         }
 
-        // ƒAƒjƒ[ƒVƒ‡ƒ“‚ğŠJn
+        // Start animation
         if (animator.getAnimationCount() > 0) {
             animator.setAnimation(0);
         }
         u_texColor = bgfx::createUniform("s_texColor", bgfx::UniformType::Sampler);
 
-        // ƒƒbƒVƒ…ƒf[ƒ^‚ğƒ[ƒhiŠÈ—ª”Åj
+        // Load mesh data
         loadMeshData(model);
-        // ƒVƒF[ƒ_[‚ğƒRƒ“ƒpƒCƒ‹
-        createShaders();
+        // Compile shaders
+        createShaders(shaderLocation);
 
-        // ƒ†ƒjƒtƒH[ƒ€‚ğì¬
+        // ï¿½ï¿½ï¿½jï¿½tï¿½Hï¿½[ï¿½ï¿½ï¿½ï¿½ï¿½ì¬
         u_skinMatrices = bgfx::createUniform("u_skinMatrices",
             bgfx::UniformType::Mat4, 64);
 
@@ -1027,7 +1028,7 @@ public:
         if (frameCount++ % 60 == 0) {
             printf("Rendering frame %d, meshes: %zu\n", frameCount, meshes.size());
         }
-        // ƒJƒƒ‰ˆÊ’uŒvZ
+        // ï¿½Jï¿½ï¿½ï¿½ï¿½ï¿½Ê’uï¿½vï¿½Z
         bx::Vec3 eye = bx::Vec3(
             cameraDistance * sinf(cameraAngleX) * cosf(cameraAngleY),
             cameraDistance * sinf(cameraAngleY),
@@ -1039,32 +1040,32 @@ public:
         float view[16];
         bx::mtxLookAt(view, eye, at, up);
 
-        // ƒvƒƒWƒFƒNƒVƒ‡ƒ“s—ñ
+        // ï¿½vï¿½ï¿½ï¿½Wï¿½Fï¿½Nï¿½Vï¿½ï¿½ï¿½ï¿½ï¿½sï¿½ï¿½
         float proj[16];
         bx::mtxProj(proj, 45.0f, float(width) / float(height),
             0.1f, 100.0f, bgfx::getCaps()->homogeneousDepth);
 
-        // ƒrƒ…[İ’è
+        // ï¿½rï¿½ï¿½ï¿½[ï¿½İ’ï¿½
         bgfx::setViewTransform(0, view, proj);
         bgfx::setViewRect(0, 0, 0, width, height);
 
-        // ƒ‚ƒfƒ‹s—ñ
+        // ï¿½ï¿½ï¿½fï¿½ï¿½ï¿½sï¿½ï¿½
         float model[16];
         bx::mtxIdentity(model);
 
-        // MVPs—ñ
+        // MVPï¿½sï¿½ï¿½
         float mvp[16];
         float tmp[16];
         bx::mtxMul(tmp, model, view);
         bx::mtxMul(mvp, tmp, proj);
 
-        // ƒXƒLƒ“ƒ}ƒgƒŠƒbƒNƒX‚ğƒ†ƒjƒtƒH[ƒ€‚Éİ’è
+        // ï¿½Xï¿½Lï¿½ï¿½ï¿½}ï¿½gï¿½ï¿½ï¿½bï¿½Nï¿½Xï¿½ï¿½ï¿½ï¿½ï¿½jï¿½tï¿½Hï¿½[ï¿½ï¿½ï¿½Éİ’ï¿½
         if (animator.getSkinMatrixCount() > 0) {
             bgfx::setUniform(u_skinMatrices, animator.getSkinMatrices(),
                 bx::min(64, animator.getSkinMatrixCount()));
         }
 
-        // ƒƒbƒVƒ…‚ğ•`‰æ
+        // ï¿½ï¿½ï¿½bï¿½Vï¿½ï¿½ï¿½ï¿½`ï¿½ï¿½
         for (const auto& mesh : meshes) {
             if (bgfx::isValid(mesh.vbh) && bgfx::isValid(mesh.ibh)) {
                 if (frameCount % 60 == 0) {
@@ -1086,7 +1087,7 @@ public:
                     bgfx::setTexture(0, u_texColor, textures[0]);
                 }
 
-                // ó‘Ôİ’è
+                // ï¿½ï¿½Ôİ’ï¿½
                 uint64_t state = BGFX_STATE_WRITE_RGB
                     | BGFX_STATE_WRITE_A
                     | BGFX_STATE_WRITE_Z
@@ -1119,34 +1120,52 @@ public:
     }
 
 private:
-    bgfx::ShaderHandle loadShader(const char* filename) {
-        std::ifstream file(filename, std::ios::binary | std::ios::ate);
-        if (!file.is_open()) {
-            printf("ERROR: Cannot open shader file: %s\n", filename);
+    // Get platform suffix for shader files
+    // Windows: no suffix (DirectX), macOS/iOS: _mtl (Metal), Android/Linux: _spv (Vulkan/SPIRV)
+    static const char* getShaderPlatformSuffix() {
+#if defined(_WIN32)
+        return "";  // Windows DirectX shaders have no suffix
+#elif defined(__ANDROID__)
+        return "_spv";  // Android uses Vulkan/SPIRV
+#elif TARGET_OS_IOS || TARGET_OS_SIMULATOR
+        return "_mtl";  // iOS uses Metal
+#elif TARGET_OS_MAC
+        return "_mtl";  // macOS uses Metal
+#elif defined(__linux__)
+        return "_spv";  // Linux uses Vulkan/SPIRV
+#else
+        return "";
+#endif
+    }
+
+    // Load shader with automatic platform suffix
+    // e.g., loadShader("shaders/vs_mesh", location) loads "shaders/vs_mesh_w.bin" on Windows
+    bgfx::ShaderHandle loadShader(const char* baseName, HopStarIO::Location location) {
+        // Build platform-specific filename: baseName + platform_suffix + .bin
+        std::string filename = std::string(baseName) + getShaderPlatformSuffix() + ".bin";
+
+        // Use PlatformIO/FileEngine for unified cross-platform file access
+        auto data = PlatformIO::readFile(filename, location);
+        if (data.empty()) {
+            printf("ERROR: Cannot open shader file: %s\n", filename.c_str());
             return BGFX_INVALID_HANDLE;
         }
 
-        std::streamsize size = file.tellg();
-        file.seekg(0, std::ios::beg);
+        printf("Loading shader: %s (%zu bytes)\n", filename.c_str(), data.size());
 
-        printf("Loading shader: %s (%d bytes)\n", filename, (int)size);
-
-        const bgfx::Memory* mem = bgfx::alloc(size);
-        if (file.read((char*)mem->data, size)) {
-            bgfx::ShaderHandle handle = bgfx::createShader(mem);
-            printf("Shader handle: %d, valid: %s\n",
-                handle.idx, bgfx::isValid(handle) ? "YES" : "NO");
-            return handle;
-        }
-
-        return BGFX_INVALID_HANDLE;
+        const bgfx::Memory* mem = bgfx::copy(data.data(), static_cast<uint32_t>(data.size()));
+        bgfx::ShaderHandle handle = bgfx::createShader(mem);
+        printf("Shader handle: %d, valid: %s\n",
+            handle.idx, bgfx::isValid(handle) ? "YES" : "NO");
+        return handle;
     }
-    void createShaders() {
+
+    void createShaders(HopStarIO::Location location) {
         printf("=== Loading pre-compiled shaders ===\n");
 
-        // Windows‚Ìê‡‚Í"dx11"ALinux‚È‚ç"glsl"
-        bgfx::ShaderHandle vsh = loadShader("vs_mesh.bin");
-        bgfx::ShaderHandle fsh = loadShader("fs_mesh.bin");
+        // Use base names - platform suffix and .bin extension are added automatically
+        bgfx::ShaderHandle vsh = loadShader("shaders/vs_mesh", location);
+        bgfx::ShaderHandle fsh = loadShader("shaders/fs_mesh", location);
 
         if (bgfx::isValid(vsh) && bgfx::isValid(fsh)) {
             program = bgfx::createProgram(vsh, fsh, true);
@@ -1160,7 +1179,7 @@ private:
 
     void loadMeshData(tinygltf::Model* model) {
 
-        // ‘O‚É’ñ‹Ÿ‚µ‚½GltfMeshLoader‚ğg—p
+        // ï¿½Oï¿½É’ñ‹Ÿ‚ï¿½ï¿½ï¿½GltfMeshLoaderï¿½ï¿½ï¿½gï¿½p
         GltfMeshLoader meshLoader;
         meshes = meshLoader.loadMeshes(*model);
 

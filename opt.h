@@ -18,7 +18,7 @@ struct Camera2 {
             device_list = NULL;
             int ret = avdevice_list_input_sources(input_format, "video", NULL, &device_list);
             if (ret < 0) {
-                std::cerr << "ƒfƒoƒCƒX‚Ìæ“¾‚É¸”s‚µ‚Ü‚µ‚½" << std::endl;
+                std::cerr << "ï¿½fï¿½oï¿½Cï¿½Xï¿½Ìæ“¾ï¿½Éï¿½ï¿½sï¿½ï¿½ï¿½Ü‚ï¿½ï¿½ï¿½" << std::endl;
                 return;
             }
             char fullname[128];
@@ -26,7 +26,7 @@ struct Camera2 {
             strcat_s(fullname, sizeof(fullname), device_list->devices[0]->device_name);
             avformat_open_input(&formatContext, fullname, input_format, NULL);
             if (!formatContext) {
-                std::cerr << "ƒfƒoƒCƒX‚ÌƒI[ƒvƒ“‚É¸”s‚µ‚Ü‚µ‚½" << std::endl;
+                std::cerr << "ï¿½fï¿½oï¿½Cï¿½Xï¿½ÌƒIï¿½[ï¿½vï¿½ï¿½ï¿½Éï¿½ï¿½sï¿½ï¿½ï¿½Ü‚ï¿½ï¿½ï¿½" << std::endl;
                 return;
             }
             int videoStreamIndex = -1;
@@ -37,7 +37,7 @@ struct Camera2 {
                 }
             }
             if (videoStreamIndex == -1) {
-                std::cerr << "ƒrƒfƒIƒXƒgƒŠ[ƒ€‚ªŒ©‚Â‚©‚è‚Ü‚¹‚ñ‚Å‚µ‚½" << std::endl;
+                std::cerr << "ï¿½rï¿½fï¿½Iï¿½Xï¿½gï¿½ï¿½ï¿½[ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â‚ï¿½ï¿½ï¿½Ü‚ï¿½ï¿½ï¿½Å‚ï¿½ï¿½ï¿½" << std::endl;
                 return;
             }
             codecParam = formatContext->streams[videoStreamIndex]->codecpar;
@@ -77,9 +77,9 @@ struct NuroPlan {
     std::vector<torch::Tensor> goal_tensors;
     void init() {
         optimizer = std::make_unique<torch::optim::Adam>(model->parameters(), torch::optim::AdamOptions(1e-3));
-        fs::create_directories("inputs/faces");
-        fs::create_directories("inputs/nonfaces");
-        for (const auto& entry : fs::directory_iterator("inputs/faces")) {
+        std::filesystem::create_directories("inputs/faces");
+        std::filesystem::create_directories("inputs/nonfaces");
+        for (const auto& entry : std::filesystem::directory_iterator("inputs/faces")) {
             std::string filename = entry.path().string();
             if (filename.substr(filename.find_last_of(".") + 1) == "png") {
                 int width, height, channels;
@@ -94,7 +94,7 @@ struct NuroPlan {
                 stbi_image_free(data);
             }
         }
-        for (const auto& entry : fs::directory_iterator("inputs/nonfaces")) {
+        for (const auto& entry : std::filesystem::directory_iterator("inputs/nonfaces")) {
             std::string filename = entry.path().string();
             if (filename.substr(filename.find_last_of(".") + 1) == "png") {
                 int width, height, channels;
@@ -144,10 +144,10 @@ struct NuroPlan {
             frameRGB->data[0],
             { 1, 480, 640, 3 },  // NHWC
             torch::kUInt8
-        ).permute({ 0, 3, 1, 2 })  // ¨ NCHW
+        ).permute({ 0, 3, 1, 2 })  // ï¿½ï¿½ NCHW
             .to(torch::kFloat).div(255).to(torch::kCUDA);
 
-        // •K—v‚É‰‚¶‚Ä resizeiƒ‚ƒfƒ‹‚Í 64x48 ‘O’ñj
+        // ï¿½Kï¿½vï¿½É‰ï¿½ï¿½ï¿½ï¿½ï¿½ resizeï¿½iï¿½ï¿½ï¿½fï¿½ï¿½ï¿½ï¿½ 64x48 ï¿½Oï¿½ï¿½j
         input_tensor = F::interpolate(input_tensor, F::InterpolateFuncOptions().size(std::vector<int64_t>({ 64, 48 })).mode(torch::kBilinear));
 
         torch::Tensor output = model->forward(input_tensor);  // shape: [1, 2]

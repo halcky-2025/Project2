@@ -5,6 +5,7 @@
 #endif
 
 #include <algorithm>
+#include "platform_io.h"
 
 #ifdef __ANDROID__
 #include <SDL3/SDL.h>
@@ -2121,50 +2122,21 @@ private:
             int w, h, channels;
             unsigned char* pixels = nullptr;
 
-#ifdef __ANDROID__
-            // Android: Use SDL_IOFromFile to read from assets
-            SDL_IOStream* io = SDL_IOFromFile(path.c_str(), "rb");
-            if (!io) return DecodedImage{};
-
-            Sint64 size = SDL_GetIOSize(io);
-            if (size <= 0) {
-                SDL_CloseIO(io);
+            // Use PlatformIO/FileEngine for unified cross-platform file access
+            auto fileData = PlatformIO::readFile(path, HopStarIO::Location::Resource);
+            if (fileData.empty()) {
+                SDL_Log("loadImage: Failed to read file: %s", path.c_str());
                 return DecodedImage{};
             }
 
-            std::vector<uint8_t> fileData(static_cast<size_t>(size));
-            size_t read = SDL_ReadIO(io, fileData.data(), fileData.size());
-            SDL_CloseIO(io);
-
-            if (read != fileData.size()) return DecodedImage{};
-
             pixels = stbi_load_from_memory(fileData.data(), (int)fileData.size(), &w, &h, &channels, 4);
-#elif TARGET_OS_IOS || TARGET_OS_SIMULATOR || TARGET_OS_MAC
-            // iOS/macOS: Use bundle path (macOS falls back to relative path)
-            std::string bundlePath = getBundlePath(path.c_str());
-            SDL_Log("loadImage: Trying bundle path: %s", bundlePath.c_str());
-            pixels = stbi_load(bundlePath.c_str(), &w, &h, &channels, 4);
-#if TARGET_OS_MAC && !TARGET_OS_IOS
-            // macOS: If bundle path failed, try relative path (for command line execution)
-            if (!pixels) {
-                SDL_Log("loadImage: Bundle path failed, trying relative path: %s", path.c_str());
-                pixels = stbi_load(path.c_str(), &w, &h, &channels, 4);
-            }
-#else
+
+#if TARGET_OS_IOS || TARGET_OS_SIMULATOR
             // iOS only: Swap R and B channels (RGBA -> BGRA) for Metal compatibility
             if (pixels) {
                 for (int i = 0; i < w * h; ++i) {
                     std::swap(pixels[i * 4 + 0], pixels[i * 4 + 2]);
                 }
-            }
-#endif
-#else
-            // Linux: Use bundle path
-            std::string bundlePath = getBundlePath(path.c_str());
-            SDL_Log("loadImage: Trying path: %s", bundlePath.c_str());
-            pixels = stbi_load(bundlePath.c_str(), &w, &h, &channels, 4);
-            if (!pixels) {
-                SDL_Log("loadImage: Failed to load: %s", bundlePath.c_str());
             }
 #endif
 

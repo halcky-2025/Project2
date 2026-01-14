@@ -6,7 +6,7 @@
 #include <chrono>
 #include <iostream>
 
-#if !TARGET_OS_IOS && !TARGET_OS_SIMULATOR
+#if !TARGET_OS_IOS && !TARGET_OS_SIMULATOR && !defined(__ANDROID__) && !defined(__linux__)
 
 class CustomModuleImpl;
 
@@ -1383,10 +1383,10 @@ CustomModuleImpl* ReadDll(ThreadGC* thgc) {
     return NULL;
 }
 
-#endif // !TARGET_OS_IOS && !TARGET_OS_SIMULATOR
+#endif // !TARGET_OS_IOS && !TARGET_OS_SIMULATOR && !__ANDROID__ && !__linux__
 
 // Timing function needed by GoThread - shared for all platforms
-#if TARGET_OS_IOS || TARGET_OS_SIMULATOR
+#if TARGET_OS_IOS || TARGET_OS_SIMULATOR || defined(__ANDROID__) || defined(__linux__)
 uint64_t now_us() {
     using namespace std::chrono;
     return duration_cast<microseconds>(steady_clock::now().time_since_epoch()).count();
@@ -1394,7 +1394,7 @@ uint64_t now_us() {
 #endif
 
 // GoThread - shared code for all platforms
-#if TARGET_OS_IOS || TARGET_OS_SIMULATOR
+#if TARGET_OS_IOS || TARGET_OS_SIMULATOR || defined(__ANDROID__) || defined(__linux__)
 void* GoThread(ThreadGC* thgc) {
 #else
 CustomModuleImpl* GoThread(ThreadGC* thgc) {
@@ -1468,7 +1468,7 @@ CustomModuleImpl* GoThread(ThreadGC* thgc) {
 void runGoThreadAsync(ThreadGC* thgc) {
     std::thread([thgc]() {
         initDone.get_future().wait();
-#if TARGET_OS_IOS || TARGET_OS_SIMULATOR
+#if TARGET_OS_IOS || TARGET_OS_SIMULATOR || defined(__ANDROID__) || defined(__linux__)
         GoThread(thgc);
 #else
         CustomModuleImpl* result = GoThread(thgc);

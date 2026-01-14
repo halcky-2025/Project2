@@ -23,6 +23,8 @@
 #include <mutex>
 #include <atomic>
 
+#include "platform_io.h"
+
 #ifdef __ANDROID__
 #include <SDL3/SDL.h>
 #endif
@@ -61,47 +63,60 @@ namespace nle {
         }
     };
 
+    // =============================================================================
+    // Cross-platform media file access via FileEngine
+    // FFmpeg needs real file paths, so we cache remote/asset files locally
+    // =============================================================================
+    inline std::string getMediaRealPath(const std::string& path) {
 #ifdef __ANDROID__
-    // =============================================================================
-    // Android Asset Helper - assets から内部ストレージに展開
-    // =============================================================================
-    inline std::string extractAssetToInternal(const std::string& assetPath) {
-        SDL_IOStream* io = SDL_IOFromFile(assetPath.c_str(), "rb");
-        if (!io) return "";
+        // Android: Extract asset to cache for FFmpeg access
+        return PlatformIO::extractAssetToCache(path);
+#else
+        // Check if it's a URL
+        std::string scheme = HopStarIO::parseAddressScheme(path);
 
-        Sint64 size = SDL_GetIOSize(io);
-        if (size <= 0) {
-            SDL_CloseIO(io);
+        if (!scheme.empty()) {
+            // Remote file: download and cache via FileEngine
+            auto* engine = PlatformIO::getEngine();
+            auto desc = engine->createDescriptor(path, HopStarIO::Location::Server,
+                                                  HopStarIO::Access::Read, path);
+
+            // Prefetch to cache
+            if (!engine->prefetch(desc)) {
+                return "";
+            }
+
+            // Get cache path
+            std::string cachePath = engine->getInternalPath("media_cache/" + HopStarIO::hashPath(path));
+
+            // Write cached data to local file for FFmpeg
+            auto result = engine->read(desc);
+            if (result.success) {
+                auto writeDesc = engine->fromExternalPath(cachePath, HopStarIO::Access::Write);
+                engine->write(writeDesc, result.data.data(), result.data.size());
+                return cachePath;
+            }
             return "";
         }
 
-        std::vector<uint8_t> data(static_cast<size_t>(size));
-        size_t read = SDL_ReadIO(io, data.data(), data.size());
-        SDL_CloseIO(io);
-
-        if (read != data.size()) return "";
-
-        const char* prefPath = SDL_GetPrefPath("org.libsdl.app", "cache");
-        if (!prefPath) return "";
-
-        std::string filename = assetPath;
-        size_t lastSlash = filename.find_last_of("/\\");
-        if (lastSlash != std::string::npos) {
-            filename = filename.substr(lastSlash + 1);
+        // Local/Resource file: Read through FileEngine and cache for FFmpeg
+        auto* engine = PlatformIO::getEngine();
+        auto fileData = PlatformIO::readFile(path, HopStarIO::Location::Resource);
+        if (fileData.empty()) {
+            SDL_Log("getMediaRealPath: Failed to read resource via FileEngine: %s", path.c_str());
+            return "";
         }
-        std::string outputPath = std::string(prefPath) + filename;
 
-        SDL_IOStream* outIo = SDL_IOFromFile(outputPath.c_str(), "wb");
-        if (!outIo) return "";
+        // Cache to internal storage for FFmpeg access
+        std::string cachePath = engine->getInternalPath("media_cache/" + HopStarIO::hashPath(path));
+        if (PlatformIO::writeFile(cachePath, fileData.data(), fileData.size(), HopStarIO::Location::External)) {
+            return cachePath;
+        }
 
-        size_t written = SDL_WriteIO(outIo, data.data(), data.size());
-        SDL_CloseIO(outIo);
-
-        if (written != data.size()) return "";
-
-        return outputPath;
-    }
+        SDL_Log("getMediaRealPath: Failed to cache file: %s", path.c_str());
+        return "";
 #endif
+    }
 
     // =============================================================================
     // MasterClock - タイムライン全体の時間管理
@@ -167,17 +182,12 @@ namespace nle {
         bool open(const std::string& path) {
             close();
 
-#ifdef __ANDROID__
-            // Android: assets から内部ストレージに展開
-            std::string realPath = extractAssetToInternal(path);
+            // Use PlatformIO for cross-platform path resolution
+            std::string realPath = getMediaRealPath(path);
             if (realPath.empty()) return false;
 
             int ret = avformat_open_input(&format_ctx_, realPath.c_str(), nullptr, nullptr);
             if (ret < 0) return false;
-#else
-            int ret = avformat_open_input(&format_ctx_, path.c_str(), nullptr, nullptr);
-            if (ret < 0) return false;
-#endif
 
             if (avformat_find_stream_info(format_ctx_, nullptr) < 0) {
                 close();
@@ -466,20 +476,14 @@ namespace nle {
         bool open(const std::string& path) {
             close();
 
-#ifdef __ANDROID__
-            // Android: assets から内部ストレージに展開
-            std::string realPath = extractAssetToInternal(path);
+            // Use PlatformIO/FileEngine for cross-platform path resolution
+            std::string realPath = getMediaRealPath(path);
             if (realPath.empty()) {
                 return false;
             }
             if (avformat_open_input(&format_ctx_, realPath.c_str(), nullptr, nullptr) < 0) {
                 return false;
             }
-#else
-            if (avformat_open_input(&format_ctx_, path.c_str(), nullptr, nullptr) < 0) {
-                return false;
-            }
-#endif
 
             if (avformat_find_stream_info(format_ctx_, nullptr) < 0) {
                 close();

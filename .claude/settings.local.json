@@ -64,7 +64,23 @@
       "Bash(LD_LIBRARY_PATH=/home/hayahiro/ドキュメント/GitHub/Project2/linux/deps/SDL3/build:/home/hayahiro/ドキュメント/GitHub/Project2/linux/deps/SDL3_ttf/build:$LD_LIBRARY_PATH SDL_VIDEODRIVER=x11 timeout:*)",
       "Bash(LD_LIBRARY_PATH=/home/hayahiro/ドキュメント/GitHub/Project2/linux/deps/SDL3/build:/home/hayahiro/ドキュメント/GitHub/Project2/linux/deps/SDL3_ttf/build:$LD_LIBRARY_PATH MALLOC_CHECK_=3 timeout 10 gdb:*)",
       "Bash(LD_LIBRARY_PATH=/home/hayahiro/ドキュメント/GitHub/Project2/linux/deps/SDL3/build:/home/hayahiro/ドキュメント/GitHub/Project2/linux/deps/SDL3_ttf/build:$LD_LIBRARY_PATH MALLOC_CHECK_=0 timeout 10 ./bin/HopStar_Linux:*)",
-      "Bash(timeout 10:*)"
+      "Bash(timeout 10:*)",
+      "Bash(/c/Program Files/Microsoft Visual Studio/2022/Community/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe --build:*)",
+      "Bash(where cmake:*)",
+      "Bash(\"/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" /c/Users/hayah/source/repos/Project2/Project2.sln /t:Build /p:Configuration=Debug /p:Platform=x64 /v:minimal)",
+      "Bash(cmd.exe /c \"dir /s /b \"\"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\2022\\\\*MSBuild.exe\"\" 2>nul\")",
+      "Bash(cmd.exe:*)",
+      "Bash(powershell.exe -Command \"& ''C:\\\\Program Files \\(x86\\)\\\\Microsoft Visual Studio\\\\Installer\\\\vswhere.exe'' -latest -products * -requires Microsoft.Component.MSBuild -find MSBuild\\\\**\\\\Bin\\\\MSBuild.exe\")",
+      "Bash(powershell.exe -Command:*)",
+      "Bash(\"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\2022\\\\Community\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe\" \"../Project2.sln\" /p:Configuration=Release /p:Platform=x64 /m /v:minimal)",
+      "Bash(\"/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe\" \"C:/Users/hayah/source/repos/Project2/Project2.sln\" /p:Configuration=Release /p:Platform=x64 /m /v:minimal)",
+      "Bash(\"/c/Program Files/Microsoft Visual Studio/18/Community/MSBuild/Current/Bin/MSBuild.exe\" \"C:/Users/hayah/source/repos/Project2/Project2.sln\" /p:Configuration=Release /p:Platform=x64 /m /v:minimal)",
+      "Bash(\"/c/Program Files/Microsoft Visual Studio/18/Community/MSBuild/Current/Bin/MSBuild.exe\" \"C:/Users/hayah/source/repos/Project2/Project2.sln\" -p:Configuration=Release -p:Platform=x64 -m -v:minimal)",
+      "Bash(./gradlew.bat:*)",
+      "Bash(dir \"C:\\\\Users\\\\hayah\\\\source\\\\repos\\\\Project2\\\\android\\\\app\\\\src\\\\main\")",
+      "Bash(adb logcat:*)",
+      "Bash(\"C:\\\\Users\\\\hayah\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\" logcat -d -s \"SDL\" \"bgfx\")",
+      "Bash(\"C:\\\\Users\\\\hayah\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\" logcat -d)"
     ]
   }
 }
