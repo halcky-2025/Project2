@@ -4,6 +4,7 @@
 #include <TargetConditionals.h>
 #endif
 
+#include "platform_io.h"
 #include <bgfx/bgfx.h>
 #include <cstdint>
 #include <vector>
@@ -1749,7 +1750,32 @@ public:
     FontId registerFont(const char* name, const std::string& font, int size) {
         std::lock_guard lock(mutex_);
         TTF_Font* f = nullptr;
-#ifdef __ANDROID__
+        std::vector<uint8_t> fontData;
+
+        // Read font data through FileEngine (unified for all platforms)
+        fontData = PlatformIO::readFile(font, HopStarIO::Location::Resource);
+        if (fontData.empty()) {
+            SDL_Log("registerFont: Failed to read font file via FileEngine: %s", font.c_str());
+        }
+        else {
+            SDL_Log("registerFont: Read %zu bytes from %s via FileEngine", fontData.size(), font.c_str());
+            // Create SDL_IOStream from memory (closeio=false because we manage the memory)
+            SDL_IOStream* io = SDL_IOFromConstMem(fontData.data(), fontData.size());
+            if (io) {
+                f = TTF_OpenFontIO(io, false, (float)size);
+                if (!f) {
+                    SDL_Log("registerFont: TTF_OpenFontIO failed for %s: %s", font.c_str(), SDL_GetError());
+                    SDL_CloseIO(io);
+                }
+                else {
+                    SDL_Log("registerFont: Loaded font %s size %d", font.c_str(), size);
+                }
+            }
+            else {
+                SDL_Log("registerFont: SDL_IOFromConstMem failed: %s", SDL_GetError());
+            }
+        }
+#if 0  // Legacy platform-specific code - now using FileEngine
         // Android�ł̓A�Z�b�g����ǂݍ���
         SDL_IOStream* io = SDL_IOFromFile(font.c_str(), "rb");
         if (io) {
@@ -1764,31 +1790,10 @@ public:
         else {
             SDL_Log("registerFont: SDL_IOFromFile failed for %s: %s", font.c_str(), SDL_GetError());
         }
-#elif defined(__APPLE__)
-        // Apple (iOS/macOS)ではバンドルから読み込む
-        std::string bundlePath = getBundlePath(font.c_str());
-        SDL_Log("registerFont: Loading font from bundle: %s", bundlePath.c_str());
-        f = TTF_OpenFont(bundlePath.c_str(), size);
-        if (!f) {
-            SDL_Log("registerFont: TTF_OpenFont failed for %s: %s", bundlePath.c_str(), SDL_GetError());
-        }
-        else {
-            SDL_Log("registerFont: Loaded font %s size %d", bundlePath.c_str(), size);
-        }
-#else
-        // Linux - getBundlePathを使用
-        std::string bundlePath = getBundlePath(font.c_str());
-        SDL_Log("registerFont: Loading font from: %s", bundlePath.c_str());
-        f = TTF_OpenFont(bundlePath.c_str(), size);
-        if (!f) {
-            SDL_Log("registerFont: TTF_OpenFont failed for %s: %s", bundlePath.c_str(), SDL_GetError());
-        }
-        else {
-            SDL_Log("registerFont: Loaded font %s size %d", bundlePath.c_str(), size);
-        }
-#endif
+#endif  // Legacy code end
+
         FontId id = FontId(name, size);
-        fonts_[id] = FontEntry{ f, name, {} };
+        fonts_[id] = FontEntry{ f, name, {}, std::move(fontData) };
 
         // �C���f�b�N�X���蓖��
         fontIdToIndex_[id] = nextFontIndex_++;
@@ -2000,6 +2005,7 @@ public:
         TTF_Font* font;
         std::string name;
         std::vector<FontId> fallbacks;
+        std::vector<uint8_t> fontData;  // Keep font data alive for TTF_OpenFontIO
     };
 
     void addPage(AtlasAffinity affinity) {

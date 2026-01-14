@@ -3,28 +3,14 @@
 #include <chrono>
 #include <future>
 
-#ifdef __APPLE__
-#include <TargetConditionals.h>
-#if TARGET_OS_IOS || TARGET_OS_SIMULATOR
-#import <Foundation/Foundation.h>
+// getBundlePath is now provided by platform_io.h (included via shader.h)
+// For backwards compatibility, define it if not already defined
 #ifndef BUNDLE_PATH_DEFINED
 #define BUNDLE_PATH_DEFINED
-// Helper to get bundle resource path on iOS (for shaders and resources)
 inline std::string getBundlePath(const char* filename) {
-    NSString* name = [[NSString alloc] initWithUTF8String:filename];
-    // Extract just the filename (last path component) for bundle lookup
-    NSString* lastComponent = [name lastPathComponent];
-    NSString* ext = [lastComponent pathExtension];
-    NSString* base = [lastComponent stringByDeletingPathExtension];
-    NSString* path = [[NSBundle mainBundle] pathForResource:base ofType:ext];
-    if (path) {
-        return std::string([path UTF8String]);
-    }
-    return std::string(filename); // fallback
+    return PlatformIO::resolvePath(filename, HopStarIO::Location::Resource);
 }
-#endif // BUNDLE_PATH_DEFINED
-#endif // TARGET_OS_IOS || TARGET_OS_SIMULATOR
-#endif // __APPLE__
+#endif
 
 // 描画コマンド構造体
 
@@ -504,7 +490,20 @@ bool initBgfx(SDL_Window* window) {
 #endif
 
 #if defined(__ANDROID__)
-    void* nwh = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_ANDROID_WINDOW_POINTER, nullptr);
+    void* nwh = nullptr;
+    // Wait for ANativeWindow to be ready (up to 5 seconds)
+    for (int retry = 0; retry < 50 && nwh == nullptr; retry++) {
+        nwh = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_ANDROID_WINDOW_POINTER, nullptr);
+        if (nwh == nullptr) {
+            SDL_Log("initBgfx: Waiting for ANativeWindow... (attempt %d)", retry + 1);
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            props = SDL_GetWindowProperties(window);  // Refresh properties
+        }
+    }
+    if (nwh == nullptr) {
+        SDL_Log("initBgfx: FATAL - ANativeWindow is NULL after waiting!");
+        return false;
+    }
     pd.nwh = nwh;
     SDL_GetWindowSize(window, &width, &height);
     SDL_Log("initBgfx: Android nwh=%p, size=%dx%d", nwh, width, height);
@@ -611,7 +610,9 @@ bool initBgfx(SDL_Window* window) {
     init.resolution.width = width;
     init.resolution.height = height;
     init.resolution.reset = BGFX_RESET_VSYNC;
-    init.resolution.formatDepthStencil = bgfx::TextureFormat::D24S8;  // Enable depth buffer
+#if defined(__linux__) && !defined(__ANDROID__)
+    init.resolution.formatDepthStencil = bgfx::TextureFormat::D24S8;  // Enable depth buffer (Desktop Linux bgfx only)
+#endif
     init.debug = true;  // デバッグ情報を有効
 
     if (!bgfx::init(init)) {
@@ -1061,7 +1062,11 @@ public:
         }
     }
     void run() {
-        initBgfx(window_);
+        if (!initBgfx(window_)) {
+            SDL_Log("RenderThread: bgfx initialization failed, aborting render thread");
+            initDone.set_value();  // Signal anyway to unblock waiting threads
+            return;
+        }
         //bgfx::setDebug(BGFX_DEBUG_TEXT | BGFX_DEBUG_IFH);
         hoppy_->master.initialize();
         hoppy_->initFonts();

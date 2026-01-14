@@ -139,7 +139,6 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\..\Downloads\miniaudio.h" />
     <ClInclude Include="..\..\..\..\Downloads\sqlite-snapshot-202505151120\sqlite-snapshot-202505151120\sqlite3.h" />
     <ClInclude Include="..\..\..\..\Downloads\stb_image.h" />
     <ClInclude Include="addelem.h" />
@@ -151,6 +150,7 @@
     <ClInclude Include="db2.h" />
     <ClInclude Include="elem.h" />
     <ClInclude Include="extorch.h" />
+    <ClInclude Include="file_engine.h" />
     <ClInclude Include="gc.h" />
     <ClInclude Include="gc2.h" />
     <ClInclude Include="gui.h" />
@@ -158,6 +158,7 @@
     <ClInclude Include="json.hpp" />
     <ClInclude Include="newelem.h" />
     <ClInclude Include="opt.h" />
+    <ClInclude Include="platform_io.h" />
     <ClInclude Include="shader.h" />
     <ClInclude Include="shader2.h" />
     <ClInclude Include="stb_image_write.h" />

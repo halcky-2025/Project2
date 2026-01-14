@@ -27,17 +27,96 @@ extern "C" {
 #define UTF8PROC_STATIC
 #include <utf8proc.h>
 #pragma comment(lib, "utf8proc_static.lib")
-#include <filesystem>
-namespace fs = std::filesystem;
+#include "file_engine.h"
 namespace F = torch::nn::functional;
 #include "gc.h"
 #include "arr.h"
-#include "sqlite3.h"
 #include "db2.h"
 #include "audio.h"
 #include "elem.h"
 bool cuda = false;
 HMODULE torch_cuda_dll;
+
+// ============================================================================
+// Global FileEngine instance
+// ============================================================================
+static std::unique_ptr<HopStarIO::FileEngine> g_fileEngine;
+
+HopStarIO::FileEngine* getFileEngine() {
+    if (!g_fileEngine) {
+        g_fileEngine = HopStarIO::FileEngineFactory::createDefault();
+    }
+    return g_fileEngine.get();
+}
+
+// ============================================================================
+// FileEngine-based file helpers
+// ============================================================================
+
+// Read file into memory using FileEngine
+std::vector<uint8_t> readFileToMemory(const std::string& path) {
+    auto* engine = getFileEngine();
+    auto desc = engine->fromExternalPath(path, HopStarIO::Access::Read);
+    auto result = engine->read(desc);
+    if (result.success) {
+        return std::move(result.data);
+    }
+    return {};
+}
+
+// Read file from URL or local path
+std::vector<uint8_t> readFileFromAddress(const std::string& address) {
+    auto* engine = getFileEngine();
+
+    // Check if it's a URL or local path
+    std::string scheme = HopStarIO::parseAddressScheme(address);
+    if (scheme.empty()) {
+        // Local file
+        return readFileToMemory(address);
+    }
+
+    // Remote file
+    auto desc = engine->createDescriptor(address, HopStarIO::Location::Server,
+                                         HopStarIO::Access::Read, address);
+    auto result = engine->read(desc);
+    if (result.success) {
+        return std::move(result.data);
+    }
+    return {};
+}
+
+// Write file using FileEngine
+bool writeFileFromMemory(const std::string& path, const uint8_t* data, size_t length) {
+    auto* engine = getFileEngine();
+    auto desc = engine->fromExternalPath(path, HopStarIO::Access::Write);
+    auto result = engine->write(desc, data, length);
+    return result.success;
+}
+
+// Load image using FileEngine + stbi
+unsigned char* loadImageViaFileEngine(const std::string& path, int* width, int* height, int* channels, int desired_channels) {
+    auto data = readFileFromAddress(path);
+    if (data.empty()) {
+        return nullptr;
+    }
+    return stbi_load_from_memory(data.data(), static_cast<int>(data.size()),
+                                  width, height, channels, desired_channels);
+}
+
+// Check if file exists - delegates to PlatformIO
+bool fileExists(const std::string& path, HopStarIO::Location location) {
+    return PlatformIO::fileExists(path, location);
+}
+
+// List files in directory - delegates to PlatformIO
+std::vector<std::string> listDirectory(const std::string& dirPath, HopStarIO::Location location, const std::string& extension = "") {
+    return PlatformIO::listDirectory(dirPath, location, extension);
+}
+
+// Create directory - delegates to PlatformIO
+bool createDirectory(const std::string& path, HopStarIO::Location location) {
+    return PlatformIO::createDirectory(path, location);
+}
 #include "opt.h"
 #include "ugui.h"
 #include "extorch.h"
@@ -46,22 +125,22 @@ SDL_HitTestResult
 hit_test_cb(SDL_Window* win, const SDL_Point* pt, void* data)
 {
     int w, h;
-    const int border = 8;  // ƒŠƒTƒCƒY‰Â”\ƒGƒŠƒA‚ÌŒú‚³(px)
+    const int border = 8;  // ï¿½ï¿½ï¿½Tï¿½Cï¿½Yï¿½Â”\ï¿½Gï¿½ï¿½ï¿½Aï¿½ÌŒï¿½ï¿½ï¿½(px)
     SDL_GetWindowSize(win, &w, &h);
 
-    // l‹÷
+    // ï¿½lï¿½ï¿½
     if (pt->x < border && pt->y < border)               return SDL_HITTEST_RESIZE_TOPLEFT;
     if (pt->x > w - border && pt->y < border)           return SDL_HITTEST_RESIZE_TOPRIGHT;
     if (pt->x < border && pt->y > h - border)           return SDL_HITTEST_RESIZE_BOTTOMLEFT;
     if (pt->x > w - border && pt->y > h - border)       return SDL_HITTEST_RESIZE_BOTTOMRIGHT;
 
-    // •Ó
+    // ï¿½ï¿½
     if (pt->y < border)                                 return SDL_HITTEST_RESIZE_TOP;
     if (pt->y > h - border)                             return SDL_HITTEST_RESIZE_BOTTOM;
     if (pt->x < border)                                 return SDL_HITTEST_RESIZE_LEFT;
     if (pt->x > w - border)                             return SDL_HITTEST_RESIZE_RIGHT;
 
-    // ‚»‚Ì‘¼—Ìˆæ‚Í’Êí‚ÌƒNƒ‰ƒCƒAƒ“ƒg—Ìˆæ‚Æ‚µ‚Äˆµ‚¤
+    // ï¿½ï¿½ï¿½Ì‘ï¿½ï¿½Ìˆï¿½Í’Êï¿½ÌƒNï¿½ï¿½ï¿½Cï¿½Aï¿½ï¿½ï¿½gï¿½Ìˆï¿½Æ‚ï¿½ï¿½Äˆï¿½ï¿½ï¿½
     return SDL_HITTEST_NORMAL;
 }
 struct SimpleCNNImpl : torch::nn::Module {
@@ -107,14 +186,22 @@ size_t utf32_to_utf16(const utf8proc_int32_t* utf32, size_t len, uint16_t* utf16
     return j;
 }
 int main() {
+    // Initialize FileEngine (lazy init on first use)
+    auto* fileEngine = getFileEngine();
+    std::cout << "FileEngine initialized" << std::endl;
+
     magc = GC_init(1000 * 1000 * 1000);
+
+    // Use FileEngine's internal storage path for database
+    std::string dbPath = fileEngine->getInternalPath("test.db");
     sqlite3* db;
-    int rc = sqlite3_open("test.db", &db); if (rc) {
+    int rc = sqlite3_open(dbPath.c_str(), &db);
+    if (rc) {
         std::cerr << "Can't open database: " << sqlite3_errmsg(db) << std::endl;
         return rc;
     }
     else {
-        std::cout << "Opened database successfully" << std::endl;
+        std::cout << "Opened database successfully at: " << dbPath << std::endl;
     }
     const char* sql = "create table if not exists users(id integer primary key, name text);";
     char* err = nullptr;
@@ -135,15 +222,16 @@ int main() {
             model->to(torch::kCUDA);
             model->train();
             torch::optim::Adam optimizer(model->parameters(), torch::optim::AdamOptions(1e-3));
-            fs::create_directories("inputs/faces");
-            fs::create_directories("inputs/nonfaces");
+            createDirectory("inputs/faces", HopStarIO::Location::External);
+            createDirectory("inputs/nonfaces", HopStarIO::Location::External);
             std::vector<torch::Tensor> input_tensors;
             std::vector<torch::Tensor> goal_tensors;
-            for (const auto& entry : fs::directory_iterator("inputs/faces")) {
-                std::string filename = entry.path().string();
-                if (filename.substr(filename.find_last_of(".") + 1) == "png") {
-                    int width, height, channels;
-                    unsigned char* data = stbi_load(filename.c_str(), &width, &height, &channels, 3);
+
+            // Load face images via FileEngine
+            for (const auto& filename : listDirectory("inputs/faces", HopStarIO::Location::External, "png")) {
+                int width, height, channels;
+                unsigned char* data = loadImageViaFileEngine(filename, &width, &height, &channels, 3);
+                if (data) {
                     torch::Tensor img_tensor = torch::from_blob(data, { height, width, 3 }, torch::kUInt8)
                         .permute({ 2, 0, 1 }).to(torch::kFloat32).div(255.0).unsqueeze(0);
                     img_tensor = F::interpolate(img_tensor, F::InterpolateFuncOptions().size(std::vector<int64_t>({ 64, 48 })).mode(torch::kBilinear).align_corners(false));
@@ -154,11 +242,12 @@ int main() {
                     stbi_image_free(data);
                 }
             }
-            for (const auto& entry : fs::directory_iterator("inputs/nonfaces")) {
-                std::string filename = entry.path().string();
-                if (filename.substr(filename.find_last_of(".") + 1) == "png") {
-                    int width, height, channels;
-                    unsigned char* data = stbi_load(filename.c_str(), &width, &height, &channels, 3);
+
+            // Load non-face images via FileEngine
+            for (const auto& filename : listDirectory("inputs/nonfaces", HopStarIO::Location::External, "png")) {
+                int width, height, channels;
+                unsigned char* data = loadImageViaFileEngine(filename, &width, &height, &channels, 3);
+                if (data) {
                     torch::Tensor img_tensor = torch::from_blob(data, { height, width, 3 }, torch::kUInt8)
                         .permute({ 2, 0, 1 }).to(torch::kFloat32).div(255.0).unsqueeze(0);
                     img_tensor = F::interpolate(img_tensor, F::InterpolateFuncOptions().size(std::vector<int64_t>({ 64, 48 })).mode(torch::kBilinear).align_corners(false));
@@ -169,6 +258,7 @@ int main() {
                     stbi_image_free(data);
                 }
             }
+
             torch::Tensor loss;
             for (int epoch = 0; epoch < 100; epoch++) {
                 size_t batch_index = 0;
@@ -179,12 +269,12 @@ int main() {
             model->eval();
         }
         else {
-            //torch::load(model, "model.pt");  // ƒtƒ@ƒCƒ‹‚©‚ç“Ç‚İ‚Ş
-            model->to(torch::kCUDA);  // •K—v‚É‰‚¶‚ÄGPU‚Ö
+            //torch::load(model, "model.pt");
+            model->to(torch::kCUDA);
             model->eval();
         }*/
 
-        // SDL3 ‚Ì‰Šú‰»
+        // SDL3 ï¿½Ìï¿½ï¿½ï¿½ï¿½ï¿½
         if (!SDL_Init(SDL_INIT_VIDEO)) {
             fprintf(stderr, "SDL_Init Error: %s\n", SDL_GetError());
             return 1;
@@ -192,7 +282,7 @@ int main() {
         if (!TTF_Init()) {
             fprintf(stderr, "ttferror");
         }
-        // ƒEƒBƒ“ƒhƒE‚Ìì¬
+        // ï¿½Eï¿½Bï¿½ï¿½ï¿½hï¿½Eï¿½Ìì¬
         SDL_Window* window = SDL_CreateWindow("SDL3 Example",
             800, 600,
             SDL_WINDOW_BORDERLESS | SDL_WINDOW_RESIZABLE);
@@ -205,7 +295,7 @@ int main() {
         
 
 
-        // ƒŒƒ“ƒ_ƒŠƒ“ƒO—p‚Ì SDL ƒOƒ‰ƒtƒBƒbƒNƒRƒ“ƒeƒLƒXƒg‚ğì¬
+        // ï¿½ï¿½ï¿½ï¿½ï¿½_ï¿½ï¿½ï¿½ï¿½ï¿½Oï¿½pï¿½ï¿½ SDL ï¿½Oï¿½ï¿½ï¿½tï¿½Bï¿½bï¿½Nï¿½Rï¿½ï¿½ï¿½eï¿½Lï¿½Xï¿½gï¿½ï¿½ï¿½ì¬
         /*SDL_Renderer* renderer = SDL_CreateRenderer(window, NULL);
         if (!renderer) {
             fprintf(stderr, "SDL_CreateRenderer Error: %s\n", SDL_GetError());
@@ -213,7 +303,7 @@ int main() {
             SDL_Quit();
             return 1;
         }
-        TTF_Font* font = TTF_OpenFont("Gen.ttf", 16);  // 48px ‚ÌƒTƒCƒY
+        TTF_Font* font = TTF_OpenFont("Gen.ttf", 16);  // 48px ï¿½ÌƒTï¿½Cï¿½Y
         if (!font) {
             printf("Failed to load font: \n");
             SDL_DestroyRenderer(renderer);
@@ -263,10 +353,10 @@ int main() {
         /*GltfRenderer gltfRenderer;
         bool hasModel = false;
 
-        // ƒ‚ƒfƒ‹‚ğƒ[ƒhiƒRƒ}ƒ“ƒhƒ‰ƒCƒ“ˆø”‚Ü‚½‚ÍƒfƒtƒHƒ‹ƒgj
+        // ï¿½ï¿½ï¿½fï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½[ï¿½hï¿½iï¿½Rï¿½}ï¿½ï¿½ï¿½hï¿½ï¿½ï¿½Cï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ü‚ï¿½ï¿½Íƒfï¿½tï¿½Hï¿½ï¿½ï¿½gï¿½j
         const char* modelPath = "CesiumMan.glb";
         float deltaTime = 1.0f / 100.0f;
-        if (gltfRenderer.loadModel(modelPath)) {
+        if (gltfRenderer.loadModel(modelPath, HopStarIO::Location::Resource)) {
             hasModel = true;
             printf("Loaded model: %s\n", modelPath);
         }
@@ -329,7 +419,7 @@ int main() {
                         continue;
                     }
 
-                    // UTF-32 ¨ UTF-16
+                    // UTF-32 ï¿½ï¿½ UTF-16
                     uint16_t utf16Buf[512];
                     size_t utf16len = utf32_to_utf16(utf32Buf, (size_t)utf32len, utf16Buf);
                     str = createString(hoppy->target, (char*)utf16Buf, utf16len * 2, 2);
@@ -362,7 +452,7 @@ int main() {
                     e.y = event.motion.y;
                     SDL_MouseButtonFlags s = event.motion.state;
 
-                    // ¶ƒ{ƒ^ƒ“‚ª‰Ÿ‚³‚ê‚Ä‚¢‚é‚©
+                    // ï¿½ï¿½ï¿½{ï¿½^ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä‚ï¿½ï¿½é‚©
                     if (s & SDL_BUTTON_LMASK) {
                         e.click = true;
                     }
@@ -382,16 +472,16 @@ int main() {
             }
         }
 
-        // Œ»İ‚ÌƒfƒoƒCƒX‚ğæ“¾‚·‚é•Ê‚Ì•û–@
-        c10::DeviceIndex device_idx = 0; // ƒfƒtƒHƒ‹ƒg‚Å0”Ô–Ú‚ÌGPU‚ğg—p
+        // ï¿½ï¿½ï¿½İ‚Ìƒfï¿½oï¿½Cï¿½Xï¿½ï¿½ï¿½æ“¾ï¿½ï¿½ï¿½ï¿½Ê‚Ì•ï¿½ï¿½@
+        c10::DeviceIndex device_idx = 0; // ï¿½fï¿½tï¿½Hï¿½ï¿½ï¿½gï¿½ï¿½0ï¿½Ô–Ú‚ï¿½GPUï¿½ï¿½ï¿½gï¿½p
         torch::Device device(torch::kCUDA, device_idx);
         std::cout << "Using CUDA device: " << device_idx << std::endl;
 
-        // CPUƒeƒ“ƒ\ƒ‹‚ğì¬‚µ‚Ä‚©‚çCUDA‚É“]‘—i’iŠK“I‚ÉŠm”Fj
+        // CPUï¿½eï¿½ï¿½ï¿½\ï¿½ï¿½ï¿½ï¿½ï¿½ì¬ï¿½ï¿½ï¿½Ä‚ï¿½ï¿½ï¿½CUDAï¿½É“]ï¿½ï¿½ï¿½iï¿½iï¿½Kï¿½Iï¿½ÉŠmï¿½Fï¿½j
         torch::Tensor cpu_tensor = torch::rand({ 3, 4 });
         std::cout << "CPU Tensor created successfully" << std::endl;
 
-        // –¾¦“I‚ÈƒfƒoƒCƒXw’è‚ÅGPU‚É“]‘—
+        // ï¿½ï¿½ï¿½ï¿½ï¿½Iï¿½Èƒfï¿½oï¿½Cï¿½Xï¿½wï¿½ï¿½ï¿½GPUï¿½É“]ï¿½ï¿½
         torch::Tensor cuda_tensor = cpu_tensor.to(device);
         std::cout << "Tensor transferred to CUDA successfully" << std::endl;
 
@@ -405,11 +495,23 @@ int main() {
         ort->CreateSessionOptions(&session_options);
 
         OrtSession* session;
-        const wchar_t* model_path = L"det_10g.onnx";
-        OrtStatus* status = ort->CreateSession(env, model_path, session_options, &session);
+
+        // Load ONNX model via FileEngine (supports local and remote)
+        std::string onnxModelPath = "det_10g.onnx";
+        std::string resolvedPath = PlatformIO::resolvePath(onnxModelPath, HopStarIO::Location::Resource);
+
+        // Check if model exists in resources, otherwise use current directory
+        if (!fileExists(resolvedPath, HopStarIO::Location::External)) {
+            resolvedPath = onnxModelPath;
+        }
+
+        // Convert to wide string for ONNX Runtime
+        std::wstring wModelPath(resolvedPath.begin(), resolvedPath.end());
+
+        OrtStatus* status = ort->CreateSession(env, wModelPath.c_str(), session_options, &session);
         if (status != NULL) {
             const char* msg = ort->GetErrorMessage(status);
-            fprintf(stderr, "ONNX session load error: %s\n", msg);
+            fprintf(stderr, "ONNX session load error: %s (path: %s)\n", msg, resolvedPath.c_str());
             ort->ReleaseStatus(status);
             exit(1);
         }
@@ -432,6 +534,10 @@ int main() {
     catch (...) {
         std::cerr << "Unknown exception occurred" << std::endl;
     }
+
+    // Cleanup FileEngine
+    g_fileEngine.reset();
+    std::cout << "FileEngine cleaned up" << std::endl;
 
     return 0;
 }

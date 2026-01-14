@@ -671,98 +671,42 @@ void renderAllLayers(NewLocal* local, std::vector<LayerInfo>& layers,
 // ============================================================
 // 初期化・終了処理
 // ============================================================
-// シェーダーバイナリ読み込み
-bgfx::ShaderHandle loadShader(const char* filename) {
-#ifdef __ANDROID__
-    // Android: use SDL_IOFromFile to read from assets
-    SDL_IOStream* io = SDL_IOFromFile(filename, "rb");
-    if (!io) {
-        SDL_Log("loadShader: Failed to open shader file: %s", filename);
-        return BGFX_INVALID_HANDLE;
-    }
+// シェーダーバイナリ読み込み (PlatformIO unified)
+#include "platform_io.h"
 
-    Sint64 size = SDL_GetIOSize(io);
-    if (size <= 0) {
-        SDL_Log("loadShader: Invalid file size for: %s", filename);
-        SDL_CloseIO(io);
-        return BGFX_INVALID_HANDLE;
-    }
-
-    std::vector<char> buffer(size);
-    size_t read = SDL_ReadIO(io, buffer.data(), size);
-    SDL_CloseIO(io);
-
-    if (read != (size_t)size) {
-        SDL_Log("loadShader: Failed to read shader file: %s", filename);
-        return BGFX_INVALID_HANDLE;
-    }
-
-    SDL_Log("loadShader: Loaded %s (%lld bytes)", filename, (long long)size);
-    const bgfx::Memory* mem = bgfx::copy(buffer.data(), static_cast<uint32_t>(size));
-    return bgfx::createShader(mem);
-#elif TARGET_OS_IOS || TARGET_OS_SIMULATOR || TARGET_OS_MAC
-    // iOS/macOS: use NSBundle to get shader path (try bundle first, then fallback to relative path)
-    std::string bundlePath = getBundlePath(filename);
-    SDL_Log("loadShader: Trying bundle path: %s", bundlePath.c_str());
-    std::ifstream file(bundlePath, std::ios::binary | std::ios::ate);
-
-    // macOS: If bundle path failed, try relative path with "shaders/" prefix (for command line execution)
-#if TARGET_OS_MAC && !TARGET_OS_IOS
-    if (!file.is_open()) {
-        std::string relativePath = std::string("shaders/") + filename;
-        SDL_Log("loadShader: Bundle path failed, trying relative path: %s", relativePath.c_str());
-        file.open(relativePath, std::ios::binary | std::ios::ate);
-    }
-#endif
-
-    if (!file.is_open()) {
-        SDL_Log("loadShader: Failed to open shader file: %s", filename);
-        return BGFX_INVALID_HANDLE;
-    }
-
-    std::streamsize size = file.tellg();
-    file.seekg(0, std::ios::beg);
-
-    std::vector<char> buffer(size);
-    if (!file.read(buffer.data(), size)) {
-        SDL_Log("loadShader: Failed to read shader file: %s", bundlePath.c_str());
-        return BGFX_INVALID_HANDLE;
-    }
-
-    SDL_Log("loadShader: Loaded shader (%lld bytes)", (long long)size);
-    const bgfx::Memory* mem = bgfx::copy(buffer.data(), static_cast<uint32_t>(size));
-    return bgfx::createShader(mem);
+// Get platform suffix for shader files
+// Windows: no suffix (DirectX), macOS/iOS: _mtl (Metal), Android/Linux: _spv (Vulkan/SPIRV)
+inline const char* getShaderPlatformSuffix() {
+#if defined(_WIN32)
+    return "";  // Windows DirectX shaders have no suffix
+#elif defined(__ANDROID__)
+    return "_a";  // Android Vulkan shaders
+#elif TARGET_OS_IOS || TARGET_OS_SIMULATOR
+    return "_mtl";  // iOS uses Metal
+#elif TARGET_OS_MAC
+    return "_mtl";  // macOS uses Metal
+#elif defined(__linux__)
+    return "_spv";  // Linux uses Vulkan/SPIRV
 #else
-    // Linux/Windows: try getBundlePath first, then shaders/ subdirectory
-    std::string shaderPath = getBundlePath(filename);
-    SDL_Log("loadShader: Trying path: %s", shaderPath.c_str());
-    std::ifstream file(shaderPath, std::ios::binary | std::ios::ate);
-
-    if (!file.is_open()) {
-        // Try shaders/ subdirectory
-        shaderPath = std::string("shaders/") + filename;
-        SDL_Log("loadShader: Trying fallback path: %s", shaderPath.c_str());
-        file.open(shaderPath, std::ios::binary | std::ios::ate);
-    }
-
-    if (!file.is_open()) {
-        SDL_Log("loadShader: Failed to open shader file: %s", filename);
-        return BGFX_INVALID_HANDLE;
-    }
-
-    std::streamsize size = file.tellg();
-    file.seekg(0, std::ios::beg);
-
-    std::vector<char> buffer(size);
-    if (!file.read(buffer.data(), size)) {
-        SDL_Log("loadShader: Failed to read shader file: %s", shaderPath.c_str());
-        return BGFX_INVALID_HANDLE;
-    }
-
-    SDL_Log("loadShader: Loaded %s (%lld bytes)", shaderPath.c_str(), (long long)size);
-    const bgfx::Memory* mem = bgfx::copy(buffer.data(), static_cast<uint32_t>(size));
-    return bgfx::createShader(mem);
+    return "";
 #endif
+}
+
+// Load shader with automatic platform suffix
+// e.g., loadShader("shaders/vs_unite2", location) loads "shaders/vs_unite2_w.bin" on Windows
+bgfx::ShaderHandle loadShader(const char* baseName, HopStarIO::Location location) {
+    // Build platform-specific filename: baseName + platform_suffix + .bin
+    std::string filename = std::string(baseName) + getShaderPlatformSuffix() + ".bin";
+
+    auto data = PlatformIO::readFile(filename, location);
+    if (data.empty()) {
+        SDL_Log("loadShader: Failed to load shader file: %s", filename.c_str());
+        return BGFX_INVALID_HANDLE;
+    }
+
+    SDL_Log("loadShader: Loaded %s (%zu bytes)", filename.c_str(), data.size());
+    const bgfx::Memory* mem = bgfx::copy(data.data(), static_cast<uint32_t>(data.size()));
+    return bgfx::createShader(mem);
 }
 
 void initRenderResources(RenderResources& resources) {
@@ -778,17 +722,14 @@ void initRenderResources(RenderResources& resources) {
         BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP,
         bgfx::copy(&whitePixel, sizeof(whitePixel)));
 
-#if TARGET_OS_IOS || TARGET_OS_SIMULATOR || TARGET_OS_MAC
-    // Use Metal shaders on iOS/macOS (from bundle, or fallback to shaders/ directory on macOS)
-    bgfx::ShaderHandle vsu = loadShader("vs_unite2_mtl.bin");
-    bgfx::ShaderHandle fsu = loadShader("fs_unite2_mtl.bin");
-#elif defined(__linux__)
-    // Use SPIR-V shaders on Linux (Vulkan)
-    bgfx::ShaderHandle vsu = loadShader("vs_unite2_spv.bin");
-    bgfx::ShaderHandle fsu = loadShader("fs_unite2_spv.bin");
+    // Load shaders with automatic platform suffix
+    // Windows: vs_unite2.bin, macOS/iOS: shaders/vs_unite2_mtl.bin, Linux/Android: shaders/vs_unite2_spv.bin
+#if defined(_WIN32)
+    bgfx::ShaderHandle vsu = loadShader("vs_unite2", HopStarIO::Location::Resource);
+    bgfx::ShaderHandle fsu = loadShader("fs_unite2", HopStarIO::Location::Resource);
 #else
-    bgfx::ShaderHandle vsu = loadShader("vs_unite2.bin");
-    bgfx::ShaderHandle fsu = loadShader("fs_unite2.bin");
+    bgfx::ShaderHandle vsu = loadShader("shaders/vs_unite2", HopStarIO::Location::Resource);
+    bgfx::ShaderHandle fsu = loadShader("shaders/fs_unite2", HopStarIO::Location::Resource);
 #endif
     resources.uniteProgram = bgfx::createProgram(vsu, fsu, true);
     // シェーダープログラムの登録は外部で行う
