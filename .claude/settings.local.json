@@ -80,7 +80,21 @@
       "Bash(dir \"C:\\\\Users\\\\hayah\\\\source\\\\repos\\\\Project2\\\\android\\\\app\\\\src\\\\main\")",
       "Bash(adb logcat:*)",
       "Bash(\"C:\\\\Users\\\\hayah\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\" logcat -d -s \"SDL\" \"bgfx\")",
-      "Bash(\"C:\\\\Users\\\\hayah\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\" logcat -d)"
+      "Bash(\"C:\\\\Users\\\\hayah\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\" logcat -d)",
+      "Bash(g++:*)",
+      "Bash(chmod:*)",
+      "Bash(for file in websocket_server.h webrtc_manager.h media_processor.h)",
+      "Bash(do echo \"=== $file ===\")",
+      "Bash(done)",
+      "Bash(/tmp/test_compile:*)",
+      "Bash(/tmp/test_http_server:*)",
+      "Bash(/tmp/test_http_client_updated)",
+      "Bash(/tmp/test_all_headers)",
+      "Bash(/tmp/test_main7_structure)",
+      "Bash(for file in thread_pool.h file_io_async.h http_client.h http_client_curl.h websocket_client.h)",
+      "Bash(do echo -n \"$file: \" if g++ -std=c++20 -c -fsyntax-only -I. -include server_common.h -include thread_pool.h $file)",
+      "Bash(then echo \"❌ FAILED\" else echo \"✓ OK\" fi done echo \"===========================\")",
+      "Bash(do echo -n \"$file: \" if g++ -std=c++20 -c -fsyntax-only -I. -include server_common.h $file)"
     ]
   }
 }
