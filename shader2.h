@@ -190,7 +190,7 @@ inline void packInstance(UnifiedDrawCommand& cmd, UnifiedInstanceData& out, Draw
     out.data4[0] = packColorAsFloat(cmd.shadowColor);
     out.data4[1] = packColorAsFloat(cmd.fillColor);
     out.data4[2] = packColorAsFloat(cmd.borderColor);
-    out.data4[3] = cmd.zIndex;
+    out.data4[3] = 50 - cmd.zIndex / 1000;
 }
 
 // ============================================================

@@ -47,7 +47,7 @@ enum OpCode {
 	Divi = 8
 };
 //+*-
-TreeElement* checkTreeElement(ThreadGC* thgc, TreeElement* parentt, NewElement* parent, List* deletes, String* id, enum LetterType type, enum OpCode op, NewElement* (*func)(ThreadGC*)) {
+TreeElement* checkTreeElement(ThreadGC* thgc, NewLocal* local, TreeElement* parentt, NewElement* parent, List* deletes, String* id, enum LetterType type, enum OpCode op, NewElement* (*func)(ThreadGC*)) {
 	TreeElement* te = (TreeElement*)get_mapy(thgc->map, id);
 	if (te == NULL) {
 		NewElement* elem = func(thgc);
@@ -69,7 +69,7 @@ TreeElement* checkTreeElement(ThreadGC* thgc, TreeElement* parentt, NewElement* 
 			remove_mapy(thgc, thgc->map, te->id);
 			remove_list_val(thgc, deletes, (char*)te);
 			RemoveTE(thgc, deletes, te);
-			NewRemoveElement(te->elem);
+			NewRemoveElement(thgc, local, te->elem);
 			return NULL;
 		}
 		if ((op & Plus) == Plus) {
@@ -87,12 +87,12 @@ TreeElement* checkTreeElement(ThreadGC* thgc, TreeElement* parentt, NewElement* 
 				RemoveTE(thgc, deletes, child);
 			}
 			for (NewElement* elem = te->elem->childend; elem->next != te->elem->childend; ) {
-				NewRemoveElement (elem->next);
+				NewRemoveElement (thgc, local, elem->next);
 			}
 		}
 		if (parent == NULL) return te;
 		else {
-			NewRemoveElement(te->elem);
+			NewRemoveElement(thgc, local, te->elem);
 			te->elem->parent = parent;
 			NewElementAddLast(thgc, NULL, parent, te->elem);
 			remove_list_val(thgc, te->parent->children, (char*)te);
@@ -107,7 +107,7 @@ TreeElement* checkTreeElement(ThreadGC* thgc, TreeElement* parentt, NewElement* 
 			remove_mapy(thgc, thgc->map, te->id);
 			remove_list_val(thgc, deletes, (char*)te);
 			RemoveChildTE(thgc, deletes, te);
-			NewRemoveElement(te->elem);
+			NewRemoveElement(thgc, local, te->elem);
 			return NULL;
 		}
 		if ((op & Plus) == Plus) {
@@ -128,7 +128,7 @@ TreeElement* checkTreeElement(ThreadGC* thgc, TreeElement* parentt, NewElement* 
 				RemoveTE(thgc, deletes, child);
 			}
 			for (NewElement* elem = te->elem->childend; elem->next != te->elem->childend; ) {
-				NewRemoveElement(elem->next);
+				NewRemoveElement(thgc, local, elem->next);
 			}
 		}
 		if (parent == NULL) {
@@ -141,7 +141,7 @@ TreeElement* checkTreeElement(ThreadGC* thgc, TreeElement* parentt, NewElement* 
 			return te;
 		}
 		else {
-			NewRemoveElement(te->elem);
+			NewRemoveElement(thgc, local, te->elem);
 			NewElementAddLast(thgc, NULL, parent, elem);
 			te->elem = elem;
 			remove_list_val(thgc, te->parent->children, (char*)te);

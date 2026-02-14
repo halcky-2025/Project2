@@ -390,17 +390,14 @@ int main() {
                 Sleep(100);
             }*/
             while (SDL_PollEvent(&event)) {
-                /*if (event.type == SDL_EVENT_KEY_DOWN) {
+                if (event.type == SDL_EVENT_KEY_DOWN) {
                     if (event.key.key == SDLK_KP_ENTER || event.key.key == SDLK_RETURN || event.key.key == SDLK_DELETE || event.key.key == SDLK_BACKSPACE ||
                         event.key.key == SDLK_LEFT || event.key.key == SDLK_RIGHT || event.key.key == SDLK_UP || event.key.key == SDLK_DOWN) {
                         bool select = false;
                         KeyEvent e = KeyEvent();
 						e.key = event.key.key;
-                        e.text = (String*)GC_malloc(hoppy->target, _String);
+                        e.text = (String*)GC_alloc(hoppy->target, _String);
                         e.text->size = 0;
-						State* state = (State*)GC_malloc(hoppy->target, _State);
-                        initState(hoppy->target, state);
-                        e.state = state;
                         auto ke = KeyButton(hoppy, &e);
                         hoppy->target->queue->push(ke.coro);
                         ke.coro = {};
@@ -411,7 +408,7 @@ int main() {
                     bool select = false;
                     KeyEvent e = KeyEvent();
                     e.key = -1;
-                    String* str = (String*)GC_malloc(hoppy->target, _String);
+                    String* str = (String*)GC_alloc(hoppy->target, _String);
                     utf8proc_int32_t utf32Buf[256];
 					utf8proc_ssize_t utf32len = utf8proc_decompose((const utf8proc_uint8_t*)text, -1, utf32Buf, 256, UTF8PROC_NULLTERM);
                     if (utf32len < 0) {
@@ -424,9 +421,6 @@ int main() {
                     size_t utf16len = utf32_to_utf16(utf32Buf, (size_t)utf32len, utf16Buf);
                     str = createString(hoppy->target, (char*)utf16Buf, utf16len * 2, 2);
                     e.text = str;
-                    State* state = (State*)GC_malloc(hoppy->target, _State);
-                    initState(hoppy->target, state);
-                    e.state = state;
 					auto ke = KeyButton(hoppy, &e);
 					hoppy->target->queue->push(ke.coro);
 					ke.coro = {};
@@ -439,9 +433,6 @@ int main() {
 					e.x = event.button.x;
                     e.y = event.button.y;
                     e.action = event.type;
-                    State* state = (State*)GC_malloc(hoppy->target, _State);
-                    initState(hoppy->target, state);
-                    e.state = state;
 					auto me = MouseButton(hoppy, &e);
 					hoppy->target->queue->push(me.coro);
                     me.coro = {};
@@ -457,9 +448,6 @@ int main() {
                         e.click = true;
                     }
                     e.action = event.type;
-                    State* state = (State*)GC_malloc(hoppy->target, _State);
-                    initState(hoppy->target, state);
-                    e.state = state;
                     auto me = MouseButton(hoppy, &e);
                     hoppy->target->queue->push(me.coro);
                     me.coro = {};
@@ -468,7 +456,7 @@ int main() {
                     
                 }
                 else if (event.type == SDL_EVENT_WINDOW_RESIZED) {
-                }*/
+                }
             }
         }
 

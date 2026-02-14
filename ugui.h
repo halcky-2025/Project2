@@ -743,11 +743,18 @@ public:
                     NewGraphic* graphic = new NewGraphic();
                     graphic->pos.x = 0; graphic->pos.y = 0; graphic->size.x = 800; graphic->size.y = 600;
                     graphic->start.x = 0; graphic->start.y = 0; graphic->end.x = 800; graphic->end.y = 600;
-                    graphic->fb = &nullfb; graphic->viewId = viewId--; graphic->layer = &layer;
+                    graphic->fb = &nullfb; graphic->viewId = 30; graphic->layer = &layer;
+                    graphic->group = NULL;
                     screen->elem->Draw(target, (NewElement*)screen->elem, graphic, local, q);
                 }
             }
-
+            if (local->select.from != NULL) {
+                NewGraphic* graphic = new NewGraphic();
+                graphic->pos.x = 0; graphic->pos.y = 0; graphic->size.x = 800; graphic->size.y = 600;
+                graphic->start.x = 0; graphic->start.y = 0; graphic->end.x = 800; graphic->end.y = 600;
+                graphic->fb = &nullfb; graphic->viewId = 30; graphic->layer = &layer;
+                SelectDraw(target, local, graphic, q);
+            }
             q->publish();
             render++;
             cv_.notify_one();
@@ -763,9 +770,9 @@ public:
 int addPattern(ThreadGC* thgc, std::vector<float>& colors, std::vector<float>& widthes) {
     return thgc->hoppy->patternAtlas.addPattern(colors, widthes);
 }
-/*Generator MouseButton(HopStar* hoppy, MouseEvent* mv) {
+Generator MouseButton(HopStar* hoppy, MouseEvent* mv) {
     TreeElement* tree = (TreeElement*)get_mapy(hoppy->target->map, createString(hoppy->target, (char*)"main", 4, 1));
-	tree->elem->Mouse(hoppy->target, tree->elem, mv, (Local*)tree->elem);
+	tree->elem->Mouse(hoppy->target, tree->elem, mv, (NewLocal*)tree->elem);
 	hoppy->invalidate = 1;
 	co_return (char*)0;
 
@@ -774,13 +781,11 @@ Generator KeyButton(HopStar* hoppy, KeyEvent* kv) {
     bool select = false;
 	TreeElement* tree = (TreeElement*)get_mapy(hoppy->target->map, createString(hoppy->target, (char*)"main", 4, 1));
     NewLocal* local = (NewLocal*)tree->elem;
-	tree->elem->Key(hoppy->target, tree->elem, kv, local, &select);
-    local->seln = -1;
-    local->selects[0]->state->n = local->selects[1]->state->n = 0;
+	SelectKey(hoppy->target, local, kv);
     hoppy->update = true;
     hoppy->invalidate = 1;
     co_return (char*)0;
-}*/
+}
 std::promise<void> initDone;
 class RenderThread {
 public:
