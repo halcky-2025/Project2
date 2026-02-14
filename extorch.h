@@ -574,7 +574,7 @@ using CreateDivType = NewElement * (*)(ThreadGC*);
 using ElementAddType = void (*)(ThreadGC*, NewElement*, NewElement*);
 using CreateLetterType = void (*) (ThreadGC*, NewElement*, String*);
 using CreateKaigyouType = void (*) (ThreadGC*, NewElement*);
-using CheckTreeElementType = TreeElement * (*)(ThreadGC* thgc, TreeElement* parentt, NewElement* parent, List* deletes, String* id, enum LetterType type, enum OpCode op, NewElement* (*func)(ThreadGC*));
+using CheckTreeElementType = TreeElement * (*)(ThreadGC* thgc, NewLocal* local, TreeElement* parentt, NewElement* parent, List* deletes, String* id, enum LetterType type, enum OpCode op, NewElement* (*func)(ThreadGC*));
 using MakeFrameType = Frame * (*)(RootNode* root, void (*func)(Frame*), char* blockobj);
 uint64_t now_us() {
     using namespace std::chrono;
@@ -1430,12 +1430,15 @@ CustomModuleImpl* GoThread(ThreadGC* thgc) {
     //GC_SetClass(thgc, _KeyEvent, "KeyEvent", sizeof(KeyEvent), NULL, NULL);
     GC_register_class(thgc, _Offscreen, "Offscreen", sizeof(Offscreen), NULL, NULL);
     //HoppyWindow* hw = (HoppyWindow*)GC_malloc(thgc, _HoppyWindow);
+    GC_register_class(thgc, CType::_ATSSpan, "ATSSpan", sizeof(ATSSpan), NULL, NULL);
+    GC_register_class(thgc, CType::_StyleSpan, "StyleSpan", sizeof(StyleSpan), NULL, NULL);
+    GC_register_class(thgc, CType::_RenderSpan, "RenderSpan", sizeof(RenderSpan), NULL, NULL);
     //initHoppyWindow(thgc, hw);
 	NewLocal* local = (NewLocal*)GC_alloc(thgc, _LocalC);
     initNewLocal(thgc, local);
     NewLetter* let = (NewLetter*)GC_alloc(thgc, _LetterC);
     initNewLetter(thgc, let, getFont("sans", 16), _Letter);
-	let->text = createString(thgc, (char*)"Hello,world!", 13, 1);
+	let->text = createString(thgc, (char*)"Hello,world!", 12, 1);
     let->color = 0xFFFFFFFF;
     NewElementAddLast(thgc, local, (NewElement*)local, (NewElement*)let);
     thgc->map = create_mapy(magc, false);
@@ -1450,8 +1453,8 @@ CustomModuleImpl* GoThread(ThreadGC* thgc) {
         auto start = std::chrono::high_resolution_clock::now();
         /*while (thgc->first != NULL) {
             thgc->first->resume_all();
-        }
-        thgc->queue->resume_all();*/
+        }*/
+        thgc->queue->resume_all();
         thgc->hoppy->buildFrame(now_us());
         auto end = std::chrono::high_resolution_clock::now();
         auto ms = std::chrono::duration<double, std::milli>(end - start).count();

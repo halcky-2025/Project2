@@ -34,7 +34,7 @@ enum SizeType {
 };
 enum LetterType {
 	_None, _ElemEnd, _Main, _End, _Kaigyou, _Line, _VLine, _Letter, _CloneElem,
-	_Number, _BracketL, _BracketR, _BlockL, _BlockR, _BraceL, _BraceR, _Semicolon, _Comma, _Plus, _Minus, _Mul, _Div, _Mod,
+	_Name, _Number, _BracketL, _BracketR, _BlockL, _BlockR, _BraceL, _BraceR, _Semicolon, _Comma, _Plus, _Minus, _Mul, _Div, _Mod,
 	_Space, _Equal
 };
 class FontAtlas;
@@ -44,22 +44,20 @@ typedef struct {
     int y;
 } Point;
 #endif
-typedef struct CloneElement CloneElement;
-typedef struct Measure Measure;
-typedef struct Graphic Graphic;
-typedef struct Local Local;
-typedef struct Select Select;
-typedef struct MouseEvent MouseEvent;
-typedef struct KeyEvent KeyEvent;
-typedef struct EventObj {
+struct CloneElement;
+struct Measure;
+struct Graphic;
+struct Local;
+struct Select;
+struct EventObj {
 	char* blk;
 	MemTable* table;
-} EventObj;
+};
 typedef struct MemObj {
 	char* blk;
 	MemTable* req;
 	MemTable* res;
-} MemObj;
+};
 
 typedef struct MemFunc {
 	char* blk;
@@ -398,30 +396,6 @@ typedef struct Graphic {
 	float px, py;
 	float h;
 } Graphic;
-typedef struct MouseEvent {
-	char* blk;
-	int id;
-	int x, y;
-	Point basepos;
-	int action;
-	enum MouseCall call;
-	HoppyWindow* window;
-	bool click = false;
-	State* state;
-} MouseEvent;
-typedef struct Capture {
-	MouseEvent* down;
-	bool (*Capture)(struct Capture*, MouseEvent*);
-} Capture;
-typedef struct KeyEvent {
-	char* blk;
-	int id;
-	String* text;
-	int key;
-	Uint8* keys;
-	enum KeyCall call;
-	State* state;
-} KeyEvent;
 typedef struct EndElement {
 	Element base;
 } EndElement;

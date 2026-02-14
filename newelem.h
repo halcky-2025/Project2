@@ -118,7 +118,7 @@ void pushPageCurl(float x, float y, float width, float height,
 enum BgType {
 	BgFill, BgImage, BgGradient, BgStripe, BgCheck, BgGradientChecker
 };
-typedef struct Background {
+struct Background {
 	enum DrawCommandType type;
 	uint32_t fillcolor;
 	ImageId tex1;
@@ -130,30 +130,43 @@ typedef struct Background {
 	float count, offset, angle;
 	float scrollX, scrollY;
 };
-typedef struct Offscreen;
-typedef struct NewEndElement {
-	struct NewElement* next, * before, * parent, * childend;
-	enum LetterType type;
-	unsigned long id;
-};
-void initNewEndElement(ThreadGC* thgc, NewEndElement* end, NewElement* parent) {
-	end->next = end->before = (NewElement*)end;
-	end->parent = parent;
-	end->type = LetterType::_ElemEnd;
-	end->id = 0;
-}
-typedef struct PointF {
+struct Offscreen;
+struct NewLocal;
+struct HoppyWindow;
+struct PointF {
 	float x;
 	float y;
-} PointF;
-typedef struct NewElement;
-typedef struct NewMeasure {
+};
+struct MouseEvent {
+	char* blk;
+	int id;
+	int x, y;
+	Point basepos;
+	int action;
+	enum MouseCall call;
+	HoppyWindow* window;
+	bool click = false;
+	ExtendedRenderGroup* group;
+};
+struct Capture {
+	MouseEvent* down;
+	bool (*Capture)(struct Capture*, MouseEvent*);
+};
+struct KeyEvent {
+	char* blk;
+	int id;
+	String* text;
+	int key;
+	Uint8* keys;
+	enum KeyCall call;
+};
+struct NewMeasure {
 	NewElement* base;
 	PointF pos, size;
 	PointF start;
 	ExtendedRenderGroup* group;
-} NewMeasure;
-typedef struct NewGraphic {
+};
+struct NewGraphic {
 	LayerInfo* layer;
 	NewElement* offscreen;
 	NewElement* orient;
@@ -164,9 +177,22 @@ typedef struct NewGraphic {
 	PointI* fbsize;
 	int viewId = 0;
 	ExtendedRenderGroup* group;
-} NewGraphic;
-typedef struct NewLocal;
-typedef struct NewElement : NewEndElement {
+};
+struct NewEndElement {
+	struct NewElement* next, * before, * parent, * childend;
+	enum LetterType type;
+	int (*Mouse)(ThreadGC*, NewElement*, MouseEvent*, NewLocal*);
+	int (*Key)(ThreadGC*, NewElement*, int, int, KeyEvent*, NewLocal*);
+	void (*DrawSelection) (ThreadGC*, NewLocal*, NewElement*, int, int, NewGraphic*, RenderCommandQueue* q);
+	int (*len)(NewElement* elem);
+	uint64_t id;
+};
+int len1(NewElement* elem) {
+	return 1;
+}
+struct NewElement;
+struct NewLocal;
+struct NewElement : NewEndElement {
 	float margins[4];
 	float mbefores[4];
 	float paddings[4];
@@ -182,29 +208,35 @@ typedef struct NewElement : NewEndElement {
 	bool orient;
 	void (*Measure)(ThreadGC*, struct NewElement*, NewMeasure*, NewLocal*, int*);
 	void (*Draw)(ThreadGC*, struct NewElement*, NewGraphic*, NewLocal*, RenderCommandQueue* q);
-	int (*Mouse)(ThreadGC*, struct NewElement*, MouseEvent*, Local*);
-	int (*Key)(ThreadGC*, struct NewElement*, KeyEvent*, Local*, bool*);
+	MemFunc* GoMouseDown; MemFunc* BackMouseDown; MemFunc* GoKeyDown; MemFunc* BackKeyDown;
 	bool offscreened = false;
 	Offscreen* offscreen;
-} NewElement;
-typedef struct HoppyWindow HoppyWindow;
+	bool editable;
+};
 enum DirtyType {
 	None,
 	Partial = 1,
 	Rebuild = 2,
 	RebuildValue = 3,
 };
-typedef struct NewLocal : NewElement {
+struct NewSelect {
+	NewElement* from, * to;
+	uint64_t fromid, toid;
+	int m, n;
+	NewElement* start, * end;
+	int s, e;
+	int count;
+};
+struct NewLocal : NewElement {
 	HoppyWindow* window;
-	Select* selects[2];
-	int seln;
-	int countn;
 	DirtyType dirty;
 	List* screens;
 	Map* temap;
+	Map* selects;
+	NewSelect select;
 };
 struct RenderGroup;
-typedef struct Offscreen {
+struct Offscreen {
 	ImageId imPing;
 	ImageId imPong;
 	bgfx::FrameBufferHandle fbPing;
@@ -221,19 +253,52 @@ typedef struct Offscreen {
 };
 static int viewId = 0;
 
-typedef struct NewLine : NewElement {
-	bool recompile;
+struct NewLine : NewElement {
 };
-typedef struct NewLetter : NewElement {
+struct ATSSpan {
+	int start, end;
+	FontId font;
+	uint32_t color;
 	String* text;
+	LetterType t;
+};
+struct StyleSpan {
+	int start, end;
 	FontId font;
 	uint32_t color;
 };
-typedef struct NewSelect {
-	NewElement* start, * end;
-	int m, n;
-	bool* select;
-} NewSelect;
+struct RenderSpan {
+	int start, end;
+	FontId font;
+	uint32_t color;
+	float x, y, width, height;
+};
+struct NewLetter : NewElement {
+	String* text;
+	FontId font;
+	uint32_t color;
+	List* atsspans;
+	List* stylespans;
+	List* renderspans;
+	bool recompile;
+};
+void ElementDrawSelect(ThreadGC* thgc, NewLocal* local, NewElement* self, int m, int n, NewGraphic* g, RenderCommandQueue* q);
+void LetterDrawSelect(ThreadGC* thgc, NewLocal* local, NewElement* self, int m, int n, NewGraphic* g, RenderCommandQueue* q);
+int ElementKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLocal* local);
+int EndKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLocal* local);
+int ElementMouse(ThreadGC* thgc, NewElement* self, MouseEvent* e, NewLocal* local);
+int LetterMouse(ThreadGC* thgc, NewElement* self, MouseEvent* e, NewLocal* local);
+int LetterKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLocal* local);
+void initNewEndElement(ThreadGC* thgc, NewEndElement* end, NewElement* parent) {
+	end->next = end->before = (NewElement*)end;
+	end->parent = parent;
+	end->type = LetterType::_ElemEnd;
+	end->id = 0;
+	end->len = len1;
+	end->Mouse = ElementMouse;
+	end->DrawSelection = ElementDrawSelect;
+	end->Key = EndKey;
+}
 void ResetId(NewElement* elem, int* n) {
 	for (NewElement* child = elem->childend->next; child->type != LetterType::_ElemEnd; child = child->next) {
 		child->id = (*n)++ * 65536 * 65536 * 65536;
@@ -279,7 +344,7 @@ bool CheckOffscreen(NewElement* elem) {
 	return false;
 
 }
-void NewBefore(NewLocal* local, NewElement* self, NewElement* elem) {
+void NewBefore(ThreadGC* thgc, NewLocal* local, NewElement* self, NewElement* elem) {
 	elem->next = self;
 	elem->before = self->before;
 	self->before->next = elem;
@@ -306,7 +371,7 @@ void NewBefore(NewLocal* local, NewElement* self, NewElement* elem) {
 	}
 	else elem->id = (self->id + before->id) / 2;
 }
-void NewNext(NewLocal* local, NewElement* self, NewElement* elem) {
+void NewNext(ThreadGC* thgc, NewLocal* local, NewElement* self, NewElement* elem) {
 	elem->before = self;
 	elem->next = self->next;
 	self->next->before = elem;
@@ -339,7 +404,7 @@ Offscreen* FindOffscreen(NewElement* elem) {
 	}
 	return NULL;
 }
-void NewRemoveElement(NewElement* elem) {
+void NewRemoveElement(ThreadGC* thgc, NewLocal* local, NewElement* elem) {
 	elem->before->next = elem->next;
 	elem->next->before = elem->before;
 }
@@ -351,11 +416,11 @@ void RebuildOffscreen(ThreadGC* thgc, List* screens, NewElement* elem) {
 }
 void NewNextElement(ThreadGC* thgc, NewLocal* local, NewElement* before, NewElement* elem) {
 	if (elem->parent != NULL) {
-		NewNext(local, before, elem);
+		NewNext(thgc, local, before, elem);
 		local->dirty = DirtyType::RebuildValue;
 	}
 	else {
-		NewNext(local, before, elem);
+		NewNext(thgc, local, before, elem);
 		if (CheckOffscreen(elem)) {
 			elem->offscreen = (Offscreen*)GC_alloc(thgc, CType::_Offscreen);
 			elem->offscreen->group = &createGroup(thgc);
@@ -364,10 +429,6 @@ void NewNextElement(ThreadGC* thgc, NewLocal* local, NewElement* before, NewElem
 		FindOffscreen(elem->parent)->markLayout(local);
 	}
 
-}
-void DeleteNewElement(NewLocal* local, NewElement* elem) {
-	FindOffscreen(elem->parent)->markLayout(local);
-	NewRemoveElement(elem);
 }
 void changeOrient(NewLocal* local, NewElement* elem, bool orient) {
 	elem->orient = orient;
@@ -488,13 +549,13 @@ void NewElementAddLast(ThreadGC* thgc, NewLocal* local, NewElement* parent, NewE
 	if (parent->childend->before->type != LetterType::_Line) {
 		auto line = (NewLine*)GC_alloc(thgc, CType::_LineC);
 		initNewLine(thgc, line);
-		NewBefore(local, parent->childend, line);
+		NewBefore(thgc, local, parent->childend, line);
 	}
-	NewBefore(local, parent->childend->before->childend, child);
+	NewBefore(thgc, local, parent->childend->before->childend, child);
 	FindOffscreen(parent)->markLayout(local);
 }
 void NewLineAddLast(ThreadGC* thgc, NewLocal* local, NewElement* parent, NewLine* line) {
-	NewBefore(local, parent->childend, line);
+	NewBefore(thgc, local, parent->childend, line);
 	FindOffscreen(parent)->markLayout(local);
 }
 
@@ -586,7 +647,7 @@ void NewDrawCall(ThreadGC* thgc, NewElement* elem, NewGraphic* g, NewLocal* loca
 		auto info = mygetStandaloneTextureInfo(thgc, elem->offscreen->ping ? elem->offscreen->imPing : elem->offscreen->imPong);
 		g->layer->pushText(elem->pos2.x, elem->pos2.y, sizex, sizey,
 			elem->scroll.x / size3x, elem->scroll.y / size3y, sizex / size3x, sizey / size3y, 0xFFFFFFFF, 10000, &info->handle, g->fb, g->fbsize, g->viewId);
-		drawUnderPagingBar(g->layer, *getAtlas(thgc), getFont("sans", 16), elem->pos2.x, sizey + 110.0f, sizex, 5.0f, 3.0, 16.0, 0.0f, g->group, g->fb, g->fbsize, g->viewId);
+		/*drawUnderPagingBar(g->layer, *getAtlas(thgc), getFont("sans", 16), elem->pos2.x, sizey + 110.0f, sizex, 5.0f, 3.0, 16.0, 0.0f, g->group, g->fb, g->fbsize, g->viewId);
 		drawRightPagingBar(g->layer, *getAtlas(thgc), getFont("sans", 16), sizex + 10.0f, elem->pos2.y, 5.0f, 100.0f, 3.0, 16.0, 0.0f, g->group, g->fb, g->fbsize, g->viewId);
 		drawUnderScrollBar(g->layer, elem->pos2.x, sizey + 100.0f, sizex, 5.0f, 100.0f, 50.0f, 300.0f, 0.0f, g->fb, g->fbsize, g->viewId);
 		drawRightScrollBar(g->layer, sizex, elem->pos2.y, 5.0f, 100.0f, 100.0f, 50.0f, 300.0f, 0.0f, g->fb, g->fbsize, g->viewId);
@@ -594,9 +655,9 @@ void NewDrawCall(ThreadGC* thgc, NewElement* elem, NewGraphic* g, NewLocal* loca
 		pro = fmod(pro, 1.0f);
 		auto info2 = mygetStandaloneTextureInfo(thgc, elem->background->tex1);
 		g->layer->pushPageCurl(elem->pos2.x + 10, elem->pos2.y + 150.f, sizex, sizey,
-			pro, -0.35f, 0.44f, 0xFFFFFFFF, 0.0f, 0.0, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0x000000FF, 1.0f, 1.0f, 1.0f, 0x000000FF, &info->handle, &info2->handle, 0.0f, g->fb, g->fbsize, g->viewId);
+			pro, -0.35f, 0.44f, 0xFFFFFFFF, 0.0f, 0.0, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0x000000FF, 1.0f, 1.0f, 1.0f, 0x000000FF, &info->handle, &info2->handle, 0.0f, g->fb, g->fbsize, g->viewId);*/
 		g = new NewGraphic{g->layer, elem, elem, {0,0}, {elem->size2.x, elem->size2.y}, {0,0}, {0,0},
-			elem->offscreen->ping ? elem->offscreen->imPong : elem->offscreen->imPing,  &info->fbo,  &info->size, elem->offscreen->viewId = viewId--, elem->offscreen->group };
+			elem->offscreen->ping ? elem->offscreen->imPong : elem->offscreen->imPing,  &info->fbo,  &info->size, elem->offscreen->viewId = --viewId, elem->offscreen->group };
 		elem->offscreen->ping = !elem->offscreen->ping;
 		std::vector<float>* colors = new std::vector<float>{
 			1.0f, 0.0f, 0.0f, 1.0f,  // ê‘
@@ -606,8 +667,7 @@ void NewDrawCall(ThreadGC* thgc, NewElement* elem, NewGraphic* g, NewLocal* loca
 		std::vector<float>* widths = new std::vector<float>{ 10.0f, 10.0f, 10.0f };
 		int size = widths->size();
 		int n = addPattern(thgc, *colors, *widths);
-		//g->layer->pushFill(elem->pos.x, elem->pos.y, elem->size2.x / 3 * 2, elem->size2.y / 3 * 2, 6.0f, 1.0f, 1.0, 0xffffffff, 0x000000ff, 3.0f, 3.0f, 12.0f, 0x00ff00ff, 0, g->fb, g->fbsize, g->viewId);
-		g->layer->pushPattern(DrawCommandType::GradientChecker, elem->pos.x, elem->pos.y, elem->size2.x / 3 * 2, elem->size2.y / 3 * 2, size, 0.0f, 0.0f, 0.0f, 6.0f, 1.0f, 1.0, 0x000000FF, 3.0f, 3.0f, 2.0f, 0x00ff00FF, n, 0, g->fb, g->fbsize, g->viewId);
+		//g->layer->pushPattern(DrawCommandType::GradientChecker, elem->pos.x, elem->pos.y, elem->size2.x / 3 * 2, elem->size2.y / 3 * 2, size, 0.0f, 0.0f, 0.0f, 6.0f, 1.0f, 1.0, 0x000000FF, 3.0f, 3.0f, 2.0f, 0x00ff00FF, n, 0, g->fb, g->fbsize, g->viewId);
 	}
 	g->pos.x += elem->margins[3] + elem->borderRadius + elem->paddings[3];
 	g->pos.y += elem->margins[0] + elem->borderRadius + elem->paddings[0];
@@ -644,8 +704,9 @@ void initNewLocal(ThreadGC* thgc, NewLocal* local) {
 	local->type = LetterType::_Main;
 	local->Measure = NewMeasureCall;
 	local->Draw = NewDrawCall;
-	local->Mouse = NULL;
-	local->Key = NULL;
+	local->Mouse = ElementMouse;
+	local->Key = ElementKey;
+	local->DrawSelection = ElementDrawSelect;
 	local->offscreen = (Offscreen*)GC_alloc(thgc, CType::_Offscreen);
 	local->offscreen->group = &createGroup(thgc);
 	local->offscreen->markLayout(local);
@@ -657,70 +718,10 @@ void initNewLocal(ThreadGC* thgc, NewLocal* local) {
 	local->background->tex1 = myloadTexture2D(thgc, "123.png");
 	local->dirty = DirtyType::RebuildValue;
 	local->screens = create_list(thgc, sizeof(Offscreen*), true);
+	local->editable = true;
+	local->select.from = NULL;
 }
 #include "Compile.h"
-void RecompileLine(ThreadGC* thgc, NewLocal* local, NewLine* line) {
-	if (!line->recompile) return;
-	NewElement* start = line->childend;
-	String* text = (String*)GC_alloc(thgc, CType::_String);
-	FontId* font = NULL;
-	for (NewElement* child = line->childend->next; ;) {
-		if (child->type == LetterType::_Letter) {
-			NewLetter* letter = (NewLetter*)child;
-			font = &letter->font;
-			text = StringAdd2(thgc, text, letter->text);
-			NewRemoveElement(child);
-		}
-		else {
-			if (start->next == child) continue;
-			List* l = Compile(thgc, text, *font);
-			for (auto i = l->size - 1; i >= 0; i--) {
-				NewElement* elem = (NewElement*)get_list(l, i);
-				NewNext(local, start, elem);
-			}
-			if (child->type == LetterType::_ElemEnd) {
-				break;
-			}
-			else start = child;
-		}
-	}
-}
-void NewLineMeasureCall(ThreadGC* thgc, NewElement* elem, NewMeasure* measure, NewLocal* local, int* n) {
-	RecompileLine(thgc, local, (NewLine*)elem);
-	bool offscreened = false;
-	if (elem->xtype == SizeType::Scroll) { measure->size.y -= 5; offscreened = true; }
-	else if (elem->xtype == SizeType::Range) { offscreened = true; }
-	if (elem->ytype == SizeType::Scroll) { measure->size.x -= 5; offscreened = true; }
-	else if (elem->ytype == SizeType::Range) { offscreened = true; }
-	else if (elem->ytype == SizeType::Break) { measure->size.y -= 10; }
-	if (elem->type == LetterType::_Main) { offscreened = true; }
-	measure->pos.x += elem->margins[3] + elem->borderRadius + elem->paddings[3];
-	measure->pos.y += elem->margins[0] + elem->borderRadius + elem->paddings[0];
-	measure->start = measure->pos;
-	float sizex = 0, sizey = 0;
-	for (NewElement* child = elem->childend->next; child->type != LetterType::_ElemEnd; ) {
-		child->Measure(thgc, child, measure, local, n);
-		if (elem->orient) {
-			if (sizey < child->size.y) sizey = child->size.y;
-			measure->pos.x += child->size.x;
-			measure->pos.y = measure->start.y;
-			sizex += child->size.x;
-		}
-		else
-		{
-			if (sizex < child->size.x) sizex = child->size.x;
-			measure->pos.y += child->size.y;
-			measure->pos.x = measure->start.x;
-			sizey += child->size.y;
-		}
-		child = child->next;
-	}
-	elem->size2.x = sizex + elem->margins[1] + elem->margins[3] + elem->paddings[1] + elem->paddings[3] + elem->borderRadius * 2;
-	elem->size2.y = sizey + elem->margins[0] + elem->margins[2] + elem->paddings[0] + elem->paddings[2] + elem->borderRadius * 2;
-	if (elem->xtype == SizeType::Auto) { elem->size.x = elem->size2.x; }
-	if (elem->ytype == SizeType::Auto) { elem->size.y = elem->size2.y; }
-	return;
-}
 void initNewLine(ThreadGC* thgc, NewLine* line) {
 	line->type = LetterType::_Line;
 	line->next = line;
@@ -730,29 +731,169 @@ void initNewLine(ThreadGC* thgc, NewLine* line) {
 	initNewEndElement(thgc, (NewEndElement*)line->childend, line);
 	line->orient = true;
 	line->id = 0;
-	line->Measure = NewLineMeasureCall;
+	line->Measure = NewMeasureCall;
 	line->Draw = NewDrawCall;
+	line->Mouse = ElementMouse;
+	line->Key = ElementKey;
+	line->DrawSelection = ElementDrawSelect;
 }
 void NewLetterMeasureCall(ThreadGC* thgc, NewElement* elem, NewMeasure* measure, NewLocal* local, int* n) {
 	NewLetter* letter = (NewLetter*)elem;
-	String* text = letter->text;
-	FontId font = letter->font;
-	float width, height;
-	size_t nn;
-	MeasureString(*getAtlas(thgc), font, text, text->size, 10000.0f, &width, &height, &nn, measure->group);
-	measure->pos.x += width;
-	elem->size.x = width;
-	elem->size.y = height;
-	if (measure->size.y < height) measure->size.y = height;
+	if (letter->recompile) {
+		letter->atsspans = Compile(thgc, letter->text, letter->font);
+		letter->recompile = false;
+	}
+	std::vector<int> boundaries;
+	for (int i = 0; i < letter->atsspans->size; i++) {
+		ATSSpan* a = *(ATSSpan**)get_list(letter->atsspans, i);
+		boundaries.push_back(a->start);
+		boundaries.push_back(a->end);
+	}
+
+
+	for (int i = 0; i < letter->stylespans->size; i++) {
+		StyleSpan* s = *(StyleSpan**)get_list(letter->stylespans, i);
+		boundaries.push_back(s->start);
+		boundaries.push_back(s->end);
+	}
+
+	std::sort(boundaries.begin(), boundaries.end());
+	boundaries.erase(std::unique(boundaries.begin(), boundaries.end()), boundaries.end());
+
+	letter->renderspans = create_list(thgc, sizeof(RenderSpan*), CType::_RenderSpan);
+	letter->size2 = { 0.0f, 0.0f };
+	for (size_t i = 0; i + 1 < boundaries.size(); ++i) {
+		int segStart = boundaries[i];
+		int segEnd = boundaries[i + 1];
+
+		RenderSpan *r = (RenderSpan*)GC_alloc(thgc, CType::_RenderSpan);
+		r->start = segStart;
+		r->end = segEnd;
+
+		bool applied = false;
+		// Ç‹Ç∏ StyleSpan ÇíTÇ∑ÅióDêÊÅj
+		for (int i = 0; i < letter->stylespans->size; i++) {
+			StyleSpan* s = *(StyleSpan**)get_list(letter->stylespans, i);
+			r->color = s->color;
+			r->font = s->font;
+			applied = true;
+			break;
+		}
+		// Ç»ÇØÇÍÇŒ ATSspan
+		if (!applied) {
+			for (int i = 0; i < letter->atsspans->size; i++) {
+				ATSSpan* a = *(ATSSpan**)get_list(letter->atsspans, i);
+				if (a->start <= segStart && a->end >= segEnd) {
+					r->color = a->color;
+					r->font = a->font;
+					break;
+				}
+			}
+		}
+		float w, h;
+		size_t n;
+		MeasureString(*getAtlas(thgc), r->font, SubString(thgc, letter->text, r->start, r->end - r->start), r->end - r->start, 10000, &w, &h, &n, measure->group);
+		r->width = w;
+		r->height = h;
+		r->x = letter->size2.x;
+		if (letter->size2.y < h) letter->size2.y = h;
+		letter->size2.x += w;
+		add_list(thgc, letter->renderspans, (char *)r);
+	}
+	letter->size = letter->size2;
+}
+void SelectDraw(ThreadGC* thgc, NewLocal* local, NewGraphic* g, RenderCommandQueue* q) {
+	if (local->select.fromid == local->select.toid) {
+		if (local->select.m <= local->select.n) {
+			local->select.start = local->select.from;
+			local->select.end = local->select.to;
+			local->select.s = local->select.m;
+			local->select.e = local->select.n;
+		}
+		else {
+			local->select.start = local->select.to;
+			local->select.end = local->select.from;
+			local->select.s = local->select.n;
+			local->select.e = local->select.m;
+		}
+	}
+	else if (local->select.fromid < local->select.toid) {
+		local->select.start = local->select.from;
+		local->select.end = local->select.to;
+		local->select.s = local->select.m;
+		local->select.e = local->select.n;
+	}
+	else {
+		local->select.start = local->select.to;
+		local->select.end = local->select.from;
+		local->select.s = local->select.n;
+		local->select.e = local->select.m;
+	}
+	NewElement* start = local->select.start;
+	int s = local->select.s;
+	for (;;) {
+		if (start == local->select.end) {
+			start->DrawSelection(thgc, local, start, s, local->select.e, g, q);
+			break;
+		}
+		start->DrawSelection(thgc, local, start, s, start->len(start), g, q);
+		s = 0;
+		if (start->childend != NULL) {
+			start = start->childend;
+			continue;
+		}
+		else if (start->type == _ElemEnd) {
+			start = start->parent->next;
+			continue;
+		}
+		start = start->next;
+	}
+}
+void ElementDrawSelect(ThreadGC* thgc, NewLocal* local, NewElement* self, int m, int n, NewGraphic* g, RenderCommandQueue* q) {
+	return;
+}
+void LetterDrawSelect(ThreadGC* thgc, NewLocal* local, NewElement* self, int m, int n, NewGraphic* g, RenderCommandQueue* q) {
+	NewLetter* letter = (NewLetter*)self;
+	int l = 0, r = letter->renderspans->size - 1;
+	while (l <= r) {
+		int m2 = (l + r) / 2;
+		auto s = *(RenderSpan**)get_list(letter->renderspans, m2);
+		if (m < s->start)
+			r = m2 - 1;
+		else if (m >= s->end)
+			l = m2 + 1;
+		else{
+			String* str = SubString(thgc, letter->text, s->start, s->end);
+			float w0, h0;
+			size_t n2;
+			MeasureString(*getAtlas(thgc), s->font, str, m - s->start, 10000, &w0, &h0, &n2, NULL);
+			for (;;) {
+				if (n <= s->end) {
+					float w, h;
+					MeasureString(*getAtlas(thgc), s->font, str, n - s->start, 10000, &w, &h, &n2, NULL);
+					g->layer->pushFill(self->pos.x + self->pos2.x + s->x + w0, self->pos.y + self->pos2.y + s->y, w - w0 + 1, h, 0.0f, 0.0f, 0.0f, 0x4477ff66, 0, 0.0f, 0.0f, 1.0f, 0, 12000.0f, g->fb, g->fbsize, g->viewId);
+					break;
+				}
+				else {
+					g->layer->pushFill(self->pos.x + self->pos2.x + s->x + w0, self->pos.y + self->pos2.y + s->y, s->width - w0 + 1, s->height, 0.0f, 0.0f, 0.0f, 0x4477ff66, 0, 0.0f, 0.0f, 1.0f, 0, 12000.0f, g->fb, g->fbsize, g->viewId);
+				}
+				w0 = 0.0f; h0 = 0.0f;
+				m2++;
+				s = *(RenderSpan**)get_list(letter->renderspans, m2);
+			}
+			break;
+		}
+	}
+	return;
 }
 bgfx::FrameBufferHandle nullfb = BGFX_INVALID_HANDLE;
 void NewLetterDrawCall(ThreadGC* thgc, NewElement* elem, NewGraphic* g, NewLocal* local, RenderCommandQueue* q) {
 	NewLetter* letter = (NewLetter*)elem;
-	String* text = letter->text;
-	FontId font = letter->font;
-	uint32_t color = letter->color;
-	drawString((LayerInfo*)g->layer, *getAtlas(thgc), font, text, g->pos.x, g->pos.y, std::floor(elem->zIndex) + 0.9,
-		color, g->group, g->fb, g->fbsize, g->viewId);
+	for (int i = 0; i < letter->renderspans->size; i++) {
+		auto rs = *(RenderSpan**)get_list(letter->renderspans, i);
+		drawString((LayerInfo*)g->layer, *getAtlas(thgc), rs->font, SubString(thgc, letter->text, rs->start, rs->end - rs->start), g->pos.x + rs->x, g->pos.y + rs->y, std::floor(elem->zIndex) + 0.9,
+			rs->color, g->group, g->fb, g->fbsize, g->viewId);
+	}
 }
 void initNewLetter(ThreadGC* thgc, NewLetter* letter, FontId font, enum LetterType type) {
 	letter->type = type;
@@ -763,6 +904,439 @@ void initNewLetter(ThreadGC* thgc, NewLetter* letter, FontId font, enum LetterTy
 	letter->id = 0;
 	letter->Measure = NewLetterMeasureCall;
 	letter->Draw = NewLetterDrawCall;
+	letter->Mouse = LetterMouse;
+	letter->Key = LetterKey;
+	letter->DrawSelection = LetterDrawSelect;
 	letter->text = NULL;
 	letter->font = font;
+	letter->atsspans = create_list(thgc, sizeof(ATSSpan*), CType::_ATSSpan);
+	letter->stylespans = create_list(thgc, sizeof(StyleSpan*), CType::_StyleSpan);
+	letter->renderspans = create_list(thgc, sizeof(RenderSpan*), CType::_RenderSpan);
+	letter->recompile = true;
+}
+int ElementMouse(ThreadGC* thgc, NewElement* self, MouseEvent* e, NewLocal* local) {
+	if (self->offscreened) e->group = self->offscreen->group;
+	if (self->GoMouseDown != NULL) {
+		MemObj* mo = (MemObj*)GC_clone(thgc, (char*)self->GoMouseDown->obj);
+		MemTable* res = (MemTable*)GC_alloc(thgc, _MemTable);
+		res->table = (Map*)create_mapy(thgc, true);
+		MemInsert(thgc, res, _MouseEvent, (ModelVal*)e);
+		mo->req = NULL; mo->res = res;
+		auto rn = GC_add_root_node(thgc);
+		auto h = std::coroutine_handle<Generator::promise_type>::from_address(static_cast<void*>(MakeFrame(rn, self->GoMouseDown->func, (char*)mo)));
+		h.promise().state = -2;
+		thgc->queue->push(h);
+	}
+	for (NewElement* elem = self->childend->next; elem->type != _ElemEnd; elem = elem->next) {
+		if (elem->orient) {
+			if (elem->pos.y + elem->pos2.y <= e->y && e->y < elem->pos.y + elem->pos2.y + elem->size.y) {
+				elem->Mouse(thgc, elem, e, local);
+			}
+		}
+		else {
+			if (elem->pos.x + elem->pos2.x <= e->x && e->x < elem->pos.x + elem->pos2.x + elem->size.x) {
+				elem->Mouse(thgc, elem, e, local);
+			}
+
+		}
+	}
+
+	if (self->BackMouseDown != NULL) {
+		MemObj* mo = (MemObj*)GC_clone(thgc, (char*)self->BackMouseDown->obj);
+		MemTable* res = (MemTable*)GC_alloc(thgc, _MemTable);
+		res->table = (Map*)create_mapy(thgc, true);
+		MemInsert(thgc, res, _MouseEvent, (ModelVal*)e);
+		mo->req = NULL; mo->res = res;
+		auto rn = GC_add_root_node(thgc);
+		auto h = std::coroutine_handle<Generator::promise_type>::from_address(static_cast<void*>(MakeFrame(rn, self->BackMouseDown->func, (char*)mo)));
+		h.promise().state = -2;
+		thgc->queue->push(h);
+	}
+	return -1;
+}
+void SelectKey(ThreadGC* thgc, NewLocal* local, KeyEvent* e) {
+	if (local->select.fromid == local->select.toid) {
+		if (local->select.m <= local->select.n) {
+			local->select.start = local->select.from;
+			local->select.end = local->select.to;
+			local->select.s = local->select.m;
+			local->select.e = local->select.n;
+		}
+		else {
+			local->select.start = local->select.to;
+			local->select.end = local->select.from;
+			local->select.s = local->select.n;
+			local->select.e = local->select.m;
+		}
+	}
+	else if (local->select.fromid < local->select.toid) {
+		local->select.start = local->select.from;
+		local->select.end = local->select.to;
+		local->select.s = local->select.m;
+		local->select.e = local->select.n;
+	}
+	else {
+		local->select.start = local->select.to;
+		local->select.end = local->select.from;
+		local->select.s = local->select.n;
+		local->select.e = local->select.m;
+	}
+	NewElement* start = local->select.start;
+	std::vector<NewElement*> vec;
+	for (; start != NULL; start = start->parent) vec.push_back(start);
+	for (auto it = vec.rbegin(); it != vec.rend(); ++it) {
+		NewElement* e = *it;
+		if (e->GoKeyDown != NULL) {
+			MemObj* mo = (MemObj*)GC_clone(thgc, (char*)e->GoKeyDown->obj);
+			MemTable* res = (MemTable*)GC_alloc(thgc, _MemTable);
+			res->table = (Map*)create_mapy(thgc, true);
+			MemInsert(thgc, res, _KeyEvent, (ModelVal*)e);
+			mo->req = NULL; mo->res = res;
+			auto rn = GC_add_root_node(thgc);
+			auto h = std::coroutine_handle<Generator::promise_type>::from_address(static_cast<void*>(MakeFrame(rn, e->GoKeyDown->func, (char*)mo)));
+			h.promise().state = -2;
+			thgc->queue->push(h);
+		}
+	}
+	start = local->select.start;
+	int s = local->select.s;
+	for (;;) {
+		if (start == local->select.end) {
+			start->Key(thgc, start, s, local->select.e, e, local);
+			break;
+		}
+		start->Key(thgc, start, s, start->len(start), e, local);
+		s = 0;
+		if (start->childend != NULL) {
+			start = start->childend;
+			continue;
+		}
+		else if (start->type == _ElemEnd) {
+			start = start->parent->next;
+			continue;
+		}
+		start = start->next;
+	}
+	for (; start != NULL; start = start->parent) {
+		if (start->BackKeyDown != NULL) {
+			MemObj* mo = (MemObj*)GC_clone(thgc, (char*)start->BackKeyDown->obj);
+			MemTable* res = (MemTable*)GC_alloc(thgc, _MemTable);
+			res->table = (Map*)create_mapy(thgc, true);
+			MemInsert(thgc, res, _KeyEvent, (ModelVal*)e);
+			mo->req = NULL; mo->res = res;
+			auto rn = GC_add_root_node(thgc);
+			auto h = std::coroutine_handle<Generator::promise_type>::from_address(static_cast<void*>(MakeFrame(rn, start->BackKeyDown->func, (char*)mo)));
+			h.promise().state = -2;
+			thgc->queue->push(h);
+		}
+	}
+}
+int ElementKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLocal* local) {
+	return -1;
+}
+int EndKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLocal* local) {
+	return -1;
+}
+void UniteLine(ThreadGC* thgc, NewLocal* local, NewLine* before, NewLine* next) {
+	for (NewElement* elem = next->childend->next; elem->type != _ElemEnd; ) {
+		NewElement* nex = elem->next;
+		NewNext(thgc, local, before->childend->before, elem);
+		elem = nex;
+	}
+	NewRemoveElement(thgc, local, next);
+}
+void AddText(ThreadGC* thgc, NewLocal* local, NewLetter* letter, int m, int n, String* text) {
+	if (m == 0 && n == letter->text->size && text->size == 0) {
+		NewRemoveElement(thgc, local, letter);
+		return;
+	}
+	if (text == NULL) letter->text = StringAdd2(thgc, SubString(thgc, letter->text, 0, m), SubString(thgc, letter->text, n, letter->text->size - n));
+	else letter->text = StringAdd2(thgc, StringAdd2(thgc, SubString(thgc, letter->text, 0, m), text), SubString(thgc, letter->text, n, letter->text->size - n));
+}
+int LetterMouse(ThreadGC* thgc, NewElement* self, MouseEvent* e, NewLocal* local) {
+	NewLetter* letter = (NewLetter*)self;
+	for (int i = 0; i < letter->renderspans->size; i++) {
+		auto rs = *(RenderSpan**)get_list(letter->renderspans, i);
+		if (self->pos2.x + self->pos.x + rs->x <= e->x && e->x < self->pos2.x + self->pos.x + rs->x + rs->width) {
+			if (self->pos2.y + self->pos.y + rs->y <= e->y && e->y < self->pos2.y + self->pos.y + rs->y + rs->height) {
+				if (self->GoMouseDown != NULL) {
+					MemObj* mo = (MemObj*)GC_clone(thgc, (char*)self->GoMouseDown->obj);
+					MemTable* res = (MemTable*)GC_alloc(thgc, _MemTable);
+					res->table = (Map*)create_mapy(thgc, true);
+					MemInsert(thgc, res, _MouseEvent, (ModelVal*)e);
+					mo->req = NULL; mo->res = res;
+					auto rn = GC_add_root_node(thgc);
+					auto h = std::coroutine_handle<Generator::promise_type>::from_address(static_cast<void*>(MakeFrame(rn, self->GoMouseDown->func, (char*)mo)));
+					h.promise().state = -2;
+					thgc->queue->push(h);
+				}
+				float width;
+				String* str = SubString(thgc, letter->text, rs->start, rs->end - rs->start);
+				size_t n;
+				float hei;
+				MeasureString(*getAtlas(thgc), rs->font, str, str->size, e->x - self->pos2.x - self->pos.x - rs->x, &width, &hei, &n, e->group);
+				if (e->action == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+					local->select.from = local->select.to = self;
+					local->select.fromid = local->select.toid = self->id;
+					local->select.m = local->select.n = rs->start + n;
+				}
+				else if (e->action == SDL_EVENT_MOUSE_BUTTON_UP || e->click) {
+					local->select.to = self;
+					local->select.toid = self->id;
+					local->select.n = rs->start + n;
+				}
+
+				if (self->BackMouseDown != NULL) {
+					MemObj* mo = (MemObj*)GC_clone(thgc, (char*)self->BackMouseDown->obj);
+					MemTable* res = (MemTable*)GC_alloc(thgc, _MemTable);
+					res->table = (Map*)create_mapy(thgc, true);
+					MemInsert(thgc, res, _MouseEvent, (ModelVal*)e);
+					mo->req = NULL; mo->res = res;
+					auto rn = GC_add_root_node(thgc);
+					auto h = std::coroutine_handle<Generator::promise_type>::from_address(static_cast<void*>(MakeFrame(rn, self->BackMouseDown->func, (char*)mo)));
+					h.promise().state = -2;
+					thgc->queue->push(h);
+				}
+				return n;
+			}
+		}
+	}
+	return -1;
+}
+int LetterKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLocal* local) {
+	if (!self->parent->parent->editable) return 0;
+	NewLetter* letter = (NewLetter*)self;
+	if (e->key == SDLK_LEFT) {
+		local->select.count = -1;
+		if (local->select.from == local->select.to && local->select.m == local->select.n) {
+			if (m == 0) {
+				if (self->before->type == _ElemEnd) {
+					if (self->parent->before->type == _ElemEnd) return 0;
+					local->select.from = local->select.to = self->parent->before->childend;
+					local->select.fromid = local->select.toid = local->select.from->id;
+					local->select.m = local->select.n = 0;
+				}
+				else {
+					local->select.from = local->select.to = self->before;
+					local->select.fromid = local->select.toid = local->select.from->id;
+					local->select.m = local->select.n = self->before->len(self->before) - 1;
+				}
+			}
+			else {
+				local->select.m = local->select.n = m - 1;
+			}
+			return 0;
+		}
+		else {
+			local->select.from = local->select.to = local->select.start;
+			local->select.fromid = local->select.toid = local->select.from->id;
+			local->select.m = local->select.n = local->select.s;
+			return 1;
+		}
+	}
+	else if (e->key == SDLK_RIGHT) {
+		local->select.count = -1;
+		if (local->select.from == local->select.to && local->select.m == local->select.n) {
+			if (m == letter->text->size) {
+				if (self->next->type == _ElemEnd) {
+					if (self->parent->before->type == _ElemEnd) return 0;
+					local->select.from = local->select.to = self->parent->next->childend->next;
+					local->select.fromid = local->select.toid = local->select.from->id;
+					local->select.m = local->select.n = 0;
+				}
+				else {
+					local->select.from = local->select.to = self->next;
+					local->select.fromid = local->select.toid = local->select.from->id;
+					local->select.m = local->select.n = 1;
+				}
+			}
+			else {
+				local->select.m = local->select.n = m + 1;
+			}
+			return 0;
+		}
+		else {
+			local->select.from = local->select.to = local->select.end;
+			local->select.fromid = local->select.toid = local->select.from->id;
+			local->select.m = local->select.n = local->select.e;
+			return 1;
+		}
+	}
+	else if (e->key == SDLK_UP) {
+		if (local->select.from == local->select.to && local->select.m == local->select.n) {
+			if (self->parent->before->type == _ElemEnd) {
+				local->select.from = local->select.to = self->parent->childend->next;
+				local->select.fromid = local->select.toid = local->select.from->id;
+				local->select.m = local->select.n = 0;
+			}
+			else {
+				if (local->select.count < 0) {
+					local->select.count = m;
+					for (NewElement* elem = self->before; elem->type != _ElemEnd; elem = elem->before) {
+						local->select.count += elem->len(elem);
+					}
+				}
+				for (NewElement* elem = self->parent->before->childend->next; ; elem = elem->next) {
+					if (elem->type == _ElemEnd) {
+						local->select.from = local->select.to = elem;
+						local->select.fromid = local->select.toid = local->select.from->id;
+						local->select.m = local->select.n = 0;
+						return 0;
+					}
+					else if (local->select.count <= elem->len(elem)) {
+						local->select.from = local->select.to = elem;
+						local->select.fromid = local->select.toid;
+						local->select.m = local->select.n = local->select.count;
+						return 0;
+					}
+				}
+			}
+			return 0;
+		}
+		else {
+			local->select.from = local->select.to = local->select.start;
+			local->select.fromid = local->select.toid = local->select.from->id;
+			local->select.m = local->select.n = local->select.s;
+			return 1;
+		}
+	}
+	else if (e->key == SDLK_DOWN) {
+		if (local->select.from == local->select.to && local->select.m == local->select.n) {
+			if (self->parent->next->type == _ElemEnd) {
+				local->select.from = local->select.to = self->parent->childend;
+				local->select.fromid = local->select.toid = local->select.from->id;
+				local->select.m = local->select.n = 0;
+			}
+			else {
+				if (local->select.count < 0) {
+					local->select.count = m;
+					for (NewElement* elem = self->before; elem->type != _ElemEnd; elem = elem->before) {
+						local->select.count += elem->len(elem);
+					}
+				}
+				for (NewElement* elem = self->parent->next->childend->next; ; elem = elem->next) {
+					if (elem->type == _ElemEnd) {
+						local->select.from = local->select.to = elem;
+						local->select.fromid = local->select.toid = local->select.from->id;
+						local->select.m = local->select.n = 0;
+						return 0;
+					}
+					else if (local->select.count <= elem->len(elem)) {
+						local->select.from = local->select.to = elem;
+						local->select.fromid = local->select.toid;
+						local->select.m = local->select.n = local->select.count;
+						return 0;
+					}
+				}
+			}
+			return 0;
+		}
+		else {
+			local->select.from = local->select.to = local->select.end;
+			local->select.fromid = local->select.toid = local->select.from->id;
+			local->select.m = local->select.n = local->select.e;
+			return 1;
+		}
+	}
+	local->select.count = -1;
+	if (e->key == SDLK_UNKNOWN) {
+		AddText(thgc, local, letter, m, n, NULL);
+	}
+	if (e->key == SDLK_KP_ENTER || e->key == SDLK_RETURN) {
+		String* head = SubString(thgc, letter->text, 0, m);
+		String* tail = SubString(thgc, letter->text, n, letter->text->size);
+		NewLine* newline = (NewLine*)GC_alloc(thgc, _LineC);
+		initNewLine(thgc, newline);
+		NewNext(thgc, local, letter->parent, newline);
+		letter->text = head;
+		for (NewElement* elem = letter->next; elem->type != _ElemEnd; ) {
+			NewElement* nex = elem->next;
+			NewNext(thgc, local, newline->childend->before, nex);
+			elem = nex;
+		}
+		if (letter->next->type == LetterType::_Letter) {
+			NewLetter* let2 = (NewLetter*)letter->next;
+			AddText(thgc, local, let2, 0, 0, tail);
+		}
+		else {
+			NewLetter* let2 = (NewLetter*)GC_alloc(thgc, CType::_LetterC);
+			NewNext(thgc, local, letter, let2);
+		}
+		local->select.from = local->select.to = letter;
+		local->select.fromid = local->select.toid = local->select.from->id;
+		local->select.m = local->select.n = letter->text->size;
+		e->key = SDLK_UNKNOWN;
+		return 0;
+	}
+	else if (e->key == SDLK_BACKSPACE) {
+		if (local->select.from == local->select.to && local->select.m == local->select.n) {
+			if (m == 0) {
+				if (letter->before->type == _ElemEnd) {
+					if (letter->parent->before->type == _ElemEnd) return 0;
+					local->select.from = local->select.to = letter->parent->before->childend->before;
+					local->select.fromid = local->select.toid = local->select.from->id;
+					local->select.m = local->select.n = local->select.from->len(local->select.from);
+					UniteLine(thgc, local, (NewLine*)letter->parent->before, (NewLine*)letter->parent);
+				}
+				else {
+					if (letter->before->type == LetterType::_Letter) {
+						if (letter->parent->parent->editable) {
+							NewLetter* let = (NewLetter*)letter->before;
+							AddText(thgc, local, let, let->text->size - 1, let->text->size, NULL);
+							local->select.from = local->select.to = let;
+							local->select.fromid = local->select.toid = local->select.from->id;
+							local->select.m = local->select.n = let->text->size - 1;
+						}
+					}
+				}
+			}
+			else {
+				AddText(thgc, local, letter, m - 1, m, NULL);
+				local->select.m = local->select.n = m - 1;
+			}
+		}
+		else {
+			AddText(thgc, local, letter, m, n, NULL);
+			local->select.m = local->select.n = m;
+			e->key = SDLK_UNKNOWN;
+		}
+	}
+	else if (e->key == SDLK_DELETE) {
+		if (local->select.from == local->select.to && local->select.m == local->select.n) {
+			if (m == letter->text->size) {
+				if (letter->next->type == _ElemEnd) {
+					if (letter->parent->next->type == _ElemEnd) return 0;
+					local->select.from = local->select.to = letter->parent->childend->before;
+					local->select.fromid = local->select.toid = local->select.from->id;
+					local->select.m = local->select.n = local->select.from->len(local->select.from);
+					UniteLine(thgc, local, (NewLine*)letter->parent, (NewLine*)letter->parent->next);
+				}
+				else {
+					if (letter->next->type == LetterType::_Letter) {
+						if (letter->parent->parent->editable) {
+							NewLetter* let = (NewLetter*)letter->next;
+							AddText(thgc, local, let, 0, 1, NULL);
+							local->select.from = local->select.to = let;
+							local->select.fromid = local->select.toid = local->select.from->id;
+							local->select.m = local->select.n = 0;
+						}
+					}
+				}
+			}
+			else {
+				AddText(thgc, local, letter, m, m + 1, NULL);
+			}
+		}
+		else {
+			AddText(thgc, local, letter, m, n, NULL);
+			local->select.m = local->select.n = m;
+			e->key = SDLK_UNKNOWN;
+		}
+	}
+	else {
+		AddText(thgc, local, letter, m, n, e->text);
+		local->select.m += e->text->size;
+		local->select.n = local->select.m;
+	}
+	return -1;
 }

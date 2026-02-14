@@ -2,7 +2,7 @@
 void initNewLetter(ThreadGC* thgc, NewLetter* letter, FontId font, enum LetterType type);
 List* Compile(ThreadGC* thgc, String* str, FontId font) {
 	List* list = create_list(thgc, sizeof(List*), true);
-	List* list0 = create_list(thgc, sizeof(NewElement*), true);
+	List* list0 = create_list(thgc, sizeof(ATSSpan*), true);
 	add_list(thgc, list, (char*)list0);
 	int len = str->size / str->esize;
 	for (int i = 0; i < len; i++) {
@@ -11,8 +11,11 @@ List* Compile(ThreadGC* thgc, String* str, FontId font) {
 			int j = i + 1;
 			for (; ; j++) {
 				if (j >= len) {
-					NewLetter* letter = (NewLetter*)GC_alloc(thgc, _LetterC);
-					initNewLetter(thgc, letter, font, _Letter);
+					ATSSpan* letter = (ATSSpan*)GC_alloc(thgc, _ATSSpan);
+					letter->color = 0x000000FF;
+					letter->font = font;
+					letter->t = LetterType::_Name;
+					letter->start = i; letter->end = j;
 					letter->text = SubString(thgc, str, i, j - i);
 					add_list(thgc, list0, (char*)letter);
 					break;
@@ -22,8 +25,11 @@ List* Compile(ThreadGC* thgc, String* str, FontId font) {
 					continue;
 				}
 				else {
-					NewLetter* letter = (NewLetter*)GC_alloc(thgc, _LetterC);
-					initNewLetter(thgc, letter, font, _Letter);
+					ATSSpan* letter = (ATSSpan*)GC_alloc(thgc, _ATSSpan);
+					letter->color = 0x000000FF;
+					letter->font = font;
+					letter->t = LetterType::_Name;
+					letter->start = i; letter->end = j;
 					letter->text = SubString(thgc, str, i, j - i);
 					add_list(thgc, list0, (char*)letter);
 					break;
@@ -35,8 +41,11 @@ List* Compile(ThreadGC* thgc, String* str, FontId font) {
 			int j = i + 1;
 			for (; ; j++) {
 				if (j >= len) {
-					NewLetter* letter = (NewLetter*)GC_alloc(thgc, _LetterC);
-					initNewLetter(thgc, letter, font, _Number);
+					ATSSpan* letter = (ATSSpan*)GC_alloc(thgc, _ATSSpan);
+					letter->color = 0x000000FF;
+					letter->font = font;
+					letter->t = LetterType::_Number;
+					letter->start = i; letter->end = j;
 					letter->text = SubString(thgc, str, i, j - i);
 					add_list(thgc, list0, (char*)letter);
 					break;
@@ -46,8 +55,11 @@ List* Compile(ThreadGC* thgc, String* str, FontId font) {
 					continue;
 				}
 				else {
-					NewLetter* letter = (NewLetter*)GC_alloc(thgc, _LetterC);
-					initNewLetter(thgc, letter, font, _Number);
+					ATSSpan* letter = (ATSSpan*)GC_alloc(thgc, _ATSSpan);
+					letter->color = 0x000000FF;
+					letter->font = font;
+					letter->t = LetterType::_Number;
+					letter->start = i; letter->end = j;
 					letter->text = SubString(thgc, str, i, j - i);
 					add_list(thgc, list0, (char*)letter);
 					break;
@@ -59,9 +71,11 @@ List* Compile(ThreadGC* thgc, String* str, FontId font) {
 			int j = i + 1;
 			for (; ; j++) {
 				if (j >= len) {
-					NewLetter* letter = (NewLetter*)GC_alloc(thgc, _LetterC);
-					initNewLetter(thgc, letter,font, _Space);
-					letter->text = SubString(thgc, str, i, j - i);
+					ATSSpan* letter = (ATSSpan*)GC_alloc(thgc, _ATSSpan);
+					letter->color = 0x000000FF;
+					letter->font = font;
+					letter->t = LetterType::_Space;
+					letter->start = i; letter->end = j;
 					add_list(thgc, list0, (char*)letter);
 					break;
 				}
@@ -70,8 +84,11 @@ List* Compile(ThreadGC* thgc, String* str, FontId font) {
 					continue;
 				}
 				else {
-					NewLetter* letter = (NewLetter*)GC_alloc(thgc, _LetterC);
-					initNewLetter(thgc, letter, font, _Space);
+					ATSSpan* letter = (ATSSpan*)GC_alloc(thgc, _ATSSpan);
+					letter->color = 0x000000FF;
+					letter->font = font;
+					letter->t = LetterType::_Space;
+					letter->start = i; letter->end = j;
 					add_list(thgc, list0, (char*)letter);
 					break;
 				}
@@ -79,51 +96,67 @@ List* Compile(ThreadGC* thgc, String* str, FontId font) {
 			i = j - 1;
 		}
 		else if (c == '(') {
-			NewLetter* letter = (NewLetter*)GC_alloc(thgc, _LetterC);
-			initNewLetter(thgc, letter, font, _BracketL);
-			letter->text = createString(thgc, (char*)"(", 1, 1);
+			ATSSpan* letter = (ATSSpan*)GC_alloc(thgc, _ATSSpan);
+			letter->color = 0x000000FF;
+			letter->font = font;
+			letter->t = LetterType::_BracketL;
+			letter->start = i; letter->end = i + 1;
 			add_list(thgc, list0, (char*)letter);
 		}
 		else if (c == ')') {
-			NewLetter* letter = (NewLetter*)GC_alloc(thgc, _LetterC);
-			initNewLetter(thgc, letter, font, _BracketR);
-			letter->text = createString(thgc, (char*)")", 1, 1);
+			ATSSpan* letter = (ATSSpan*)GC_alloc(thgc, _ATSSpan);
+			letter->color = 0x000000FF;
+			letter->font = font;
+			letter->t = LetterType::_BracketR;
+			letter->start = i; letter->end = i + 1;
 			add_list(thgc, list0, (char*)letter);
 		}
 		else if (c == '[') {
-			NewLetter* letter = (NewLetter*)GC_alloc(thgc, _LetterC);
-			initNewLetter(thgc, letter, font, _BlockL);
-			letter->text = createString(thgc, (char*)"[", 1, 1);
+			ATSSpan* letter = (ATSSpan*)GC_alloc(thgc, _ATSSpan);
+			letter->color = 0x000000FF;
+			letter->font = font;
+			letter->t = LetterType::_BlockL;
+			letter->start = i; letter->end = i + 1;
 			add_list(thgc, list0, (char*)letter);
 		}
 		else if (c == ']') {
-			NewLetter* letter = (NewLetter*)GC_alloc(thgc, _LetterC);
-			initNewLetter(thgc, letter, font, _BlockR);
-			letter->text = createString(thgc, (char*)"]", 1, 1);
+			ATSSpan* letter = (ATSSpan*)GC_alloc(thgc, _ATSSpan);
+			letter->color = 0x000000FF;
+			letter->font = font;
+			letter->t = LetterType::_BlockR;
+			letter->start = i; letter->end = i + 1;
 			add_list(thgc, list0, (char*)letter);
 		}
 		else if (c == '{') {
-			NewLetter* letter = (NewLetter*)GC_alloc(thgc, _LetterC);
-			initNewLetter(thgc, letter, font, _BraceL);
-			letter->text = createString(thgc, (char*)"{", 1, 1);
+			ATSSpan* letter = (ATSSpan*)GC_alloc(thgc, _ATSSpan);
+			letter->color = 0x000000FF;
+			letter->font = font;
+			letter->t = LetterType::_BraceL;
+			letter->start = i; letter->end = i + 1;
 			add_list(thgc, list0, (char*)letter);
 		}
 		else if (c == '}') {
-			NewLetter* letter = (NewLetter*)GC_alloc(thgc, _LetterC);
-			initNewLetter(thgc, letter, font, _BraceR);
-			letter->text = createString(thgc, (char*)"}", 1, 1);
+			ATSSpan* letter = (ATSSpan*)GC_alloc(thgc, _ATSSpan);
+			letter->color = 0x000000FF;
+			letter->font = font;
+			letter->t = LetterType::_BraceR;
+			letter->start = i; letter->end = i + 1;
 			add_list(thgc, list0, (char*)letter);
 		}
 		else if (c == ';') {
-			NewLetter* letter = (NewLetter*)GC_alloc(thgc, _LetterC);
-			initNewLetter(thgc, letter, font, _Semicolon);
-			letter->text = createString(thgc, (char*)";", 1, 1);
+			ATSSpan* letter = (ATSSpan*)GC_alloc(thgc, _ATSSpan);
+			letter->color = 0x000000FF;
+			letter->font = font;
+			letter->t = LetterType::_Semicolon;
+			letter->start = i; letter->end = i + 1;
 			add_list(thgc, list0, (char*)letter);
 		}
 		else if (c == ',') {
-			NewLetter* letter = (NewLetter*)GC_alloc(thgc, _LetterC);
-			initNewLetter(thgc, letter, font, _Comma);
-			letter->text = createString(thgc, (char*)",", 1, 1);
+			ATSSpan* letter = (ATSSpan*)GC_alloc(thgc, _ATSSpan);
+			letter->color = 0x000000FF;
+			letter->font = font;
+			letter->t = LetterType::_Comma;
+			letter->start = i; letter->end = i + 1;
 			add_list(thgc, list0, (char*)letter);
 		}
 		else if (c == '\0') {
@@ -134,41 +167,53 @@ List* Compile(ThreadGC* thgc, String* str, FontId font) {
 			add_list(thgc, list, (char*)list0);
 		}
 		else if (c == '+') {
-			NewLetter* letter = (NewLetter*)GC_alloc(thgc, _LetterC);
-			initNewLetter(thgc, letter, font, _Plus);
-			letter->text = createString(thgc, (char*)"+", 1, 1);
+			ATSSpan* letter = (ATSSpan*)GC_alloc(thgc, _ATSSpan);
+			letter->color = 0x000000FF;
+			letter->font = font;
+			letter->t = LetterType::_Plus;
+			letter->start = i; letter->end = i + 1;
 			add_list(thgc, list0, (char*)letter);
 		}
 		else if (c == '-') {
-			NewLetter* letter = (NewLetter*)GC_alloc(thgc, _LetterC);
-			initNewLetter(thgc, letter, font, _Minus);
-			letter->text = createString(thgc, (char*)"-", 1, 1);
+			ATSSpan* letter = (ATSSpan*)GC_alloc(thgc, _ATSSpan);
+			letter->color = 0x000000FF;
+			letter->font = font;
+			letter->t = LetterType::_Minus;
+			letter->start = i; letter->end = i + 1;
 			add_list(thgc, list0, (char*)letter);
 		}
 		else if (c == '*') {
-			NewLetter* letter = (NewLetter*)GC_alloc(thgc, _LetterC);
-			initNewLetter(thgc, letter, font, _Mul);
-			letter->text = createString(thgc, (char*)"*", 1, 1);
+			ATSSpan* letter = (ATSSpan*)GC_alloc(thgc, _ATSSpan);
+			letter->color = 0x000000FF;
+			letter->font = font;
+			letter->t = LetterType::_Mul;
+			letter->start = i; letter->end = i + 1;
 			add_list(thgc, list0, (char*)letter);
 		}
 		else if (c == '/') {
-			NewLetter* letter = (NewLetter*)GC_alloc(thgc, _LetterC);
-			initNewLetter(thgc, letter, font, _Div);
-			letter->text = createString(thgc, (char*)"/", 1, 1);
+			ATSSpan* letter = (ATSSpan*)GC_alloc(thgc, _ATSSpan);
+			letter->color = 0x000000FF;
+			letter->font = font;
+			letter->t = LetterType::_Div;
+			letter->start = i; letter->end = i + 1;
 			add_list(thgc, list0, (char*)letter);
 		}
 		else if (c == '%') {
-			NewLetter* letter = (NewLetter*)GC_alloc(thgc, _LetterC);
-			initNewLetter(thgc, letter, font, _Mod);
-			letter->text = createString(thgc, (char*)"%", 1, 1);
+			ATSSpan* letter = (ATSSpan*)GC_alloc(thgc, _ATSSpan);
+			letter->color = 0x000000FF;
+			letter->font = font;
+			letter->t = LetterType::_Mod;
+			letter->start = i; letter->end = i + 1;
 			add_list(thgc, list0, (char*)letter);
 		}
 		else if (c == '=') {
-			NewLetter* letter = (NewLetter*)GC_alloc(thgc, _LetterC);
-			initNewLetter(thgc, letter, font, _Equal);
-			letter->text = createString(thgc, (char*)"=", 1, 1);
+			ATSSpan* letter = (ATSSpan*)GC_alloc(thgc, _ATSSpan);
+			letter->color = 0x000000FF;
+			letter->font = font;
+			letter->t = LetterType::_Equal;
+			letter->start = i; letter->end = i + 1;
 			add_list(thgc, list0, (char*)letter);
 		}
 	}
-	return list;
+	return list0;
 }
