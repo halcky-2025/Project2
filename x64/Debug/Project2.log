@@ -1,106 +1,88 @@
 ﻿  main.cpp
 C:\Users\hayah\source\repos\Project2\Project2\main.cpp(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
 C:\Users\hayah\Downloads\libtorch-win-shared-with-deps-debug-2.6.0+cu126\libtorch\include\torch\csrc\api\include\torch\nn\options\fold.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
-  (compiling source file 'main.cpp')
+  (ソース ファイル 'main.cpp' をコンパイルしています)
   
 C:\C2\include\libavutil\rational.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
-  (compiling source file 'main.cpp')
+  (ソース ファイル 'main.cpp' をコンパイルしています)
   
 C:\Users\hayah\source\repos\Project2\Project2\threed.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
-  (compiling source file 'main.cpp')
+  (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\threed.h(794,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
-  (compiling source file 'main.cpp')
+C:\Users\hayah\source\repos\Project2\Project2\threed.h(811,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
+  (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\arr.h(592,12): warning C4477: 'printf' : 書式文字列 '%d' には、型 'int' の引数が必要ですが、可変個引数 1 は型 'char *' です
-  (compiling source file 'main.cpp')
+C:\Users\hayah\source\repos\Project2\Project2\arr.h(593,12): warning C4477: 'printf' : 書式文字列 '%d' には、型 'int' の引数が必要ですが、可変個引数 1 は型 'char *' です
+  (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\arr.h(592,12): warning C4313: 'printf': 書式文字列内の '%d' が引数 1 ('char *' 型) と競合しています
-  (compiling source file 'main.cpp')
+C:\Users\hayah\source\repos\Project2\Project2\arr.h(593,12): warning C4313: 'printf': 書式文字列内の '%d' が引数 1 ('char *' 型) と競合しています
+  (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\arr.h(595,12): warning C4477: 'printf' : 書式文字列 '%f' には、型 'double' の引数が必要ですが、可変個引数 1 は型 'char *' です
-  (compiling source file 'main.cpp')
+C:\Users\hayah\source\repos\Project2\Project2\arr.h(596,12): warning C4477: 'printf' : 書式文字列 '%f' には、型 'double' の引数が必要ですが、可変個引数 1 は型 'char *' です
+  (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\arr.h(783,13): warning C4311: '型キャスト': ポインターを 'char *' から 'long' へ切り詰めます。
-  (compiling source file 'main.cpp')
+C:\Users\hayah\source\repos\Project2\Project2\arr.h(789,13): warning C4311: '型キャスト': ポインターを 'char *' から 'long' へ切り詰めます。
+  (ソース ファイル 'main.cpp' をコンパイルしています)
   
 C:\Users\hayah\source\repos\Project2\Project2\elem.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
-  (compiling source file 'main.cpp')
+  (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\elem.h(64,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'MemFunc' の左辺を無視します。
-  (compiling source file 'main.cpp')
+C:\Users\hayah\source\repos\Project2\Project2\elem.h(62,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'MemObj' の左辺を無視します。
+  (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\elem.h(70,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'PointI' の左辺を無視します。
-  (compiling source file 'main.cpp')
+C:\Users\hayah\source\repos\Project2\Project2\elem.h(68,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'MemFunc' の左辺を無視します。
+  (ソース ファイル 'main.cpp' をコンパイルしています)
+  
+C:\Users\hayah\source\repos\Project2\Project2\elem.h(74,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'PointI' の左辺を無視します。
+  (ソース ファイル 'main.cpp' をコンパイルしています)
+  
+C:\Users\hayah\source\repos\Project2\Project2\newelem.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
+  (ソース ファイル 'main.cpp' をコンパイルしています)
   
 C:\Users\hayah\source\repos\Project2\Project2\newelem.h(12,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'NewElement' の左辺を無視します。
-  (compiling source file 'main.cpp')
+  (ソース ファイル 'main.cpp' をコンパイルしています)
   
 C:\Users\hayah\source\repos\Project2\Project2\newelem.h(13,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'DrawCommand' の左辺を無視します。
-  (compiling source file 'main.cpp')
+  (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\newelem.h(121,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'Background' の左辺を無視します。
-  (compiling source file 'main.cpp')
+C:\Users\hayah\source\repos\Project2\Project2\Compile.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
+  (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\newelem.h(133,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'Offscreen' の左辺を無視します。
-  (compiling source file 'main.cpp')
-  
-C:\Users\hayah\source\repos\Project2\Project2\newelem.h(134,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'NewEndElement' の左辺を無視します。
-  (compiling source file 'main.cpp')
-  
-C:\Users\hayah\source\repos\Project2\Project2\newelem.h(149,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'NewElement' の左辺を無視します。
-  (compiling source file 'main.cpp')
-  
-C:\Users\hayah\source\repos\Project2\Project2\newelem.h(168,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'NewLocal' の左辺を無視します。
-  (compiling source file 'main.cpp')
-  
-C:\Users\hayah\source\repos\Project2\Project2\newelem.h(197,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'NewLocal' の左辺を無視します。
-  (compiling source file 'main.cpp')
-  
-C:\Users\hayah\source\repos\Project2\Project2\newelem.h(207,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'Offscreen' の左辺を無視します。
-  (compiling source file 'main.cpp')
-  
-C:\Users\hayah\source\repos\Project2\Project2\newelem.h(224,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'NewLine' の左辺を無視します。
-  (compiling source file 'main.cpp')
-  
-C:\Users\hayah\source\repos\Project2\Project2\newelem.h(227,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'NewLetter' の左辺を無視します。
-  (compiling source file 'main.cpp')
-  
-C:\Users\hayah\source\repos\Project2\Project2\elem.h(830,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
-  (compiling source file 'main.cpp')
+C:\Users\hayah\source\repos\Project2\Project2\elem.h(814,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
+  (ソース ファイル 'main.cpp' をコンパイルしています)
   
 C:\Users\hayah\source\repos\Project2\Project2\opt.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
-  (compiling source file 'main.cpp')
+  (ソース ファイル 'main.cpp' をコンパイルしています)
   
 C:\Users\hayah\source\repos\Project2\Project2\ugui.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
-  (compiling source file 'main.cpp')
+  (ソース ファイル 'main.cpp' をコンパイルしています)
   
 C:\Users\hayah\source\repos\Project2\Project2\shader.h(612,43): warning C5055: 演算子 '<=': 列挙型と浮動小数点型の間では非推奨です
-  (compiling source file 'main.cpp')
+  (ソース ファイル 'main.cpp' をコンパイルしています)
   
 C:\Users\hayah\source\repos\Project2\Project2\shader.h(612,73): warning C5055: 演算子 '<=': 列挙型と浮動小数点型の間では非推奨です
-  (compiling source file 'main.cpp')
+  (ソース ファイル 'main.cpp' をコンパイルしています)
   
 C:\Users\hayah\source\repos\Project2\Project2\thumnailAtlas.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
-  (compiling source file 'main.cpp')
+  (ソース ファイル 'main.cpp' をコンパイルしています)
   
 C:\Users\hayah\source\repos\Project2\Project2\thumnailAtlas.h(802,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
-  (compiling source file 'main.cpp')
+  (ソース ファイル 'main.cpp' をコンパイルしています)
   
 C:\Users\hayah\source\repos\Project2\Project2\thumnailAtlas.h(1593,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
-  (compiling source file 'main.cpp')
+  (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\ugui.h(778,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
-  (compiling source file 'main.cpp')
+C:\Users\hayah\source\repos\Project2\Project2\ugui.h(770,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
+  (ソース ファイル 'main.cpp' をコンパイルしています)
   
 C:\Users\hayah\source\repos\Project2\Project2\extorch.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
-  (compiling source file 'main.cpp')
+  (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\extorch.h(779,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
-  (compiling source file 'main.cpp')
+C:\Users\hayah\source\repos\Project2\Project2\extorch.h(795,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
+  (ソース ファイル 'main.cpp' をコンパイルしています)
   
 C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\optional(82,17): warning C4267: '初期化中': 'size_t' から 'int' に変換しました。データが失われているかもしれません。
-  (compiling source file 'main.cpp')
+  (ソース ファイル 'main.cpp' をコンパイルしています)
       C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\optional(82,17):
       テンプレートインスタンス化コンテキスト (最初に最も古いもの) は
           C:\Users\hayah\Downloads\libtorch-win-shared-with-deps-debug-2.6.0+cu126\libtorch\include\ATen\core\function_schema.h(438,9):
@@ -118,7 +100,7 @@ C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\
           [
               _Ty=int
           ]
-          C:\Users\hayah\source\repos\Project2\Project2\main.cpp(544,1):
+          C:\Users\hayah\source\repos\Project2\Project2\main.cpp(532,1):
           コンパイル対象の関数 テンプレート インスタンス化 'std::_Optional_destruct_base<_Ty,true>::_Optional_destruct_base<const unsigned __int64>(std::in_place_t,const unsigned __int64 &&) noexcept' のリファレンスを確認してください
           with
           [
@@ -130,7 +112,7 @@ C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\
 C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\xutility(508,64): warning C4267:         [
 C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\xutility(508,64): warning C4267:             _Ty=unsigned int
 C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\xutility(508,64): warning C4267:         ]
-  (compiling source file 'main.cpp')
+  (ソース ファイル 'main.cpp' をコンパイルしています)
       C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\xutility(508,64):
       テンプレートインスタンス化コンテキスト (最初に最も古いもの) は
           C:\Users\hayah\Downloads\libtorch-win-shared-with-deps-debug-2.6.0+cu126\libtorch\include\torch\csrc\dynamo\compiled_autograd.h(150,23):
@@ -167,14 +149,14 @@ C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\
           ]
   
 C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\xutility(522,61): warning C4267: '初期化中': 'size_t' から 'unsigned int' に変換しました。データが失われているかもしれません。
-  (compiling source file 'main.cpp')
+  (ソース ファイル 'main.cpp' をコンパイルしています)
   
 C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\xutility(508,64): warning C4267: '初期化中': 'size_t' から '_Ty' に変換しました。データが失われているかもしれません。
 C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\xutility(508,64): warning C4267:         with
 C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\xutility(508,64): warning C4267:         [
 C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\xutility(508,64): warning C4267:             _Ty=int
 C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\xutility(508,64): warning C4267:         ]
-  (compiling source file 'main.cpp')
+  (ソース ファイル 'main.cpp' をコンパイルしています)
       C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\xutility(508,64):
       テンプレートインスタンス化コンテキスト (最初に最も古いもの) は
           C:\Users\hayah\Downloads\libtorch-win-shared-with-deps-debug-2.6.0+cu126\libtorch\include\torch\csrc\dynamo\compiled_autograd.h(537,26):
@@ -211,14 +193,14 @@ C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\
           ]
   
 C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\xutility(522,61): warning C4267: '初期化中': 'size_t' から 'int' に変換しました。データが失われているかもしれません。
-  (compiling source file 'main.cpp')
+  (ソース ファイル 'main.cpp' をコンパイルしています)
   
 C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\utility(274,16): warning C4267: '初期化中': 'size_t' から '_Ty1' に変換しました。データが失われているかもしれません。
 C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\utility(274,16): warning C4267:         with
 C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\utility(274,16): warning C4267:         [
 C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\utility(274,16): warning C4267:             _Ty1=int
 C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\utility(274,16): warning C4267:         ]
-  (compiling source file 'main.cpp')
+  (ソース ファイル 'main.cpp' をコンパイルしています)
       C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\utility(274,16):
       テンプレートインスタンス化コンテキスト (最初に最も古いもの) は
           C:\Users\hayah\Downloads\libtorch-win-shared-with-deps-debug-2.6.0+cu126\libtorch\include\torch\csrc\dynamo\compiled_autograd.h(531,33):
@@ -259,7 +241,7 @@ C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\
 C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\xutility(509,69): warning C4267:         [
 C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\xutility(509,69): warning C4267:             _Ty=unsigned int
 C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\xutility(509,69): warning C4267:         ]
-  (compiling source file 'main.cpp')
+  (ソース ファイル 'main.cpp' をコンパイルしています)
       C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\xutility(509,69):
       テンプレートインスタンス化コンテキスト (最初に最も古いもの) は
           C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\vector(860,18):
@@ -280,7 +262,7 @@ C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\
 C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\xutility(509,69): warning C4267:         [
 C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\xutility(509,69): warning C4267:             _Ty=int
 C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\xutility(509,69): warning C4267:         ]
-  (compiling source file 'main.cpp')
+  (ソース ファイル 'main.cpp' をコンパイルしています)
       C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\xutility(509,69):
       テンプレートインスタンス化コンテキスト (最初に最も古いもの) は
           C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\vector(860,18):

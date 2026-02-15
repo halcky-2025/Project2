@@ -419,7 +419,7 @@ int main() {
                     // UTF-32 �� UTF-16
                     uint16_t utf16Buf[512];
                     size_t utf16len = utf32_to_utf16(utf32Buf, (size_t)utf32len, utf16Buf);
-                    str = createString(hoppy->target, (char*)utf16Buf, utf16len * 2, 2);
+                    str = createString(hoppy->target, (char*)utf16Buf, utf16len, 2);
                     e.text = str;
 					auto ke = KeyButton(hoppy, &e);
 					hoppy->target->queue->push(ke.coro);

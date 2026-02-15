@@ -35,7 +35,13 @@ enum SizeType {
 enum LetterType {
 	_None, _ElemEnd, _Main, _End, _Kaigyou, _Line, _VLine, _Letter, _CloneElem,
 	_Name, _Number, _BracketL, _BracketR, _BlockL, _BlockR, _BraceL, _BraceR, _Semicolon, _Comma, _Plus, _Minus, _Mul, _Div, _Mod,
-	_Space, _Equal
+	_Space, _Equal,
+	_Str, _Decimal, _Sharp, _Dot, _Bou, _Not, _LessThan, _MoreThan,
+	_Question, _Mountain, _Nyoro, _NyoroNyoro, _NyoroNyoroNyoro,
+	_Dolor, _Left, _Right, _HLetter, _StringTag, _AtLetter, _RightRight,
+	_Colon, _And, _Percent, _EqualEqual, _NotEqual, _LessEqual, _MoreEqual, _CommentSingle,
+	_Obj,
+	OT_Call1, OT_Call2, OT_Bracket, OT_Block, OT_Comment, OT_Dot, OT_Left, OT_Right, OT_None
 };
 class FontAtlas;
 #ifndef __MACTYPES__  // Avoid conflict with MacTypes.h Point on Apple platforms
@@ -256,7 +262,7 @@ typedef struct TreeElement {
 } TreeElement;
 void TreeElementAdd(ThreadGC* thgc, NewLocal* local, TreeElement* self, TreeElement* child) {
 	if (self->children == NULL) {
-		self->children = create_list(thgc, sizeof(TreeElement*), true);
+		self->children = create_list(thgc, sizeof(TreeElement*), _List);
 	}
 	add_list(thgc, self->children, (char*)child);
 	child->parent = self;
@@ -329,8 +335,8 @@ void createSurface(Element* elem, int w, int h) {
 	attPong[0].init(elem->texPong);  // color attachment
 	attPong[1].init(depthPong);       // depth attachment
 
-	elem->fbPing = bgfx::createFrameBuffer(2, attPing, true);
-	elem->fbPong = bgfx::createFrameBuffer(2, attPong, true);
+	elem->fbPing = bgfx::createFrameBuffer(2, attPing, _List);
+	elem->fbPong = bgfx::createFrameBuffer(2, attPong, _List);
 }
 Element;
 typedef struct HoppyWindow {
@@ -473,13 +479,13 @@ void initLocal(ThreadGC* thgc, Local* local, HoppyWindow* window) {
 	initElement(thgc, (Element*)local);
 	Select* select = (Select*)GC_malloc(thgc, _Select);
 	select->state = (State*)GC_malloc(thgc, _State);
-	select->state->elements = create_list(thgc, sizeof(Element*), true);
+	select->state->elements = create_list(thgc, sizeof(Element*), _List);
 	Element* elem = (Element*)GC_malloc(thgc, _Element);
 	initElement(thgc, elem);
 	add_list(thgc, select->state->elements, (char*)elem);
 	local->selects[0] = local->selects[1] = select;
 	local->window = window;
-	local->temap = create_mapy(thgc, true);
+	local->temap = create_mapy(thgc, _List);
 }
 void Next(Element* self, Element* elem) {
 	elem->parent = self->parent;
@@ -541,9 +547,9 @@ void ElementAdd(ThreadGC* thgc, Element* self , Element* elem) {
 }
 State* StateClone(ThreadGC* thgc, State* self) {
 	State* state = (State*)GC_malloc(thgc, _State);
-	state->elements = create_list(thgc, sizeof(Element*), true);
+	state->elements = create_list(thgc, sizeof(Element*), _List);
 	for(int i = 0; i < self->elements->size; i++) add_list(thgc, state->elements, *get_list(self->elements, i));
-	state->histories = create_list(thgc, sizeof(Element*), true);
+	state->histories = create_list(thgc, sizeof(Element*), _List);
 	state->n = self->n;
 	return state;
 }
@@ -555,8 +561,8 @@ void StateUpdate(State* self) {
 	}
 }
 void initState(ThreadGC* thgc, State* self) {
-	self->elements = create_list(thgc, sizeof(Element*), true);
-	self->histories = create_list(thgc, sizeof(Element*), true);
+	self->elements = create_list(thgc, sizeof(Element*), _List);
+	self->histories = create_list(thgc, sizeof(Element*), _List);
 	self->n = 0;
 }
 Element* ElementMeasure(ThreadGC* thgc, Element* self, Measure* m, Local* local, int* order) {
@@ -619,7 +625,7 @@ int ElementMouse(ThreadGC* thgc, Element* self, MouseEvent* e, Local* local) {
 	if (self->GoMouseDown != NULL) {
 		MemObj* mo = (MemObj*)clone_object(thgc, (char*)self->GoMouseDown->obj);
 		MemTable* res = (MemTable*)GC_malloc(thgc, _MemTable);
-		res->table = (Map*)create_mapy(thgc, true);
+		res->table = (Map*)create_mapy(thgc, _List);
 		MemInsert(thgc, res, _MouseEvent, (ModelVal*)e);
 		mo->req = NULL; mo->res = res;
 		auto rn = GC_AddRoot(thgc);
@@ -649,7 +655,7 @@ int ElementMouse(ThreadGC* thgc, Element* self, MouseEvent* e, Local* local) {
 		if (self->BackMouseDown != NULL) {
 			MemObj* mo = (MemObj*)clone_object(thgc, (char*)self->BackMouseDown->obj);
 			MemTable* res = (MemTable*)GC_malloc(thgc, _MemTable);
-			res->table = (Map*)create_mapy(thgc, true);
+			res->table = (Map*)create_mapy(thgc, _List);
 			MemInsert(thgc, res, _MouseEvent, (ModelVal*)e);
 			mo->req = NULL; mo->res = res;
 			auto rn = GC_AddRoot(thgc);
@@ -665,7 +671,7 @@ int ElementMouse(ThreadGC* thgc, Element* self, MouseEvent* e, Local* local) {
 			if (self->BackMouseDown != NULL) {
 				MemObj* mo = (MemObj*)clone_object(thgc, (char*)self->BackMouseDown->obj);
 				MemTable* res = (MemTable*)GC_malloc(thgc, _MemTable);
-				res->table = (Map*)create_mapy(thgc, true);
+				res->table = (Map*)create_mapy(thgc, _List);
 				MemInsert(thgc, res, _MouseEvent, (ModelVal*)e);
 				mo->req = NULL; mo->res = res;
 				auto rn = GC_AddRoot(thgc);
@@ -698,7 +704,7 @@ head2:
 	if (self->BackMouseDown != NULL) {
 		MemObj* mo = (MemObj*)clone_object(thgc, (char*)self->BackMouseDown->obj);
 		MemTable* res = (MemTable*)GC_malloc(thgc, _MemTable);
-		res->table = (Map*)create_mapy(thgc, true);
+		res->table = (Map*)create_mapy(thgc, _List);
 		MemInsert(thgc, res, _MouseEvent, (ModelVal*)e);
 		mo->req = NULL; mo->res = res;
 		auto rn = GC_AddRoot(thgc);
@@ -722,7 +728,7 @@ int ElementKey(ThreadGC* thgc, Element* self, KeyEvent* e, Local* local, bool* s
 		if (self->GoKeyDown != NULL) {
 			MemObj* mo = (MemObj*)clone_object(thgc, (char*)self->GoKeyDown->obj);
 			MemTable* res = (MemTable*)GC_malloc(thgc, _MemTable);
-			res->table = (Map*)create_mapy(thgc, true);
+			res->table = (Map*)create_mapy(thgc, _List);
 			MemInsert(thgc, res, _KeyEvent, (ModelVal*)e);
 			mo->req = NULL; mo->res = res;
 			auto rn = GC_AddRoot(thgc);
@@ -738,7 +744,7 @@ int ElementKey(ThreadGC* thgc, Element* self, KeyEvent* e, Local* local, bool* s
 		if (self->BackKeyDown != NULL) {
 			MemObj* mo = (MemObj*)clone_object(thgc, (char*)self->BackKeyDown->obj);
 			MemTable* res = (MemTable*)GC_malloc(thgc, _MemTable);
-			res->table = (Map*)create_mapy(thgc, true);
+			res->table = (Map*)create_mapy(thgc, _List);
 			MemInsert(thgc, res, _KeyEvent, (ModelVal*)e);
 			mo->req = NULL; mo->res = res;
 			auto rn = GC_AddRoot(thgc);
@@ -777,7 +783,7 @@ void initElement(ThreadGC* thgc, Element* self) {
 	self->type = (LetterType)0;
 	self->align = Left;
 	self->index = 0;
-	self->groups = create_list(thgc, sizeof(Element*), true);
+	self->groups = create_list(thgc, sizeof(Element*), _List);
 	self->Measure = ElementMeasure;
 	self->Draw = ElementDraw;
 	self->Mouse = ElementMouse;
@@ -805,7 +811,7 @@ void initElement2(ThreadGC* thgc, Element* self, Element* parent) {
 	self->type = (LetterType)0;
 	self->align = Left;
 	self->index = 0;
-	self->groups = create_list(thgc, sizeof(Element*), true);
+	self->groups = create_list(thgc, sizeof(Element*), _List);
 	self->Measure = ElementMeasure;
 	self->Draw = ElementDraw;
 	self->Mouse = ElementMouse;
@@ -994,7 +1000,7 @@ int LineMouse(ThreadGC* thgc, Element* self, MouseEvent* e, Local* local) {
 	if (self->GoMouseDown != NULL) {
 		MemObj* mo = (MemObj*)clone_object(thgc, (char*)self->GoMouseDown->obj);
 		MemTable* res = (MemTable*)GC_malloc(thgc, _MemTable);
-		res->table = (Map*)create_mapy(thgc, true);
+		res->table = (Map*)create_mapy(thgc, _List);
 		MemInsert(thgc, res, _MouseEvent, (ModelVal*)e);
 		mo->req = NULL; mo->res = res;
 		auto rn = GC_AddRoot(thgc);
@@ -1031,7 +1037,7 @@ int LineMouse(ThreadGC* thgc, Element* self, MouseEvent* e, Local* local) {
 				if (self->BackMouseDown != NULL) {
 					MemObj* mo = (MemObj*)clone_object(thgc, (char*)self->BackMouseDown->obj);
 					MemTable* res = (MemTable*)GC_malloc(thgc, _MemTable);
-					res->table = (Map*)create_mapy(thgc, true);
+					res->table = (Map*)create_mapy(thgc, _List);
 					MemInsert(thgc, res, _MouseEvent, (ModelVal*)e);
 					mo->req = NULL; mo->res = res;
 					auto rn = GC_AddRoot(thgc);
@@ -1055,7 +1061,7 @@ int LineMouse(ThreadGC* thgc, Element* self, MouseEvent* e, Local* local) {
 		if (self->BackMouseDown != NULL) {
 			MemObj* mo = (MemObj*)clone_object(thgc, (char*)self->BackMouseDown->obj);
 			MemTable* res = (MemTable*)GC_malloc(thgc, _MemTable);
-			res->table = (Map*)create_mapy(thgc, true);
+			res->table = (Map*)create_mapy(thgc, _List);
 			MemInsert(thgc, res, _MouseEvent, (ModelVal*)e);
 			mo->req = NULL; mo->res = res;
 			auto rn = GC_AddRoot(thgc);
@@ -1087,7 +1093,7 @@ int LineKey(ThreadGC* thgc, Element* self, KeyEvent* e, Local* local, bool* sele
 		if (self->GoKeyDown != NULL) {
 			MemObj* mo = (MemObj*)clone_object(thgc, (char*)self->GoKeyDown->obj);
 			MemTable* res = (MemTable*)GC_malloc(thgc, _MemTable);
-			res->table = (Map*)create_mapy(thgc, true);
+			res->table = (Map*)create_mapy(thgc, _List);
 			MemInsert(thgc, res, _KeyEvent, (ModelVal*)e);
 			mo->req = NULL; mo->res = res;
 			auto rn = GC_AddRoot(thgc);
@@ -1105,7 +1111,7 @@ int LineKey(ThreadGC* thgc, Element* self, KeyEvent* e, Local* local, bool* sele
 		if (self->BackKeyDown != NULL) {
 			MemObj* mo = (MemObj*)clone_object(thgc, (char*)self->BackKeyDown->obj);
 			MemTable* res = (MemTable*)GC_malloc(thgc, _MemTable);
-			res->table = (Map*)create_mapy(thgc, true);
+			res->table = (Map*)create_mapy(thgc, _List);
 			MemInsert(thgc, res, _KeyEvent, (ModelVal*)e);
 			mo->req = NULL; mo->res = res;
 			auto rn = GC_AddRoot(thgc);
@@ -1281,7 +1287,7 @@ int LetterMouse(ThreadGC* thgc, Element* self, MouseEvent* e, Local* local) {
 			if (self->GoMouseDown != NULL) {
 				MemObj* mo = (MemObj*)clone_object(thgc, (char*)self->GoMouseDown->obj);
 				MemTable* res = (MemTable*)GC_malloc(thgc, _MemTable);
-				res->table = (Map*)create_mapy(thgc, true);
+				res->table = (Map*)create_mapy(thgc, _List);
 				MemInsert(thgc, res, _MouseEvent, (ModelVal*)e);
 				mo->req = NULL; mo->res = res;
 				auto rn = GC_AddRoot(thgc);
@@ -1294,12 +1300,12 @@ int LetterMouse(ThreadGC* thgc, Element* self, MouseEvent* e, Local* local) {
 			size_t n;
 			float hei;
 			if (letter->value->atlas == NULL) return -2;
-			MeasureString(*letter->value->atlas, let->text, let->text->size / let->text->esize, e->x - self->pos2.x - self->pos.x, &width, &hei, &n);
+			MeasureString(*letter->value->atlas, let->text, let->text->size, e->x - self->pos2.x - self->pos.x, &width, &hei, &n);
 
 			if (self->BackMouseDown != NULL) {
 				MemObj* mo = (MemObj*)clone_object(thgc, (char*)self->BackMouseDown->obj);
 				MemTable* res = (MemTable*)GC_malloc(thgc, _MemTable);
-				res->table = (Map*)create_mapy(thgc, true);
+				res->table = (Map*)create_mapy(thgc, _List);
 				MemInsert(thgc, res, _MouseEvent, (ModelVal*)e);
 				mo->req = NULL; mo->res = res;
 				auto rn = GC_AddRoot(thgc);
@@ -1338,7 +1344,7 @@ int LetterKey(ThreadGC* thgc, Element* self, KeyEvent* e, Local* local, bool* se
 			if (self->BackKeyDown != NULL) {
 				MemObj* mo = (MemObj*)clone_object(thgc, (char*)self->BackKeyDown->obj);
 				MemTable* res = (MemTable*)GC_malloc(thgc, _MemTable);
-				res->table = (Map*)create_mapy(thgc, true);
+				res->table = (Map*)create_mapy(thgc, _List);
 				MemInsert(thgc, res, _KeyEvent, (ModelVal*)e);
 				mo->req = NULL; mo->res = res;
 				auto rn = GC_AddRoot(thgc);
@@ -1368,7 +1374,7 @@ int LetterKey(ThreadGC* thgc, Element* self, KeyEvent* e, Local* local, bool* se
 				if (self->GoKeyDown != NULL) {
 					MemObj* mo = (MemObj*)clone_object(thgc, (char*)self->GoKeyDown->obj);
 					MemTable* res = (MemTable*)GC_malloc(thgc, _MemTable);
-					res->table = (Map*)create_mapy(thgc, true);
+					res->table = (Map*)create_mapy(thgc, _List);
 					MemInsert(thgc, res, _KeyEvent, (ModelVal*)e);
 					mo->req = NULL; mo->res = res;
 					auto rn = GC_AddRoot(thgc);
@@ -1382,7 +1388,7 @@ int LetterKey(ThreadGC* thgc, Element* self, KeyEvent* e, Local* local, bool* se
 					if (self->BackKeyDown != NULL) {
 						MemObj* mo = (MemObj*)clone_object(thgc, (char*)self->BackKeyDown->obj);
 						MemTable* res = (MemTable*)GC_malloc(thgc, _MemTable);
-						res->table = (Map*)create_mapy(thgc, true);
+						res->table = (Map*)create_mapy(thgc, _List);
 						MemInsert(thgc, res, _KeyEvent, (ModelVal*)e);
 						mo->req = NULL; mo->res = res;
 						auto rn = GC_AddRoot(thgc);
@@ -1917,7 +1923,7 @@ int KaigyouKey(ThreadGC* thgc, Element* self, KeyEvent* e, Local* local, bool* s
 			if (self->BackKeyDown != NULL) {
 				MemObj* mo = (MemObj*)clone_object(thgc, (char*)self->BackKeyDown->obj);
 				MemTable* res = (MemTable*)GC_malloc(thgc, _MemTable);
-				res->table = (Map*)create_mapy(thgc, true);
+				res->table = (Map*)create_mapy(thgc, _List);
 				MemInsert(thgc, res, _KeyEvent, (ModelVal*)e);
 				mo->req = NULL; mo->res = res;
 				auto rn = GC_AddRoot(thgc);
@@ -1952,7 +1958,7 @@ int KaigyouKey(ThreadGC* thgc, Element* self, KeyEvent* e, Local* local, bool* s
 				if (self->GoKeyDown != NULL) {
 					MemObj* mo = (MemObj*)clone_object(thgc, (char*)self->GoKeyDown->obj);
 					MemTable* res = (MemTable*)GC_malloc(thgc, _MemTable);
-					res->table = (Map*)create_mapy(thgc, true);
+					res->table = (Map*)create_mapy(thgc, _List);
 					MemInsert(thgc, res, _KeyEvent, (ModelVal*)e);
 					mo->req = NULL; mo->res = res;
 					auto rn = GC_AddRoot(thgc);
@@ -1966,7 +1972,7 @@ int KaigyouKey(ThreadGC* thgc, Element* self, KeyEvent* e, Local* local, bool* s
 					if (self->BackKeyDown != NULL) {
 						MemObj* mo = (MemObj*)clone_object(thgc, (char*)self->BackKeyDown->obj);
 						MemTable* res = (MemTable*)GC_malloc(thgc, _MemTable);
-						res->table = (Map*)create_mapy(thgc, true);
+						res->table = (Map*)create_mapy(thgc, _List);
 						MemInsert(thgc, res, _KeyEvent, (ModelVal*)e);
 						mo->req = NULL; mo->res = res;
 						auto rn = GC_AddRoot(thgc);

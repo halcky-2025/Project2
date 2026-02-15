@@ -54,7 +54,7 @@ TreeElement* checkTreeElement(ThreadGC* thgc, NewLocal* local, TreeElement* pare
 		te = (TreeElement*)GC_alloc(thgc, _TreeElement);
 		te->elem = elem;
 		te->id = id;
-		te->children = create_list(thgc, sizeof(TreeElement*), true);
+		te->children = create_list(thgc, sizeof(TreeElement*), _List);
 		if ((op & Minus) == Minus) {
 			return NULL;
 		}
