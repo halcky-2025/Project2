@@ -34,25 +34,25 @@ struct LayerInfo {
 		}
 	}
 
-	// ƒRƒs[‚ğ‹Ö~iƒ_ƒuƒ‹ delete –h~j
+	// ï¿½Rï¿½sï¿½[ï¿½ï¿½ï¿½Ö~ï¿½iï¿½_ï¿½uï¿½ï¿½ delete ï¿½hï¿½~ï¿½j
 	LayerInfo(const LayerInfo&) = delete;
 	LayerInfo& operator=(const LayerInfo&) = delete;
 
-	// ƒ€[ƒu‚Í‹–‰Â
+	// ï¿½ï¿½ï¿½[ï¿½uï¿½Í‹ï¿½ï¿½ï¿½
 	LayerInfo(LayerInfo&& other) noexcept
 		: cmds(std::move(other.cmds))
-		// ... ‘¼‚Ìƒƒ“ƒo[‚àƒ€[ƒu ...
+		// ... ï¿½ï¿½ï¿½Ìƒï¿½ï¿½ï¿½ï¿½oï¿½[ï¿½ï¿½ï¿½ï¿½ï¿½[ï¿½u ...
 	{
 	}
 
 	LayerInfo& operator=(LayerInfo&& other) noexcept {
 		if (this != &other) {
-			// Šù‘¶‚ÌƒRƒ}ƒ“ƒh‚ğ‰ğ•ú
+			// ï¿½ï¿½ï¿½ï¿½ï¿½ÌƒRï¿½}ï¿½ï¿½ï¿½hï¿½ï¿½ï¿½ï¿½ï¿½
 			for (auto* cmd : cmds) {
 				delete cmd;
 			}
 			cmds = std::move(other.cmds);
-			// ... ‘¼‚Ìƒƒ“ƒo[‚àƒ€[ƒu ...
+			// ... ï¿½ï¿½ï¿½Ìƒï¿½ï¿½ï¿½ï¿½oï¿½[ï¿½ï¿½ï¿½ï¿½ï¿½[ï¿½u ...
 		}
 		return *this;
 	}
@@ -261,6 +261,7 @@ struct ATSSpan {
 	uint32_t color;
 	String* text;
 	LetterType t;
+	String* error;
 };
 struct StyleSpan {
 	int start, end;
@@ -311,18 +312,18 @@ void SetChildIds(NewElement* elem) {
 	uint64_t startId = elem->id;
 	uint64_t endId = elem->childend->id;
 
-	// q—v‘f‚Ì”‚ğ”‚¦‚é
+	// ï¿½qï¿½vï¿½fï¿½Ìï¿½ï¿½ğ”‚ï¿½ï¿½ï¿½
 	int childCount = 0;
 	for (auto el = elem->childend->next; el->type != LetterType::_ElemEnd; el = el->next) {
 		childCount++;
 		if (el->childend != NULL) {
-			childCount++;  // childend•ª‚à
+			childCount++;  // childendï¿½ï¿½ï¿½ï¿½
 		}
 	}
 
 	if (childCount == 0) return;
 
-	// Šeq—v‘f‚ÉID‚ğŠ„‚è“–‚Ä
+	// ï¿½eï¿½qï¿½vï¿½fï¿½ï¿½IDï¿½ï¿½ï¿½ï¿½ï¿½è“–ï¿½ï¿½
 	uint64_t step = (endId - startId) / (childCount + 1);
 	uint64_t currentId = startId;
 
@@ -333,7 +334,7 @@ void SetChildIds(NewElement* elem) {
 		if (el->childend != NULL) {
 			currentId += step;
 			el->childend->id = currentId;
-			SetChildIds(el);  // Ä‹A
+			SetChildIds(el);  // ï¿½Ä‹A
 		}
 	}
 }
@@ -529,7 +530,7 @@ void setColor(NewElement* elem, uint32_t color) {
 	if (node && node->color != color) {
 		node->color = color; markPaintDirty(node);
 	}
-}// ========== ‡¬ƒpƒ‰ƒ[ƒ^iDirty‚É‚µ‚È‚¢j ========== 
+}// ========== ï¿½ï¿½ï¿½ï¿½ï¿½pï¿½ï¿½ï¿½ï¿½ï¿½[ï¿½^ï¿½iDirtyï¿½É‚ï¿½ï¿½È‚ï¿½ï¿½j ========== 
 void setScroll(NewElement* elem, float x, float y) {
 	elem->scroll.x = x;
 	elem->scroll.y = y;
@@ -660,9 +661,9 @@ void NewDrawCall(ThreadGC* thgc, NewElement* elem, NewGraphic* g, NewLocal* loca
 			elem->offscreen->ping ? elem->offscreen->imPong : elem->offscreen->imPing,  &info->fbo,  &info->size, elem->offscreen->viewId = --viewId, elem->offscreen->group };
 		elem->offscreen->ping = !elem->offscreen->ping;
 		std::vector<float>* colors = new std::vector<float>{
-			1.0f, 0.0f, 0.0f, 1.0f,  // Ô
-			0.0f, 1.0f, 0.0f, 1.0f,  // —Î
-			0.0f, 0.0f, 1.0f, 1.0f,  // Â
+			1.0f, 0.0f, 0.0f, 1.0f,  // ï¿½ï¿½
+			0.0f, 1.0f, 0.0f, 1.0f,  // ï¿½ï¿½
+			0.0f, 0.0f, 1.0f, 1.0f,  // ï¿½ï¿½
 		};
 		std::vector<float>* widths = new std::vector<float>{ 10.0f, 10.0f, 10.0f };
 		int size = widths->size();
@@ -717,7 +718,7 @@ void initNewLocal(ThreadGC* thgc, NewLocal* local) {
 	local->background = new Background();
 	local->background->tex1 = myloadTexture2D(thgc, "123.png");
 	local->dirty = DirtyType::RebuildValue;
-	local->screens = create_list(thgc, sizeof(Offscreen*), true);
+	local->screens = create_list(thgc, sizeof(Offscreen*), _List);
 	local->editable = true;
 	local->select.from = NULL;
 }
@@ -771,7 +772,7 @@ void NewLetterMeasureCall(ThreadGC* thgc, NewElement* elem, NewMeasure* measure,
 		r->end = segEnd;
 
 		bool applied = false;
-		// ‚Ü‚¸ StyleSpan ‚ğ’T‚·i—Dæj
+		// ï¿½Ü‚ï¿½ StyleSpan ï¿½ï¿½Tï¿½ï¿½ï¿½iï¿½Dï¿½ï¿½j
 		for (int i = 0; i < letter->stylespans->size; i++) {
 			StyleSpan* s = *(StyleSpan**)get_list(letter->stylespans, i);
 			r->color = s->color;
@@ -779,7 +780,7 @@ void NewLetterMeasureCall(ThreadGC* thgc, NewElement* elem, NewMeasure* measure,
 			applied = true;
 			break;
 		}
-		// ‚È‚¯‚ê‚Î ATSspan
+		// ï¿½È‚ï¿½ï¿½ï¿½ï¿½ ATSspan
 		if (!applied) {
 			for (int i = 0; i < letter->atsspans->size; i++) {
 				ATSSpan* a = *(ATSSpan**)get_list(letter->atsspans, i);
@@ -919,7 +920,7 @@ int ElementMouse(ThreadGC* thgc, NewElement* self, MouseEvent* e, NewLocal* loca
 	if (self->GoMouseDown != NULL) {
 		MemObj* mo = (MemObj*)GC_clone(thgc, (char*)self->GoMouseDown->obj);
 		MemTable* res = (MemTable*)GC_alloc(thgc, _MemTable);
-		res->table = (Map*)create_mapy(thgc, true);
+		res->table = (Map*)create_mapy(thgc, _List);
 		MemInsert(thgc, res, _MouseEvent, (ModelVal*)e);
 		mo->req = NULL; mo->res = res;
 		auto rn = GC_add_root_node(thgc);
@@ -944,7 +945,7 @@ int ElementMouse(ThreadGC* thgc, NewElement* self, MouseEvent* e, NewLocal* loca
 	if (self->BackMouseDown != NULL) {
 		MemObj* mo = (MemObj*)GC_clone(thgc, (char*)self->BackMouseDown->obj);
 		MemTable* res = (MemTable*)GC_alloc(thgc, _MemTable);
-		res->table = (Map*)create_mapy(thgc, true);
+		res->table = (Map*)create_mapy(thgc, _List);
 		MemInsert(thgc, res, _MouseEvent, (ModelVal*)e);
 		mo->req = NULL; mo->res = res;
 		auto rn = GC_add_root_node(thgc);
@@ -989,7 +990,7 @@ void SelectKey(ThreadGC* thgc, NewLocal* local, KeyEvent* e) {
 		if (e->GoKeyDown != NULL) {
 			MemObj* mo = (MemObj*)GC_clone(thgc, (char*)e->GoKeyDown->obj);
 			MemTable* res = (MemTable*)GC_alloc(thgc, _MemTable);
-			res->table = (Map*)create_mapy(thgc, true);
+			res->table = (Map*)create_mapy(thgc, _List);
 			MemInsert(thgc, res, _KeyEvent, (ModelVal*)e);
 			mo->req = NULL; mo->res = res;
 			auto rn = GC_add_root_node(thgc);
@@ -1021,7 +1022,7 @@ void SelectKey(ThreadGC* thgc, NewLocal* local, KeyEvent* e) {
 		if (start->BackKeyDown != NULL) {
 			MemObj* mo = (MemObj*)GC_clone(thgc, (char*)start->BackKeyDown->obj);
 			MemTable* res = (MemTable*)GC_alloc(thgc, _MemTable);
-			res->table = (Map*)create_mapy(thgc, true);
+			res->table = (Map*)create_mapy(thgc, _List);
 			MemInsert(thgc, res, _KeyEvent, (ModelVal*)e);
 			mo->req = NULL; mo->res = res;
 			auto rn = GC_add_root_node(thgc);
@@ -1062,7 +1063,7 @@ int LetterMouse(ThreadGC* thgc, NewElement* self, MouseEvent* e, NewLocal* local
 				if (self->GoMouseDown != NULL) {
 					MemObj* mo = (MemObj*)GC_clone(thgc, (char*)self->GoMouseDown->obj);
 					MemTable* res = (MemTable*)GC_alloc(thgc, _MemTable);
-					res->table = (Map*)create_mapy(thgc, true);
+					res->table = (Map*)create_mapy(thgc, _List);
 					MemInsert(thgc, res, _MouseEvent, (ModelVal*)e);
 					mo->req = NULL; mo->res = res;
 					auto rn = GC_add_root_node(thgc);
@@ -1089,7 +1090,7 @@ int LetterMouse(ThreadGC* thgc, NewElement* self, MouseEvent* e, NewLocal* local
 				if (self->BackMouseDown != NULL) {
 					MemObj* mo = (MemObj*)GC_clone(thgc, (char*)self->BackMouseDown->obj);
 					MemTable* res = (MemTable*)GC_alloc(thgc, _MemTable);
-					res->table = (Map*)create_mapy(thgc, true);
+					res->table = (Map*)create_mapy(thgc, _List);
 					MemInsert(thgc, res, _MouseEvent, (ModelVal*)e);
 					mo->req = NULL; mo->res = res;
 					auto rn = GC_add_root_node(thgc);

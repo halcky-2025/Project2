@@ -13,7 +13,7 @@ RowSet* MemInsert(ThreadGC* thgc, MemTable* mt, enum CType type, ModelVal* val) 
 	}
 	Map* t = (Map*)get_mapy(mt->table, thgc->class_table[type].name);
 	if (t == NULL) {
-		t = create_mapy(thgc, true);
+		t = create_mapy(thgc, _List);
 		add_mapy(thgc, mt->table, thgc->class_table[type].name, (char*)t);
 	}
 	add_mapy(thgc, t, NumberString(thgc, val->id), (char*)val);
@@ -24,10 +24,10 @@ RowSet* MemSelect(ThreadGC* thgc, MemTable* mt, enum CType type, char* (*func)(M
 	RowSet* rs = (RowSet*)malloc(sizeof(RowSet));
 	Map* t = (Map*)get_mapy(mt->table, thgc->class_table[type].name);
 	if (t == NULL) {
-		t = create_mapy(thgc, true);
+		t = create_mapy(thgc, _List);
 		add_mapy(thgc, mt->table, thgc->class_table[type].name, (char*)t);
 	}
-	rs->rows = create_mapy(thgc, true);
+	rs->rows = create_mapy(thgc, _List);
 	for (int i = 0; i < t->kvs->size; i++) {
 		KV* kv = (KV*)*get_list2(t->kvs, i);
 		ModelVal* val = (ModelVal*)kv->value;
@@ -59,7 +59,7 @@ MemTable* StringMem(ThreadGC* thgc, String* str) {
 			for (; ; j++) {
 				if (j >= len) {
 					MemTable* mt = (MemTable*)GC_alloc(thgc, sizeof(MemTable));
-					mt->table = create_mapy(thgc, true);
+					mt->table = create_mapy(thgc, _List);
 					return mt;
 				}
 				c = GetChar(str, j);
@@ -68,7 +68,7 @@ MemTable* StringMem(ThreadGC* thgc, String* str) {
 				}
 				else {
 					MemTable* mt = (MemTable*)GC_alloc(thgc, sizeof(MemTable));
-					mt->table = create_mapy(thgc, true);
+					mt->table = create_mapy(thgc, _List);
 					return mt;
 				}
 			}

@@ -63,12 +63,12 @@ void GoThread_iOS(ThreadGC* thgc) {
     let->text = createString(thgc, (char*)"Hello,world!", 13, 1);
     let->color = 0xFFFFFFFF;
     NewElementAddLast(thgc, local, (NewElement*)local, (NewElement*)let);
-    thgc->map = create_mapy(magc, false);
+    thgc->map = create_mapy(magc, _Struct);
     String* str = createString(thgc, (char*)"main", 4, 1);
     TreeElement* te = (TreeElement*)GC_alloc(thgc, _TreeElement);
     te->id = str;
     te->elem = (NewElement*)local;
-    te->children = create_list(thgc, sizeof(TreeElement*), true);
+    te->children = create_list(thgc, sizeof(TreeElement*), _List);
     add_mapy(thgc, thgc->map, str, (char*)te);
 
     while (true) {

@@ -145,7 +145,7 @@ void drawString(LayerInfo* layer, FontAtlas& atlas, FontId font,
     float cursorX = x;
     float cursorY = y;
 
-    for(int i = 0; i < text->size / text->esize; i++){
+    for(int i = 0; i < text->size; i++){
         uint32_t codepoint = (uint32_t)GetChar(text, i);
 
         auto gi = atlas.getOrAddGlyph(font, codepoint, group);
@@ -710,7 +710,7 @@ public:
             q->begin(frameId, 1024);
             auto& layer = q->setCurrentSlotLayer({}, 1.0f, true, true, 800, 600);
             if ((local->dirty & DirtyType::Rebuild) > 0) {
-                List* screens = create_list(target, sizeof(Offscreen*), true);
+                List* screens = create_list(target, sizeof(Offscreen*), _List);
                 add_list(target, screens, (char*)local->offscreen);
                 RebuildOffscreen(target, screens, local);
                 for (int i = 0; i < local->screens->size; i++) {

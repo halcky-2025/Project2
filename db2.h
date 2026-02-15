@@ -203,13 +203,13 @@ private:
         {
             std::unique_lock lock(thgc->mutex);
         head99:
-            rs->columns = create_mapy_ant(thgc, true);
+            rs->columns = create_mapy_ant(thgc, _List);
             if (rs->columns == NULL) {
                 CallGCant(thgc, queue, &lock);
                 goto head99;
             }
         head88:
-            rs->rows = create_mapy_ant(thgc, true);
+            rs->rows = create_mapy_ant(thgc, _List);
             if (rs->rows == NULL) {
                 goto head88;
             }

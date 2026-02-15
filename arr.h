@@ -2,25 +2,25 @@
 
 struct String {
     char* data;
-    int size;
-    int esize;
+    int size;    // 文字数（文字列の長さ）
+    int esize;   // 1文字あたりのバイト数
 };
 String* createString(ThreadGC* thgc, char* tex, int size, int esize) {
 	String* str = (String*)GC_alloc(thgc, _String);
-	str->data = (char*)GC_alloc_size(thgc, size);
+	str->data = (char*)GC_alloc_size(thgc, size * esize);
 	str->size = size;
     str->esize = esize;
-	memcpy(str->data, tex, size);
+	memcpy(str->data, tex, size * esize);
 	return str;
 }
 String* createStringant(ThreadGC* thgc, char* tex, int size, int esize) {
     String* str = (String*)GC_alloc_ant(thgc, _String);
     if (str == NULL) return NULL;
-    str->data = (char*)GC_alloc_size_ant(thgc, size);
+    str->data = (char*)GC_alloc_size_ant(thgc, size * esize);
     if (str == NULL) return NULL;
     str->size = size;
     str->esize = esize;
-    memcpy(str->data, tex, size);
+    memcpy(str->data, tex, size * esize);
     return str;
 }
 String* StringAdd(ThreadGC* thgc, String* str, char* value, int len, int esize) {
@@ -28,26 +28,26 @@ String* StringAdd(ThreadGC* thgc, String* str, char* value, int len, int esize) 
     if (str->esize == esize) {
         ret->esize = esize;
         ret->size = str->size + len;
-        ret->data = (char*)GC_alloc_size(thgc, ret->size);
-        memcpy(ret->data, str->data, str->size);
-        memcpy((char*)(ret->data + str->size), value, len);
+        ret->data = (char*)GC_alloc_size(thgc, ret->size * ret->esize);
+        memcpy(ret->data, str->data, str->size * str->esize);
+        memcpy((char*)(ret->data + str->size * str->esize), value, len * esize);
     }
     else {
         ret->esize = 2;
+        ret->size = str->size + len;
+        ret->data = (char*)GC_alloc_size(thgc, ret->size * 2);
         if (str->esize == 1) {
-            ret->size = str->size * 2 + len;
-			ret->data = (char*)GC_alloc_size(thgc, ret->size);
             for (int i = 0; i < str->size; i++) {
 				ret->data[i * 2] = str->data[i];
+				ret->data[i * 2 + 1] = 0;
             }
-            memcpy((char*)(ret->data + str->size * 2), value, len);
+            memcpy((char*)(ret->data + str->size * 2), value, len * 2);
         }
         else {
-			ret->size = str->size + len * 2;
-			ret->data = (char*)GC_alloc_size(thgc, ret->size);
-            memcpy(ret->data, str->data, str->size);
+            memcpy(ret->data, str->data, str->size * 2);
             for (int i = 0; i < len; i++) {
-                ret->data[str->size + i * 2] = value[i];
+                ret->data[(str->size + i) * 2] = value[i];
+                ret->data[(str->size + i) * 2 + 1] = 0;
             }
         }
     }
@@ -58,26 +58,26 @@ String* StringAdd2(ThreadGC* thgc, String* str, String* value) {
     if (str->esize == value->esize) {
         ret->esize = str->esize;
         ret->size = str->size + value->size;
-        ret->data = (char*)GC_alloc_size(thgc, ret->size);
-        memcpy(ret->data, str->data, str->size);
-        memcpy((char*)(ret->data + str->size), value->data, value->size);
+        ret->data = (char*)GC_alloc_size(thgc, ret->size * ret->esize);
+        memcpy(ret->data, str->data, str->size * str->esize);
+        memcpy((char*)(ret->data + str->size * str->esize), value->data, value->size * value->esize);
     }
     else {
         ret->esize = 2;
+        ret->size = str->size + value->size;
+        ret->data = (char*)GC_alloc_size(thgc, ret->size * 2);
         if (str->esize == 1) {
-			ret->size = str->size * 2 + value->size;
-			ret->data = (char*)GC_alloc_size(thgc, ret->size);
             for (int i = 0; i < str->size; i++) {
                 ret->data[i * 2] = str->data[i];
+                ret->data[i * 2 + 1] = 0;
             }
-            memcpy((char*)(ret->data + str->size * 2), value->data, value->size);
+            memcpy((char*)(ret->data + str->size * 2), value->data, value->size * 2);
         }
         else {
-            ret->size = str->size + value->size * 2;
-            ret->data = (char*)GC_alloc_size(thgc, ret->size);
-            memcpy(ret->data, str->data, str->size);
+            memcpy(ret->data, str->data, str->size * 2);
             for (int i = 0; i < value->size; i++) {
-                ret->data[str->size + i * 2] = value->data[i];
+                ret->data[(str->size + i) * 2] = value->data[i];
+                ret->data[(str->size + i) * 2 + 1] = 0;
             }
         }
     }
@@ -86,18 +86,18 @@ String* StringAdd2(ThreadGC* thgc, String* str, String* value) {
 String* StringRemove(ThreadGC* thgc, String* str, int n) {
 	String* ret = (String*)GC_alloc(thgc, _String);
     ret->esize = str->esize;
-    ret->size = str->size - str->esize;
-	ret->data = (char*)GC_alloc_size(thgc, ret->size);
+    ret->size = str->size - 1;
+	ret->data = (char*)GC_alloc_size(thgc, ret->size * ret->esize);
     memcpy(ret->data, str->data, n * str->esize);
-    memcpy((char*)(ret->data + n * str->esize), str->data + (n + 1) * str->esize, str->size - (n + 1) * str->esize);
+    memcpy((char*)(ret->data + n * str->esize), str->data + (n + 1) * str->esize, (str->size - (n + 1)) * str->esize);
     return ret;
 }
 String* SubString(ThreadGC* thgc, String* str, int n1, int length) {
 	String* ret = (String*)GC_alloc(thgc, _String);
 	ret->esize = str->esize;
-	ret->size = length * str->esize;
-	ret->data = (char*)GC_alloc_size(thgc, ret->size);
-    memcpy(ret->data, str->data + n1 * str->esize, ret->size);
+	ret->size = length;
+	ret->data = (char*)GC_alloc_size(thgc, ret->size * ret->esize);
+    memcpy(ret->data, str->data + n1 * str->esize, length * str->esize);
 	return ret;
 }
 wchar_t GetChar(String* str, int n) {
@@ -171,12 +171,13 @@ char* latin1_to_utf8_malloc_exact(const char* data, int size, int* out_len = nul
     return buf;
 }
 
-/* UTF-16LE（byteSizeはバイト数）→ UTF-8（正確な長さでmalloc） */
-char* utf16le_to_utf8_malloc_exact(const char* data, int byteSize, int* out_len = nullptr) {
-    if (!data || byteSize < 0 || (byteSize & 1))
+/* UTF-16LE（charCountは文字数）→ UTF-8（正確な長さでmalloc） */
+char* utf16le_to_utf8_malloc_exact(const char* data, int charCount, int* out_len = nullptr) {
+    int byteSize = charCount * 2;
+    if (!data || charCount < 0)
         throw std::runtime_error("utf16le_to_utf8: invalid input size");
     const unsigned char* p = reinterpret_cast<const unsigned char*>(data);
-    const size_t len16 = static_cast<size_t>(byteSize) / 2u;
+    const size_t len16 = static_cast<size_t>(charCount);
 
     // 1st pass: 必要バイト数
     size_t need = 0;
@@ -298,9 +299,9 @@ void PrintString(String* str) {
         }
     }
     else {
-        for (int i = 0; i < str->size; i += 2) {
+        for (int i = 0; i < str->size; i++) {
             wchar_t result;
-            memcpy(&result, str->data + i, sizeof(wchar_t));
+            memcpy(&result, str->data + i * 2, sizeof(wchar_t));
             putwchar(result);
         }
     }
@@ -313,9 +314,9 @@ int StringNumber(String* str) {
 		}
 	}
 	else {
-		for (int i = 0; i < str->size; i += 2) {
+		for (int i = 0; i < str->size; i++) {
 			wchar_t wc;
-			memcpy(&wc, str->data + i, sizeof(wchar_t));
+			memcpy(&wc, str->data + i * 2, sizeof(wchar_t));
 			n = n * 10 + (wc - '0');
 		}
 	}
@@ -328,7 +329,7 @@ bool StringEqual(char* str1, int len1, int esize1,
     if (str1 == NULL || str2 == NULL) {
         return false;
     }
-    if (len1 * esize2 != len2 * esize1) return false;
+    if (len1 != len2) return false;
     // 同じエンコーディングの場合
     if (esize1 == esize2) {
         for (int i = 0; i < len1 * esize1; i++) {
@@ -377,39 +378,39 @@ typedef struct {
     int size;
     int capa;
     int esize;
-    bool objected;
+    CType type;
 } List;
 void ListCheck(ThreadGC* thgc, char* data) {
     List* list = (List*)data;
     list->data = (char**)GC_clone(thgc, (char*)list->data);
-    if (list->objected) {
+    if (list->type) {
         for (int i = 0; i < list->size; i++) {
             char** value = (char**)(list->data + i * list->esize);
             *value = (char*)GC_clone(thgc, *value);
         }
     }
 }
-List* create_list(ThreadGC* thgc, int esize, bool objected) {
+List* create_list(ThreadGC* thgc, int esize, CType type) {
     List* list = (List*)GC_alloc(thgc, _List);
-    list->objected = objected;
+    list->type = type;
     list->data = (char **)GC_alloc_size(thgc, 4 * esize);
     list->size = 0;
     list->capa = 4;
     list->esize = esize;
     return list;
 }
-List* create_list2(ThreadGC* thgc, List* list, int esize, bool objected) {
+List* create_list2(ThreadGC* thgc, List* list, int esize, CType type) {
     list->data = (char**)GC_alloc(thgc, _List);
     list->size = 0;
     list->capa = 4;
     list->esize = esize;
-	list->objected = objected;
+	list->type = type;
     return list;
 }
-List* create_list_ant(ThreadGC* thgc, int esize, bool objected) {
+List* create_list_ant(ThreadGC* thgc, int esize, CType type) {
     List* list = (List*)GC_alloc_ant(thgc, _List);
 	if (list == NULL) return NULL;
-    list->objected = objected;
+    list->type = type;
     list->data = (char**)GC_alloc_size_ant(thgc, 4 * esize);
 	if (list->data == NULL) return NULL;
     list->size = 0;
@@ -417,13 +418,13 @@ List* create_list_ant(ThreadGC* thgc, int esize, bool objected) {
     list->esize = esize;
     return list;
 }
-List* create_list2_ant(ThreadGC* thgc, List* list, int esize, bool objected) {
+List* create_list2_ant(ThreadGC* thgc, List* list, int esize, CType type) {
     list->data = (char**)GC_alloc_ant(thgc, _List);
 	if (list->data == NULL) return NULL;
     list->size = 0;
     list->capa = 4;
     list->esize = esize;
-    list->objected = objected;
+    list->type = type;
     return list;
 }
 void add_list(ThreadGC* thgc, List* list, char* value) {
@@ -516,11 +517,11 @@ typedef struct {
     int n;
     String* key;
     char* value;
-    bool objected;
+    CType type;
 }KV;
 void KVCheck(ThreadGC* thgc, char* data) {
 	KV* kv = (KV*)data;
-	if (kv->objected) {
+	if (kv->type) {
 		kv->key = (String*)GC_clone(thgc, (char*)kv->key);
 		kv->value = (char*)GC_clone(thgc, kv->value);
 	}
@@ -540,13 +541,13 @@ void MapDataCheck(ThreadGC* thgc, char* data) {
 struct Map{
     List* kvs;
     MapData* md;
-    bool objected;
+    CType type;
 };
 void MapCheck(ThreadGC* thgc, char* data) {
 	Map* map = (Map*)data;
 	map->md = (MapData*)GC_clone(thgc, (char*)map->md);
 }
-MapData* create_map_data(ThreadGC* thgc, int capa, bool objected) {
+MapData* create_map_data(ThreadGC* thgc, int capa, CType type) {
     MapData* md = (MapData*)GC_alloc(thgc, _MapData);
     md->capa = capa;
     md->_map = (List**)GC_alloc_size(thgc, capa * sizeof(List*));
@@ -554,11 +555,11 @@ MapData* create_map_data(ThreadGC* thgc, int capa, bool objected) {
         md->_map[i] = (List*)GC_alloc(thgc, _List);
     }
     for (int i = 0; i < md->capa; i++) {
-        create_list2(thgc, (List*) md->_map[i], sizeof(KV*), objected);
+        create_list2(thgc, (List*) md->_map[i], sizeof(KV*), type);
     }
     return md;
 }
-MapData* create_map_data_ant(ThreadGC* thgc, int capa, bool objected) {
+MapData* create_map_data_ant(ThreadGC* thgc, int capa, CType type) {
     MapData* map = (MapData*)GC_alloc_ant(thgc, _MapData);
     if (map == NULL) return NULL;
     map->capa = capa;
@@ -569,7 +570,7 @@ MapData* create_map_data_ant(ThreadGC* thgc, int capa, bool objected) {
 		if (map->_map[i] == NULL) return NULL;
     }
     for (int i = 0; i < map->capa; i++) {
-        create_list2_ant(thgc, (List*)map->_map[i], sizeof(KV*), objected);
+        create_list2_ant(thgc, (List*)map->_map[i], sizeof(KV*), type);
     }
     return map;
 }
@@ -603,26 +604,27 @@ void PrintArray(Map* map, int depth, int type) {
     putchar(']');
     putchar('\n');
 }
-Map* create_mapy(ThreadGC* thgc, bool objected) {
+Map* create_mapy(ThreadGC* thgc, CType type) {
     Map* map = (Map*)GC_alloc(thgc, _Map);
-	map->objected = objected;
-    map->md = create_map_data(thgc, 16, objected);
-    map->kvs = create_list(thgc, sizeof(KV*), objected);
+	map->type = type;
+    map->md = create_map_data(thgc, 16, type);
+    map->kvs = create_list(thgc, sizeof(KV*), type);
     return map;
 }
-Map* create_mapy_ant(ThreadGC* thgc, bool objected) {
+Map* create_mapy_ant(ThreadGC* thgc, CType type) {
     Map* map = (Map*)GC_alloc_ant(thgc, _Map);
     if (map == NULL) return NULL;
-    map->objected = objected;
-    map->md = create_map_data_ant(thgc, 16, objected);
+    map->type = type;
+    map->md = create_map_data_ant(thgc, 16, type);
     if (map->md == NULL) return NULL;
-    map->kvs = create_list_ant(thgc, sizeof(KV*), objected);
+    map->kvs = create_list_ant(thgc, sizeof(KV*), type);
 	if (map->kvs == NULL) return NULL;
     return map;
 }
 int get_hashvalue(String* key, int size) {
     int hash = 10000;
-    for (int i = 0; i < key->size; i++) {
+    int byteSize = key->size * key->esize;
+    for (int i = 0; i < byteSize; i++) {
         hash ^= (unsigned char)key->data[i];
         hash *= 1619;
         hash %= size;
@@ -635,7 +637,7 @@ head:
     if (key != NULL) {
         mdl = map->md->_map[get_hashvalue(key, map->md->capa)];
         if (mdl->size > 3) {
-            map->md = create_map_data(thgc, map->md->capa * 4, map->objected);
+            map->md = create_map_data(thgc, map->md->capa * 4, map->type);
             for (int i = 0; i < map->kvs->size; i++) {
                 KV* kv = (KV*)*get_list2(map->kvs, i);
                 if (kv->key == NULL) continue;
@@ -647,8 +649,9 @@ head:
         for (int i = 0; i < mdl->size; i++) {
             KV* kv = (KV*)*get_list2(mdl, i);
             if (kv->key->size != key->size) continue;
+            int byteSize = key->size * key->esize;
             for (int j = 0; ; j++) {
-                if (j >= kv->key->size) {
+                if (j >= byteSize) {
                     kv->value = value;
                     return;
                 }
@@ -656,7 +659,7 @@ head:
             }
         }
         KV* kv2 = (KV*)GC_alloc(thgc, _KV);
-        kv2->objected = map->objected;
+        kv2->type = map->type;
         kv2->key = key;
         kv2->value = value;
         kv2->n = map->kvs->size;
@@ -665,7 +668,7 @@ head:
     }
     else {
         KV* kv2 = (KV*)GC_alloc(thgc, _KV);
-        kv2->objected = map->objected;
+        kv2->type = map->type;
         kv2->key = NULL;
         kv2->value = value;
         kv2->n = map->kvs->size;
@@ -679,7 +682,7 @@ head:
     if (key != NULL) {
         mdl = map->md->_map[get_hashvalue(key, map->md->capa)];
         if (mdl->size > 3) {
-            map->md = create_map_data_ant(thgc, map->md->capa * 4, map->objected);
+            map->md = create_map_data_ant(thgc, map->md->capa * 4, map->type);
             if (map->md == NULL) return NULL;
             for (int i = 0; i < map->kvs->size; i++) {
                 KV* kv = (KV*)*get_list2(map->kvs, i);
@@ -693,8 +696,9 @@ head:
         for (int i = 0; i < mdl->size; i++) {
             KV* kv = (KV*)*get_list2(mdl, i);
             if (kv->key->size != key->size) continue;
+            int byteSize = key->size * key->esize;
             for (int j = 0; ; j++) {
-                if (j >= kv->key->size) {
+                if (j >= byteSize) {
                     kv->value = value;
                     return (char*)map;
                 }
@@ -703,7 +707,7 @@ head:
         }
         KV* kv2 = (KV*)GC_alloc_ant(thgc, _KV);
         if (kv2 == NULL) return NULL;
-        kv2->objected = map->objected;
+        kv2->type = map->type;
         kv2->key = key;
         kv2->value = value;
         kv2->n = map->kvs->size;
@@ -715,7 +719,7 @@ head:
     else {
         KV* kv2 = (KV*)GC_alloc_ant(thgc, _KV);
 		if (kv2 == NULL) return NULL;
-        kv2->objected = map->objected;
+        kv2->type = map->type;
         kv2->key = NULL;
         kv2->value = value;
         kv2->n = map->kvs->size;
@@ -729,8 +733,9 @@ char* get_mapy(Map* map, String* key) {
     for (int i = 0; i < mdl->size; i++) {
         KV* kv = (KV*)*get_list2(mdl, i);
         if (kv->key->size != key->size) continue;
+        int byteSize = key->size * key->esize;
         for (int j = 0; ; j++) {
-            if (j >= kv->key->size) {
+            if (j >= byteSize) {
                 return kv->value;
             }
             if (kv->key->data[j] != key->data[j]) break;
@@ -750,9 +755,10 @@ int remove_mapy(ThreadGC* thgc, Map* map, String* key) {
         if (kv->key->size != key->size) continue;
 
         // 生バイト比較（既存コード準拠）
+        int byteSize = key->size * key->esize;
         int j = 0;
         for (;; ++j) {
-            if (j >= kv->key->size) {
+            if (j >= byteSize) {
                 target = kv;
                 md_index = i;
                 break;
@@ -791,7 +797,7 @@ head:
     if (key != NULL) {
         mdl = map->md->_map[get_hashvaluen(key, map->md->capa)];
         if (mdl->size > 3) {
-            map->md = create_map_data(thgc, map->md->capa * 4, map->objected);
+            map->md = create_map_data(thgc, map->md->capa * 4, map->type);
             for (int i = 0; i < map->kvs->size; i++) {
                 KV* kv = (KV*)*get_list2(map->kvs, i);
                 if (kv->key == NULL) continue;
@@ -809,7 +815,7 @@ head:
             }
         }
         KV* kv2 = (KV*)GC_alloc(thgc, _KV);
-        kv2->objected = map->objected;
+        kv2->type = map->type;
         kv2->key = (String*)key;
         kv2->value = value;
         kv2->n = map->kvs->size;
@@ -818,7 +824,7 @@ head:
     }
     else {
         KV* kv2 = (KV*)GC_alloc(thgc, _KV);
-        kv2->objected = map->objected;
+        kv2->type = map->type;
         kv2->key = NULL;
         kv2->value = value;
         kv2->n = map->kvs->size;
@@ -832,7 +838,7 @@ head:
     if (key != NULL) {
         mdl = map->md->_map[get_hashvaluen(key, map->md->capa)];
         if (mdl->size > 3) {
-            map->md = create_map_data_ant(thgc, map->md->capa * 4, map->objected);
+            map->md = create_map_data_ant(thgc, map->md->capa * 4, map->type);
             if (map->md == NULL) return NULL;
             for (int i = 0; i < map->kvs->size; i++) {
                 KV* kv = (KV*)*get_list2(map->kvs, i);
@@ -853,7 +859,7 @@ head:
         }
         KV* kv2 = (KV*)GC_alloc_ant(thgc, _KV);
         if (kv2 == NULL) return NULL;
-        kv2->objected = map->objected;
+        kv2->type = map->type;
         kv2->key = (String*)key;
         kv2->value = value;
         kv2->n = map->kvs->size;
@@ -865,7 +871,7 @@ head:
     else {
         KV* kv2 = (KV*)GC_alloc_ant(thgc, _KV);
         if (kv2 == NULL) return NULL;
-        kv2->objected = map->objected;
+        kv2->type = map->type;
         kv2->key = NULL;
         kv2->value = value;
         kv2->n = map->kvs->size;

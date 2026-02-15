@@ -538,14 +538,14 @@ using TensorCloneType = void* (*)(void*);
 using CopyObjectType = char* (*)(ThreadGC*, char*);
 using GetHashValueType = int (*) (String*, int);
 
-using CreateListType = List * (*) (ThreadGC*, int, bool);
+using CreateListType = List * (*) (ThreadGC*, int, CType);
 using AddListType = void (*)(ThreadGC*, List*, char*);
 using GetListType = char** (*)(List*, int);
 using GetLastType = char** (*)(List*);
 using SetListType = void (*)(List*, int, char*);
 using SetLastType = void (*)(List*, char*);
 
-using CreateHashType = Map * (*) (ThreadGC*, bool);
+using CreateHashType = Map * (*) (ThreadGC*, CType);
 using AddHashType = void (*)(ThreadGC*, Map*, String*, char*);
 using GetHashType = char* (*)(Map*, String*);
 
@@ -1433,6 +1433,28 @@ CustomModuleImpl* GoThread(ThreadGC* thgc) {
     GC_register_class(thgc, CType::_ATSSpan, "ATSSpan", sizeof(ATSSpan), NULL, NULL);
     GC_register_class(thgc, CType::_StyleSpan, "StyleSpan", sizeof(StyleSpan), NULL, NULL);
     GC_register_class(thgc, CType::_RenderSpan, "RenderSpan", sizeof(RenderSpan), NULL, NULL);
+    GC_register_class(thgc, CType::_CObj, "Obj", sizeof(Obj), NULL, NULL);
+    GC_register_class(thgc, CType::_Block, "Block", sizeof(Block), NULL, NULL);
+    GC_register_class(thgc, CType::_CallBlock, "CallBlock", sizeof(Block), NULL, NULL);
+    GC_register_class(thgc, CType::_TagBlock, "TagBlock", sizeof(TagBlock), NULL, NULL);
+    GC_register_class(thgc, CType::_Primary, "Primary", sizeof(Primary), NULL, NULL);
+    GC_register_class(thgc, CType::_COperator, "COperator", sizeof(Obj), NULL, NULL);
+    GC_register_class(thgc, CType::_Word, "Word", sizeof(Obj), NULL, NULL);
+    GC_register_class(thgc, CType::_CNumber, "CNumber", sizeof(Obj), NULL, NULL);
+    GC_register_class(thgc, CType::_FloatVal, "FloatVal", sizeof(Obj), NULL, NULL);
+    GC_register_class(thgc, CType::_StrObj, "StrObj", sizeof(Obj), NULL, NULL);
+    GC_register_class(thgc, CType::_Address, "Address", sizeof(Obj), NULL, NULL);
+    GC_register_class(thgc, CType::_Comment, "Comment", sizeof(Obj), NULL, NULL);
+    GC_register_class(thgc, CType::_Comment2, "Comment2", sizeof(Obj), NULL, NULL);
+    GC_register_class(thgc, CType::_HtmObj, "HtmObj", sizeof(Obj), NULL, NULL);
+    GC_register_class(thgc, CType::_CMountain, "CMountain", sizeof(Obj), NULL, NULL);
+    GC_register_class(thgc, CType::_CQuestion, "CQuestion", sizeof(Obj), NULL, NULL);
+    GC_register_class(thgc, CType::_CDolor, "CDolor", sizeof(Obj), NULL, NULL);
+    GC_register_class(thgc, CType::_PrimOp, "PrimOp", sizeof(PrimOp), NULL, NULL);
+    GC_register_class(thgc, CType::_SingleOp, "SingleOp", sizeof(SingleOp), NULL, NULL);
+    GC_register_class(thgc, CType::_Label, "Label", sizeof(Label), NULL, NULL);
+    GC_register_class(thgc, CType::_Local, "Local", sizeof(Master), NULL, NULL);
+    GC_register_class(thgc, CType::_Operator, "Operator", sizeof(Operator), NULL, NULL);
     //initHoppyWindow(thgc, hw);
 	NewLocal* local = (NewLocal*)GC_alloc(thgc, _LocalC);
     initNewLocal(thgc, local);
@@ -1441,12 +1463,12 @@ CustomModuleImpl* GoThread(ThreadGC* thgc) {
 	let->text = createString(thgc, (char*)"Hello,world!", 12, 1);
     let->color = 0xFFFFFFFF;
     NewElementAddLast(thgc, local, (NewElement*)local, (NewElement*)let);
-    thgc->map = create_mapy(magc, false);
+    thgc->map = create_mapy(magc, _Struct);
     String* str = createString(thgc, (char*)"main", 4, 1);
     TreeElement* te = (TreeElement*)GC_alloc(thgc, _TreeElement);
     te->id = str;
     te->elem = (NewElement*)local;
-    te->children = create_list(thgc, sizeof(TreeElement*), true);
+    te->children = create_list(thgc, sizeof(TreeElement*), _List);
     add_mapy(thgc, thgc->map, str, (char*)te);
     /*ReadDll(thgc);*/
     while (true) {
