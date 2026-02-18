@@ -116,7 +116,9 @@ void main()
     );
     
     // 深度（zIndex, i_data4.w）
-    float z = colors.w / 65535.0;
-    
+    // colors.w = 10000 - zIndex（C++側で変換済み）
+    // 射影行列の near=0, far=10000 に直接マッピング
+    float z = colors.w;
+
     gl_Position = mul(u_modelViewProj, vec4(pos, z, 1.0));
 }

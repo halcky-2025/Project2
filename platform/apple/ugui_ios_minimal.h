@@ -21,7 +21,7 @@ struct PointI {
 
 enum DrawCommandType {
     DelFBO = -2, FBO = -1, Fill = 0, Gradient = 1, Stripe = 2,
-    Checker = 3, GradientChecker = 4, Image = 5, End = 7, PageCurl = 6
+    Checker = 3, GradientChecker = 4, Image = 5, PageCurl = 6, RawImage = 7, End = 8
 };
 
 // ============================================================
@@ -51,6 +51,7 @@ struct DrawCommand {
     float zIndex = 0.0f;
     bgfx::TextureHandle* texture = nullptr;
     bgfx::TextureHandle* texture2 = nullptr;
+    float blendMode = 0.0f; // 0=premultiplied, 1=overwrite
 };
 
 struct UnifiedDrawCommand : DrawCommand {
@@ -110,7 +111,7 @@ inline void packInstance(UnifiedDrawCommand& cmd, UnifiedInstanceData& out, Draw
     out.data0[2] = cmd.width;
     out.data0[3] = cmd.height;
 
-    if (type == DrawCommandType::Image) {
+    if (type == DrawCommandType::Image || type == DrawCommandType::RawImage) {
         out.data1[0] = 0.0f;
         out.data1[1] = 0.0f;
         out.data1[2] = cmd.angle;
@@ -211,10 +212,12 @@ struct LayerInfo {
         uint32_t fillColor, uint32_t borderColor,
         float shadowX, float shadowY, float shadowBlur,
         uint32_t shadowColor, float zIndex,
-        bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId)
+        bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId,
+        float blendMode = 0.0f)
     {
         UnifiedDrawCommand* cmd = new UnifiedDrawCommand();
         cmd->type = DrawCommandType::Fill;
+        cmd->blendMode = blendMode;
         cmd->targetFBO = targetFBO;
         cmd->viewId = viewId;
         cmd->x = x; cmd->y = y;
@@ -331,7 +334,8 @@ inline void drawUnifiedBatch(
     }
 
     // Set mode parameter
-    float param1[4] = { float(batchType), 0.0f, 0.0f, 0.0f };
+    float blendMode = commands[0]->blendMode;
+    float param1[4] = { float(batchType), blendMode, 0.0f, 0.0f };
     bgfx::setUniform(resources.param1Uniform, param1);
 
     // Set vertex/index buffers
@@ -340,11 +344,14 @@ inline void drawUnifiedBatch(
     bgfx::setInstanceDataBuffer(&idb);
 
     // Set state and submit
-    bgfx::setState(
-        BGFX_STATE_WRITE_RGB |
-        BGFX_STATE_WRITE_A |
-        BGFX_STATE_BLEND_ALPHA
-    );
+    if (blendMode > 0.5f) {
+        // 上書きモード: 背景を無視
+        bgfx::setState(BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A);
+    }
+    else {
+        // プリマルチプライドモード
+        bgfx::setState(BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A | BGFX_STATE_BLEND_ALPHA);
+    }
 
     bgfx::submit(viewId, resources.uniteProgram);
 }

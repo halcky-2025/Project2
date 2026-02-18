@@ -21,10 +21,12 @@ void LayerInfo::pushFill(float x, float y, float width, float height,
     uint32_t fillColor, uint32_t borderColor,
     float shadowX, float shadowY, float shadowBlur,
     uint32_t shadowColor, float zIndex,
-    bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId)
+    bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId,
+    float blendMode)
 {
     UnifiedDrawCommand* cmd = new UnifiedDrawCommand();
     cmd->type = DrawCommandType::Fill;
+    cmd->blendMode = blendMode;
     cmd->targetFBO = targetFBO;
     cmd->viewId = viewId;
     cmd->x = x; cmd->y = y;
@@ -66,10 +68,12 @@ void LayerInfo::pushPageCurl(float x, float y, float width, float height,
     float shadowX, float shadowY, float shadowBlur,
     uint32_t shadowColor,
     bgfx::TextureHandle* tex1, bgfx::TextureHandle* tex2, float zIndex,
-    bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId)
+    bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId,
+    float blendMode)
 {
     UnifiedDrawCommand* cmd = new UnifiedDrawCommand();
     cmd->type = DrawCommandType::PageCurl;
+    cmd->blendMode = blendMode;
     cmd->targetFBO = targetFBO;
     cmd->viewId = viewId;
     cmd->x = x; cmd->y = y;
@@ -121,10 +125,12 @@ void LayerInfo::pushImage(float x, float y, float width, float height,
     float shadowX, float shadowY, float shadowBlur,
     uint32_t shadowColor, uint32_t modulate,
     float zIndex, bgfx::TextureHandle* tex1,
-    bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId)
+    bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId,
+    float blendMode)
 {
     UnifiedDrawCommand* cmd = new UnifiedDrawCommand();
     cmd->type = DrawCommandType::Image;
+    cmd->blendMode = blendMode;
     cmd->targetFBO = targetFBO;
     cmd->viewId = viewId;
     cmd->x = x; cmd->y = y;
@@ -152,6 +158,41 @@ void LayerInfo::pushImage(float x, float y, float width, float height,
 }
 
 // ============================================================
+// RawImage (純粋テクスチャ描画、SDF/影/ボーダーなし)
+// ============================================================
+
+void LayerInfo::pushRawImage(float x, float y, float width, float height,
+    float atlasX, float atlasY, float atlasW, float atlasH,
+    uint32_t modulate, float zIndex, bgfx::TextureHandle* tex1,
+    bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId,
+    float blendMode)
+{
+    UnifiedDrawCommand* cmd = new UnifiedDrawCommand();
+    cmd->type = DrawCommandType::RawImage;
+    cmd->blendMode = blendMode;
+    cmd->targetFBO = targetFBO;
+    cmd->viewId = viewId;
+    cmd->x = x; cmd->y = y;
+    cmd->width = width; cmd->height = height;
+    cmd->dataOffset = 0; cmd->colorCount = 0;
+    cmd->angle = atlasX;              // uvMin.x
+    cmd->curlRadius = atlasY;         // uvMin.y
+    cmd->scrollX = atlasX + atlasW;   // uvMax.x
+    cmd->scrollY = atlasY + atlasH;   // uvMax.y
+    cmd->radius = 0; cmd->aa = 0;
+    cmd->shadowX = 0; cmd->shadowY = 0;
+    cmd->shadowBlur = 0; cmd->borderWidth = 0;
+    cmd->shadowColor = 0;
+    cmd->fillColor = modulate;
+    cmd->borderColor = 0;
+    cmd->zIndex = zIndex;
+    cmd->texture = tex1;
+    cmd->texture2 = &nulltex;
+    cmd->fbsize = fbsize;
+    cmds.push_back(cmd);
+}
+
+// ============================================================
 // Pattern
 // ============================================================
 
@@ -164,10 +205,12 @@ void LayerInfo::pushPattern(enum DrawCommandType patternMode,
     float shadowX, float shadowY, float shadowBlur,
     uint32_t shadowColor,
     int dataOffset, float zIndex,
-    bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId)
+    bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId,
+    float blendMode)
 {
     UnifiedDrawCommand* cmd = new UnifiedDrawCommand();
     cmd->type = patternMode;
+    cmd->blendMode = blendMode;
     cmd->targetFBO = targetFBO;
     cmd->viewId = viewId;
     cmd->x = x; cmd->y = y;
@@ -198,10 +241,12 @@ void LayerInfo::pushPattern(enum DrawCommandType patternMode,
 void LayerInfo::pushText(float x, float y, float width, float height,
     float atlasX, float atlasY, float atlasW, float atlasH,
     uint32_t color, float zIndex, bgfx::TextureHandle* tex1,
-    bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId)
+    bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId,
+    float blendMode)
 {
     UnifiedDrawCommand* cmd = new UnifiedDrawCommand();
     cmd->type = DrawCommandType::Image;
+    cmd->blendMode = blendMode;
     cmd->targetFBO = targetFBO;
     cmd->viewId = viewId;
     cmd->x = x; cmd->y = y;
@@ -223,6 +268,42 @@ void LayerInfo::pushText(float x, float y, float width, float height,
     cmd->zIndex = zIndex;
     cmd->texture = tex1;
     cmd->texture2 = &nulltex;
+    cmd->fbsize = fbsize;
+    cmds.push_back(cmd);
+}
+// ============================================================
+// Text (Imageと同じレイアウト)
+// ============================================================
+
+void LayerInfo::pushBackground(Background* back, float x, float y, float width, float height,
+    float zIndex, bgfx::TextureHandle* tex1, bgfx::TextureHandle* tex2,
+    bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId,
+    float blendMode)
+{
+    UnifiedDrawCommand* cmd = new UnifiedDrawCommand();
+    cmd->type = back->type;
+    cmd->blendMode = blendMode;
+    cmd->targetFBO = targetFBO;
+    cmd->viewId = viewId;
+    cmd->x = x; cmd->y = y;
+    cmd->width = width; cmd->height = height;
+    cmd->dataOffset = back->offset; cmd->colorCount = back->count;
+    // 新レイアウト: float精度でUV座標を渡す
+    cmd->angle = back->angle;              // uvMin.x (i_data1.z)
+    cmd->curlRadius = back->curl;         // uvMin.y (i_data1.w に転送)
+    cmd->scrollX = back->scrollX;   // uvMax.x (i_data2.x)
+    cmd->scrollY = back->scrollY;   // uvMax.y (i_data2.y)
+
+    cmd->radius = back->borderRadius;
+    cmd->aa = back->aa;
+    cmd->shadowBlur = back->shadowBlur;
+    cmd->borderWidth = back->borderWidth;             // i_data3.w
+    cmd->shadowColor = back->shadowColor;             // i_data4.x
+    cmd->fillColor = back->fillcolor;           // i_data4.y
+    cmd->borderColor = back->borderColor;             // i_data4.z
+    cmd->zIndex = zIndex;
+    cmd->texture = tex1;
+    cmd->texture2 = tex2;
     cmd->fbsize = fbsize;
     cmds.push_back(cmd);
 }
@@ -476,12 +557,14 @@ struct RenderPassKey {
     int zIndexBucket;
     bgfx::TextureHandle* texture;
     bgfx::TextureHandle* texture2;
+    float blendMode;
 
     bool operator<(const RenderPassKey& other) const {
         if (fbo != other.fbo) return fbo < other.fbo;
         if (viewId != other.viewId) return viewId < other.viewId;
         if (zIndexBucket != other.zIndexBucket) return zIndexBucket < other.zIndexBucket;
         if (dctype != other.dctype) return dctype < other.dctype;
+        if (blendMode != other.blendMode) return blendMode < other.blendMode;
         if (texture != other.texture) return texture < other.texture;
         return texture2 < other.texture2;
     }
@@ -515,6 +598,7 @@ GroupedCommands groupDrawCommands(
         passKey.zIndexBucket = static_cast<int>(cmd->zIndex);
         passKey.texture = cmd->texture;    // ★ テクスチャポインタ
         passKey.texture2 = cmd->texture2;
+        passKey.blendMode = cmd->blendMode;
 
         passGroups[passKey].push_back(cmd);
     }
@@ -588,7 +672,7 @@ void renderAllCommands(
                 bgfx::setViewRect(pass.viewId, 0, 0, pass.fbsize->x, pass.fbsize->y);
                 // 射影行列設定（2D用）
                 float orthoProj[16];
-                bx::mtxOrtho(orthoProj, 0.0f, pass.fbsize->x, pass.fbsize->y, 0.0f, 0.0f, 100.0f, 0.0f, bgfx::getCaps()->homogeneousDepth);
+                bx::mtxOrtho(orthoProj, 0.0f, pass.fbsize->x, pass.fbsize->y, 0.0f, 0.0f, 10000.0f, 0.0f, bgfx::getCaps()->homogeneousDepth);
                 bgfx::setViewTransform(pass.viewId, NULL, orthoProj);
             }
             else {
@@ -597,7 +681,7 @@ void renderAllCommands(
                 bgfx::setViewRect(pass.viewId, 0, 0, 800, 600);
                 // 射影行列設定（2D用）
                 float orthoProj[16];
-                bx::mtxOrtho(orthoProj, 0.0f, 800.0f, 600.0f, 0.0f, 0.0f, 100.0f, 0.0f, bgfx::getCaps()->homogeneousDepth);
+                bx::mtxOrtho(orthoProj, 0.0f, 800.0f, 600.0f, 0.0f, 0.0f, 10000.0f, 0.0f, bgfx::getCaps()->homogeneousDepth);
                 bgfx::setViewTransform(pass.viewId, NULL, orthoProj);
             }
             currentFBO = pass.fbo;

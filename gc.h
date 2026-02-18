@@ -258,7 +258,9 @@ enum CType {
     _FloatVal, _StrObj, _Address, _Comment,
     _Comment2, _HtmObj, _CMountain, _CQuestion,
     _CDolor, _PrimOp, _SingleOp, _Label,
-    _Local, _Operator
+    _Local, _Operator,
+    _VariClass, _ArrType, _FuncType2, _Variable, _Function, _GenericFunction,
+    _ClassObj, _ModelObj, _GeneObj, _GenericObj, _ObjBlock, _Generic
 };
 // =============================================================================
 // クラス定義

@@ -53,6 +53,7 @@ struct DrawCommand {
 	float zIndex = 0.0f;
     bgfx::TextureHandle* texture = nullptr;
     bgfx::TextureHandle* texture2 = nullptr;
+    float blendMode = 0.0f; // 0=premultiplied, 1=overwrite
 };
 
 struct UnifiedDrawCommand : DrawCommand {
@@ -143,8 +144,8 @@ inline void packInstance(UnifiedDrawCommand& cmd, UnifiedInstanceData& out, Draw
     out.data0[3] = cmd.height;
 
     // i_data1: モード別
-    if (type == DrawCommandType::Image) {
-        // Imageモード: float精度でUV座標
+    if (type == DrawCommandType::Image || type == DrawCommandType::RawImage) {
+        // Image/RawImageモード: float精度でUV座標
         out.data1[0] = 0.0f;           // (未使用)
         out.data1[1] = 0.0f;           // (未使用)
         out.data1[2] = cmd.angle;      // uvMin.x
@@ -190,7 +191,7 @@ inline void packInstance(UnifiedDrawCommand& cmd, UnifiedInstanceData& out, Draw
     out.data4[0] = packColorAsFloat(cmd.shadowColor);
     out.data4[1] = packColorAsFloat(cmd.fillColor);
     out.data4[2] = packColorAsFloat(cmd.borderColor);
-    out.data4[3] = 50 - cmd.zIndex / 1000;
+    out.data4[3] = 5000 - cmd.zIndex / 10;
 }
 
 // ============================================================
@@ -241,13 +242,22 @@ inline void drawUnifiedBatch(
     bgfx::setTexture(1, resources.widthsUniform, tex2);
 
     float mode = static_cast<float>(batchType);
-    float modeVec[4] = { mode, 0.0f, 0.0f, 0.0f };
+    float blendMode = sorted[0]->blendMode;
+    float modeVec[4] = { mode, blendMode, 0.0f, 0.0f };
     bgfx::setUniform(resources.param1Uniform, modeVec);
 
     bgfx::setInstanceDataBuffer(&idb);
-    bgfx::setState(BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A
-        | BGFX_STATE_DEPTH_TEST_LESS | BGFX_STATE_WRITE_Z
-        | BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_INV_SRC_ALPHA));
+
+    if (blendMode > 0.5f) {
+        bgfx::setState(BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A
+            | BGFX_STATE_DEPTH_TEST_LESS | BGFX_STATE_WRITE_Z);
+    }
+    else {
+        // プリマルチプライドモード: 背景と合成
+        bgfx::setState(BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A
+            | BGFX_STATE_DEPTH_TEST_LESS | BGFX_STATE_WRITE_Z
+            | BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_INV_SRC_ALPHA));
+    }
     bgfx::submit(viewId, resources.uniteProgram);
 }
 struct PageCurlDrawCommand : DrawCommand {
