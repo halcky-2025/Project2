@@ -13,7 +13,8 @@ SAMPLER2D(s_widths, 1);
 #define MODE_GRADIENT_CHECKER 4.0
 #define MODE_IMAGE            5.0
 #define MODE_PAGE_CURL        6.0
-#define MODE_END              7.0
+#define MODE_RAW_IMAGE        7.0
+#define MODE_END              8.0
 
 float sdRoundRect(vec2 p, vec2 b, float r)
 {
@@ -28,6 +29,7 @@ void main()
     vec2 p = v_uv * v_rectParams.zw;
     vec2 resolution = v_rectParams.zw;
     float mode = u_param1.x;
+    float blendMode = u_param1.y; // 0=premultiplied, 1=overwrite
     
     // v_patternParams:
     //   .xy: (未使用)
@@ -64,8 +66,7 @@ void main()
     // ============================================================
     
     vec4 patternCol = v_fillColor;
-    patternCol.rgb *= patternCol.a;
-    
+
     // ----------------------------------------------------------
     // Fill (初期値をそのまま使用)
     // ----------------------------------------------------------
@@ -113,7 +114,6 @@ void main()
                     vec4 colA = texture2D(s_palette, vec2(pU_A, 0.5));
                     vec4 colB = texture2D(s_palette, vec2(pU_B, 0.5));
                     patternCol = mix(colA, colB, t);
-                    patternCol.rgb *= patternCol.a;
                     found = 1.0;
                 }
                 prevLimit = limit;
@@ -123,7 +123,6 @@ void main()
         if (found < 0.5) {
             float pU = (dataOffset + 0.5) / totalSize;
             patternCol = texture2D(s_palette, vec2(pU, 0.5));
-            patternCol.rgb *= patternCol.a;
         }
     }
     // ----------------------------------------------------------
@@ -165,7 +164,6 @@ void main()
         
         float pU = (dataOffset + idx + 0.5) / totalSize;
         patternCol = texture2D(s_palette, vec2(pU, 0.5));
-        patternCol.rgb *= patternCol.a;
     }
     // ----------------------------------------------------------
     // Checker (補間なし)
@@ -216,7 +214,6 @@ void main()
         float idx = mod(idxX + idxY, u_colorCount);
         float pU = (dataOffset + idx + 0.5) / totalSize;
         patternCol = texture2D(s_palette, vec2(pU, 0.5));
-        patternCol.rgb *= patternCol.a;
     }
     // ----------------------------------------------------------
     // GradientChecker (バイリニア補間)
@@ -298,8 +295,7 @@ void main()
         vec4 colTop = mix(col00, col10, tX);
         vec4 colBot = mix(col01, col11, tX);
         patternCol = mix(colTop, colBot, tY);
-        patternCol.rgb *= patternCol.a;
-    }    
+    }
     // ----------------------------------------------------------
     // Image
     // v_patternParams.z: uvMin.x, v_patternParams.w: uvMin.y
@@ -311,7 +307,6 @@ void main()
         vec2 uvMax = scrollXY;                    // v_scroll.xy
         vec2 texUV = mix(uvMin, uvMax, clamp(v_uv, 0.0, 1.0));
         patternCol = texture2D(s_palette, texUV) * v_fillColor;
-        patternCol.rgb *= patternCol.a;
     }
     // ----------------------------------------------------------
     // PageCurl
@@ -319,7 +314,7 @@ void main()
     // v_scroll: uvSize.x, uvSize.y, progress, aa
     // v_uvRange: uvMin.xy(int), backUVMin.xy(int)
     // ----------------------------------------------------------
-    else if (mode < MODE_END) {
+    else if (mode < MODE_RAW_IMAGE) {
         // 16bitパック値を小数に変換
         vec2 uvMin = v_uvRange.xy / 65535.0;
         vec2 backUVMin = backUVMinInt / 65535.0;
@@ -396,13 +391,26 @@ void main()
             }
         }
         
-        patternCol.rgb *= patternCol.a;
-        
         // ページめくりモードでは radius=0 として扱う（角丸なし）
         // aa はそのまま使用
         radius = 0.0;
     }
-    
+    // ----------------------------------------------------------
+    // RawImage (純粋テクスチャ描画、SDF/影/ボーダーなし)
+    // ----------------------------------------------------------
+    else if (mode < MODE_END) {
+        vec2 uvMin = vec2(u_angle, curlRadius);
+        vec2 uvMax = scrollXY;
+        vec2 texUV = mix(uvMin, uvMax, clamp(v_uv, 0.0, 1.0));
+        vec4 col = texture2D(s_palette, texUV) * v_fillColor;
+        col.rgb *= col.a;
+        if (col.a < 0.001) {
+            discard;
+        }
+        gl_FragColor = col;
+        return;
+    }
+
     // ============================================================
     // SDF計算
     // ============================================================
@@ -422,10 +430,6 @@ void main()
     float shadowDist = sdRoundRect(shadowPos, halfSize, rSafe);
     float shadowAlpha = 1.0 - smoothstep(-shadowBlurSafe, shadowBlurSafe, shadowDist);
     
-    vec4 shadow = v_shadowColor;
-    shadow.rgb *= shadow.a * shadowAlpha;
-    shadow.a *= shadowAlpha;
-    
     // ============================================================
     // Fill
     // ============================================================
@@ -442,31 +446,62 @@ void main()
     float alphaInner = smoothstep(aaSafe, -aaSafe, distInner);
     float alphaBorder = clamp(alphaFill - alphaInner, 0.0, 1.0);
     
-    // Pattern (内側のみ)
-    vec4 pattern = patternCol * alphaInner;
-    
-    // Border色
-    vec4 bord = v_borderColor;
-    bord.rgb *= bord.a;
-    bord *= alphaBorder;
-    
     // ============================================================
-    // 合成: Shadow → Pattern → Border
+    // 合成
     // ============================================================
-    
-    vec4 col = shadow;
-    
-    // Pattern over Shadow
-    col.rgb = col.rgb * (1.0 - pattern.a) + pattern.rgb;
-    col.a = col.a + pattern.a * (1.0 - col.a);
-    
-    // Border over result
-    col.rgb = col.rgb * (1.0 - bord.a) + bord.rgb;
-    col.a = col.a + bord.a * (1.0 - col.a);
-    
-    if (col.a < 0.001) {
-        discard;
+
+    if (blendMode < 0.5) {
+        // --- プリマルチプライドモード (背景と合成) ---
+        // Shadow (premultiply)
+        vec4 shadow = v_shadowColor;
+        shadow.a *= shadowAlpha;
+        shadow.rgb *= shadow.a;
+
+        // Pattern (内側のみ, premultiply)
+        vec4 pattern = patternCol;
+        pattern.rgb *= pattern.a;
+        pattern *= alphaInner;
+
+        // Border色 (premultiply)
+        vec4 bord = v_borderColor;
+        bord.rgb *= bord.a;
+        bord *= alphaBorder;
+
+        vec4 col = shadow;
+
+        // Pattern over Shadow
+        col.rgb = col.rgb * (1.0 - pattern.a) + pattern.rgb;
+        col.a = col.a + pattern.a * (1.0 - col.a);
+
+        // Border over result
+        col.rgb = col.rgb * (1.0 - bord.a) + bord.rgb;
+        col.a = col.a + bord.a * (1.0 - col.a);
+
+        if (col.a < 0.001) {
+            discard;
+        }
+        gl_FragColor = col;
     }
-    
-    gl_FragColor = col;
+    else {
+        // --- 上書きモード (背景を反映しない) ---
+        // 優先度: ボーダー > パネル > 影 (分岐なし)
+        float bordA  = v_borderColor.a * alphaBorder;
+        float panelA = patternCol.a * alphaInner;
+        float shadA  = v_shadowColor.a * shadowAlpha * (1.0 - alphaFill);
+
+        // ボーダーがあればボーダー、なければパネル
+        float useBord = step(0.001, bordA);
+        vec3 rgb = mix(patternCol.rgb, v_borderColor.rgb, useBord);
+        float a  = mix(panelA, bordA, useBord);
+
+        // パネル/ボーダーがなければ影
+        float useFill = step(0.001, a);
+        rgb = mix(v_shadowColor.rgb, rgb, useFill);
+        a   = mix(shadA, a, useFill);
+
+        if (a < 0.001) {
+            discard;
+        }
+        gl_FragColor = vec4(rgb * a, a);
+    }
 }

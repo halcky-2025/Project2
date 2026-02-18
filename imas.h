@@ -23,41 +23,41 @@
 
 
 enum class ResolveStatus {
-    Success,        // ��������
-    Pending,        // ���[�h���iplaceholder�g�p�j
-    NotFound,       // ������Ȃ�
-    Evicted,        // eviction�ς݁i�ă��[�h�\�����j
+    Success,        // 成功した
+    Pending,        // ロード中（placeholder使用）
+    NotFound,       // 見つからない
+    Evicted,        // eviction済み（リロード可能性）
 };
 
 struct ResolveResult {
     ResolveStatus status = ResolveStatus::NotFound;
     ResolvedTexture resolved;
-    ResolvedTexture placeholder;  // Pending���̃t�H�[���o�b�N
+    ResolvedTexture placeholder;  // Pending時のフォールバック
 
     bool isReady() const { return status == ResolveStatus::Success; }
 
-    // �`��p�i�����Ȃ�resolved�APending�Ȃ�placeholder�j
+    // 描画用（成功ならresolved、Pendingならplaceholder）
     const ResolvedTexture& forDraw() const {
         return (status == ResolveStatus::Success) ? resolved : placeholder;
     }
 };
 
 //=============================================================================
-// ImageLocation - ImageId�̔z�u���
+// ImageLocation - ImageIdの配置情報
 //=============================================================================
 
 struct ImageLocation {
     enum class Type : uint8_t {
         None,
-        Standalone,   // standaloneTextures_ �ɑ���
-        FontAtlas,    // FontAtlas �ɑ���
-        GridAtlas,    // ThumbnailGridAtlas �ɑ���
-        ShelfAtlas,   // ThumbnailShelfAtlas �ɑ���
+        Standalone,   // standaloneTextures_ に存在
+        FontAtlas,    // FontAtlas に存在
+        GridAtlas,    // ThumbnailGridAtlas に存在
+        ShelfAtlas,   // ThumbnailShelfAtlas に存在
     };
 
     Type type = Type::None;
 
-    // �eAtlas�p�̓����L�[
+    // 各Atlas用の内部キー
     union {
         struct { uint64_t glyphKey; } font;           // FontId + codepoint
         struct { ThumbnailHandle handle; } thumbnail; // Grid/Shelf
@@ -71,12 +71,12 @@ struct ImageLocation {
 };
 
 //=============================================================================
-// RenderGroup - ��{�O���[�v
+// RenderGroup - 基本グループ
 //=============================================================================
 
 
 //=============================================================================
-// ExtendedRenderGroup - ImageMaster �p�g���O���[�v
+// ExtendedRenderGroup - ImageMaster 用拡張グループ
 //=============================================================================
 struct ExtendedRenderGroup : RenderGroup {
     std::unordered_set<uint64_t> usedGridThumbnails;
@@ -96,9 +96,9 @@ struct ExtendedRenderGroup : RenderGroup {
 };
 
 //=============================================================================
-// ImageMasterGroupManager - �O���錾
+// ImageMasterGroupManager - 前方宣言
 //=============================================================================
-class ImageMaster;  // �O���錾
+class ImageMaster;  // 前方宣言
 
 class ImageMasterGroupManager {
 public:
@@ -177,7 +177,7 @@ public:
     }
 
     void shutdown() {
-        // Standalone textures ���
+        // Standalone textures 解放
         {
             std::lock_guard lock(standaloneMutex_);
             for (auto& [id, info] : standaloneTextures_) {
@@ -191,7 +191,7 @@ public:
             standaloneTextures_.clear();
         }
 
-        // �z�u���N���A
+        // 配置情報クリア
         {
             std::lock_guard lock(locationMutex_);
             imageLocations_.clear();
@@ -211,13 +211,13 @@ public:
     }
 
     void collectGarbage() {
-        // �����؂�O���[�v�̉��
+        // 期限切れグループの解放
         collectExpiredGroups(config_.groupExpireFrames);
 
         // FontAtlas GC
         fontAtlas_.collectGarbage();
 
-        // ThumbnailAtlas �͓���LRU�ŊǗ�
+        // ThumbnailAtlas は内部LRUで管理
         gridAtlas_.evictLRU(16);
         shelfAtlas_.evictLRU(16);
 
@@ -248,7 +248,7 @@ public:
                 }
                 standaloneTextures_.erase(it);
 
-                // �z�u�����폜
+                // 配置情報を削除
                 std::lock_guard locLock(locationMutex_);
                 imageLocations_.erase(id);
             }
@@ -258,7 +258,7 @@ public:
     uint64_t currentFrame() const { return currentFrame_; }
 
     //=========================================================================
-    // ���v���
+    // 統計情報
     //=========================================================================
     struct Stats {
         // FontAtlas
@@ -333,7 +333,7 @@ public:
     }
 
     //=========================================================================
-    // �yLayer A�z�������API�iUI/Scene�����j
+    // 【Layer A】解決系API（UI/Scene向け）
     //=========================================================================
     ResolveResult resolveFontGlyph(ImageId id) {
         ResolveResult result;
@@ -364,7 +364,7 @@ public:
         ResolveResult result;
         uint64_t contentId = getImageIdLocal(id);
 
-        // �܂� Grid �ŒT��
+        // まず Grid で探索
         float u0, v0, u1, v1;
         auto gridHandle = gridAtlas_.find(contentId);
         if (gridHandle) {
@@ -380,7 +380,7 @@ public:
             }
         }
 
-        // ���� Shelf �ŒT��
+        // 次に Shelf で探索
         auto shelfHandle = shelfAtlas_.find(contentId);
         if (shelfHandle) {
             float u0, v0, u1, v1;
@@ -398,7 +398,7 @@ public:
         result.status = ResolveStatus::NotFound;
         return result;
     }
-    // ImageId �� �`��\�ȃe�N�X�`��������
+    // ImageId → 描画可能なテクスチャに解決
     ResolveResult resolve(ImageId id) {
         ResolveResult result;
 
@@ -414,7 +414,7 @@ public:
             return resolveFontGlyph(id);
 
         case ImageIdDomain::Thumbnail:
-            return resolveThumbnail(id);  // Grid/Shelf ����
+            return resolveThumbnail(id);  // Grid/Shelf 両方
 
         case ImageIdDomain::Offscreen:
         case ImageIdDomain::Memory:
@@ -428,7 +428,7 @@ public:
         }
     }
 
-    // �ȈՔŁi�������̂݃e�N�X�`������Ԃ��j
+    // 簡易版（成功時のみテクスチャ情報を返す）
     bool resolve(ImageId id, bgfx::TextureHandle& outTex,
         float& u0, float& v0, float& u1, float& v1) {
         auto result = resolve(id);
@@ -442,16 +442,16 @@ public:
         return true;
     }
 
-    // �`��p�iPending����placeholder�j
+    // 描画用（Pending時はplaceholder）
     ResolvedTexture resolveForDraw(ImageId id) {
         return resolve(id).forDraw();
     }
 
     //=========================================================================
-    // �yLayer A�zImageId �o�^/�Ǘ�
+    // 【Layer A】ImageId 登録/管理
     //=========================================================================
 
-    // ImageId�̏�Ԃ��m�F
+    // ImageIdの状態を確認
     bool exists(ImageId id) const {
         std::lock_guard lock(locationMutex_);
         return imageLocations_.find(id) != imageLocations_.end();
@@ -463,7 +463,7 @@ public:
         return it != imageLocations_.end() && it->second.isPending;
     }
 
-    // Pending��Ԃœo�^�i���[�h�J�n���j
+    // Pending状態で登録（ロード開始時）
     void registerPending(ImageId id) {
         std::lock_guard lock(locationMutex_);
         auto& loc = imageLocations_[id];
@@ -471,11 +471,11 @@ public:
         loc.isPending = true;
     }
 
-    // touch�i�g�p�}�[�N�j
+    // touch（使用マーク）
     void touch(ImageId id) {
         ImageIdDomain domain = getImageIdDomain(id);
 
-        // Standalone�n
+        // Standalone系
         if (domain == ImageIdDomain::Offscreen ||
             domain == ImageIdDomain::Memory ||
             domain == ImageIdDomain::Generated ||
@@ -487,7 +487,7 @@ public:
             }
         }
 
-        // Grid/Shelf �͓����n���h���o�R�� touch
+        // Grid/Shelf は内部ハンドル経由で touch
         std::lock_guard lock(locationMutex_);
         auto it = imageLocations_.find(id);
         if (it != imageLocations_.end()) {
@@ -500,7 +500,7 @@ public:
         }
     }
 
-    // �Q�ƃJ�E���g
+    // 参照カウント
     void retain(ImageId id) {
         ImageIdDomain domain = getImageIdDomain(id);
         if (domain == ImageIdDomain::Offscreen ||
@@ -514,7 +514,7 @@ public:
                 it->second.lastUsedFrame = currentFrame_;
             }
         }
-        // Grid/Shelf�͓���LRU�ŊǗ�
+        // Grid/Shelfは内部LRUで管理
     }
 
     void release(ImageId id) {
@@ -532,10 +532,10 @@ public:
     }
 
     //=========================================================================
-    // �yLayer B�zStandalone �e�N�X�`���i�჌�x���j
+    // 【Layer B】Standalone テクスチャ（低レベル）
     //=========================================================================
 
-    // �쐬�i�s�N�Z���f�[�^����j
+    // 作成（ピクセルデータから）
     ImageId createStandaloneTexture(const void* pixels, uint16_t w, uint16_t h,
         int pitch, bool persistent = false) {
         ImageId id = ImageIdGenerator::fromMemory();
@@ -546,7 +546,7 @@ public:
         return id;
     }
 
-    // �쐬�iSDL_Surface ����j
+    // 作成（SDL_Surface から）
     ImageId createStandaloneTexture(SDL_Surface* surface, bool persistent = false) {
         if (!surface) return 0;
 
@@ -563,7 +563,7 @@ public:
         return id;
     }
 
-    // �쐬�i��e�N�X�`���j
+    // 作成（空テクスチャ）
     ImageId createEmptyStandaloneTexture(uint16_t w, uint16_t h, bool persistent = false) {
         if (w == 0 || h == 0) return 0;
 
@@ -589,7 +589,7 @@ public:
         info.origin = ImageOrigin::Memory;
         info.isRenderTarget = false;
 
-        // �z�u����o�^
+        // 配置情報を登録
         {
             std::lock_guard locLock(locationMutex_);
             auto& loc = imageLocations_[id];
@@ -602,10 +602,10 @@ public:
         return id;
     }
     //=========================================================================
-    // �e�N�X�`���|�C���^�擾API�i�ǉ��j
+    // テクスチャポインタ取得API（追加）
     //=========================================================================
 
-    // Standalone �e�N�X�`���ւ̃|�C���^�擾
+    // Standalone テクスチャへのポインタ取得
     bgfx::TextureHandle* getStandaloneTexturePtr(ImageId id) {
         std::lock_guard lock(standaloneMutex_);
         auto it = standaloneTextures_.find(id);
@@ -615,7 +615,7 @@ public:
         return nullptr;
     }
 
-    // FBO �ւ̃|�C���^�擾
+    // FBO へのポインタ取得
     bgfx::FrameBufferHandle* getOffscreenFBOPtr(ImageId id) {
         std::lock_guard lock(standaloneMutex_);
         auto it = standaloneTextures_.find(id);
@@ -625,12 +625,12 @@ public:
         return nullptr;
     }
 
-    // ��API�݊�
+    // 旧API互換
     ImageId reserveOffscreenTexture(uint16_t w, uint16_t h,
         bool persistent = false) {
         ImageId id = ImageIdGenerator::forOffscreen();
 
-        // ��ɃG���g�����쐬�i�e�N�X�`���������j
+        // 先にエントリを作成（テクスチャは後から）
         {
             std::lock_guard lock(standaloneMutex_);
             auto [it, inserted] = standaloneTextures_.emplace(id, StandaloneTextureInfo{});
@@ -650,7 +650,7 @@ public:
                 loc.isPending = true;
             }
 
-            // �쐬�L���[�ɒǉ�
+            // 作成キューに追加
             {
                 std::lock_guard lock(offscreenQueueMutex_);
                 offscreenCreateQueue_.push_back({ id, w, h, persistent });
@@ -665,7 +665,7 @@ public:
         std::lock_guard lock(offscreenQueueMutex_);
         offscreenResizeQueue_.push_back({ id, newW, newH });
     }
-    // �ʏ�e�N�X�`���\��i���[�h�O�Ƀ|�C���^�擾�j
+    // 通常テクスチャ予約（ロード前にポインタ取得）
     ImageId reserveTexture(bgfx::TextureHandle** outTexPtr, uint16_t w, uint16_t h) {
         ImageId id = ImageIdGenerator::fromMemory();
 
@@ -691,7 +691,7 @@ public:
 
         return id;
     }
-    // �e�N�X�`���f�[�^���A�b�v���[�h�i�\��ς�ID�ɑ΂��āj
+    // テクスチャデータをアップロード（予約済みIDに対して）
     bool uploadTexture(ImageId id, const void* pixels, uint16_t w, uint16_t h, int pitch) {
         std::lock_guard lock(standaloneMutex_);
         auto it = standaloneTextures_.find(id);
@@ -699,7 +699,7 @@ public:
 
         auto& info = it->second;
 
-        // �e�N�X�`���쐬
+        // テクスチャ作成
         const bgfx::Memory* mem = bgfx::copy(pixels, w * h * 4);
         info.handle = bgfx::createTexture2D(
             w, h, false, 1,
@@ -713,7 +713,7 @@ public:
         info.size.y = h;
         info.lastUsedFrame = currentFrame_;
 
-        // Pending����
+        // Pending解除
         {
             std::lock_guard locLock(locationMutex_);
             auto locIt = imageLocations_.find(id);
@@ -726,14 +726,14 @@ public:
     }
 
     //=========================================================================
-    // FontAtlas �e�N�X�`���|�C���^�擾
+    // FontAtlas テクスチャポインタ取得
     //=========================================================================
 
     bgfx::TextureHandle* getFontAtlasTexturePtr(uint16_t pageIndex) {
         return &fontAtlas_.getPageTexture(pageIndex);
     }
 
-    // �O���t�擾�i�|�C���^�t���j
+    // グリフ取得（ポインタ付き）
     struct GlyphResult {
         const GlyphInfo* info = nullptr;
         bgfx::TextureHandle* texturePtr = nullptr;
@@ -752,7 +752,7 @@ public:
     }
 
     //=========================================================================
-    // Thumbnail �e�N�X�`���|�C���^�擾
+    // Thumbnail テクスチャポインタ取得
     //=========================================================================
 
     bgfx::TextureHandle* getGridAtlasTexturePtr(uint16_t pageIndex) {
@@ -763,7 +763,7 @@ public:
         return (bgfx::TextureHandle*)(&shelfAtlas_.getTexture(pageIndex));
     }
 
-    // Thumbnail �擾�i�|�C���^�t���j
+    // Thumbnail 取得（ポインタ付き）
     struct ThumbnailResult {
         ThumbnailHandle handle;
         bgfx::TextureHandle* texturePtr = nullptr;
@@ -795,7 +795,7 @@ public:
     }
 
     //=========================================================================
-    // Placeholder �e�N�X�`���|�C���^
+    // Placeholder テクスチャポインタ
     //=========================================================================
 
     bgfx::TextureHandle* getPlaceholderTexturePtr() {
@@ -815,12 +815,12 @@ public:
 
         auto& info = it->second;
 
-        // �T�C�Y�ύX�Ȃ��Ȃ牽�����Ȃ�
+        // サイズ変更なしなら何もしない
         if (info.size.x == newW && info.size.y == newH) {
             return true;
         }
 
-        // �Â����\�[�X�j��
+        // 古いリソース破棄
         if (bgfx::isValid(info.fbo)) {
             bgfx::destroy(info.fbo);
         }
@@ -863,7 +863,7 @@ public:
         info.size.y = newH;
         info.lastUsedFrame = currentFrame_;
 
-        // �z�u�����X�V
+        // 配置情報を更新
         {
             std::lock_guard locLock(locationMutex_);
             auto locIt = imageLocations_.find(id);
@@ -903,7 +903,7 @@ public:
             resizes.swap(offscreenResizeQueue_);
         }
         int size = creates.size() + resizes.size();
-        // �쐬
+        // 作成
         for (auto& req : creates) {
             if (createOffscreenInternal(req.id, req.width, req.height, req.persistent)) {
                 if (req.dest) {
@@ -933,13 +933,13 @@ public:
             }
             standaloneTextures_.erase(it);
 
-            // �z�u�����폜
+            // 配置情報を削除
             std::lock_guard locLock(locationMutex_);
             imageLocations_.erase(id);
         }
     }
 
-    // ��API�݊�
+    // 旧API互換
     void touchStandaloneTexture(ImageId id) {
         touch(id);
     }
@@ -956,14 +956,14 @@ public:
         destroyStandalone(id);
     }
 
-    // Standalone �e�N�X�`�����擾
+    // Standalone テクスチャ情報取得
     StandaloneTextureInfo* getStandaloneTexture(ImageId id) {
         std::lock_guard lock(standaloneMutex_);
         auto it = standaloneTextures_.find(id);
         return (it != standaloneTextures_.end()) ? &it->second : nullptr;
     }
 
-    // Standalone �e�N�X�`���X�V
+    // Standalone テクスチャ更新
     bool updateStandaloneTexture(ImageId id, const void* pixels,
         uint16_t x, uint16_t y, uint16_t w, uint16_t h, int pitch) {
         std::lock_guard lock(standaloneMutex_);
@@ -985,13 +985,13 @@ public:
     }
 
     //=========================================================================
-    // �yLayer B�zFontAtlas�i�჌�x���j
+    // 【Layer B】FontAtlas（低レベル）
     //=========================================================================
 
     FontAtlas& fontAtlas() { return fontAtlas_; }
     const FontAtlas& fontAtlas() const { return fontAtlas_; }
 
-    // FontAtlas �֗����\�b�h�i�Ϗ��j
+    // FontAtlas 便利メソッド（委譲）
     FontId registerFont(const char* name, const std::string& fontPath, int size) {
         return fontAtlas_.registerFont(name, fontPath, size);
     }
@@ -1018,21 +1018,21 @@ public:
         return fontAtlas_.getPageTexture(pageIndex);
     }
 
-    // �O���t�ǉ�����ImageId��Ԃ�
+    // グリフ追加してImageIdを返す
     ImageId addGlyph(FontId font, uint32_t codepoint, SDL_Color color = { 255,255,255,255 }) {
-        // FontIndex ���擾�i�Փ˂Ȃ��̘A�ԁj
+        // FontIndex を取得（衝突なしの連番）
         uint32_t fontIndex = fontAtlas_.getFontIndex(font);
-        if (fontIndex == 0) return 0;  // ���o�^�t�H���g
+        if (fontIndex == 0) return 0;  // 未登録フォント
 
         const auto& gi = fontAtlas_.getOrAddGlyph(font, codepoint, nullptr, color);
         if (gi.width == 0) return 0;
 
-        // localId = fontIndex(24bit) + codepoint(24bit) �ň��
-        // codepoint �� Unicode �ōő� 0x10FFFF (21bit) �Ȃ̂� 24bit �ŏ\��
+        // localId = fontIndex(24bit) + codepoint(24bit) で一意
+        // codepoint は Unicode で最大 0x10FFFF (21bit) なので 24bit で十分
         uint64_t localId = (uint64_t(fontIndex) << 24) | (codepoint & 0x00FFFFFF);
         ImageId id = ImageIdGenerator::forFontGlyph(localId);
 
-        // �z�u����o�^
+        // 配置情報を登録
         {
             std::lock_guard lock(locationMutex_);
             auto& loc = imageLocations_[id];
@@ -1046,7 +1046,7 @@ public:
         return id;
     }
 
-    // �摜�ǉ�����ImageId��Ԃ�
+    // 画像追加してImageIdを返す
     ImageId addImageToFontAtlas(SDL_Surface* surface, bool pinned = false) {
         ImageId id = ImageIdGenerator::forFontGlyph(nextFontAtlasImageId_++);
         const auto& gi = fontAtlas_.addImage(id, surface, nullptr, pinned);
@@ -1065,19 +1065,19 @@ public:
         return id;
     }
 
-    // ���ڃA�N�Z�X
+    // 直接アクセス
     bgfx::TextureHandle getFontAtlasTexture(uint16_t pageIndex) {
         return fontAtlas_.getPageTexture(pageIndex);
     }
 
     //=========================================================================
-    // �yLayer B�zThumbnailGridAtlas�i�჌�x���j
+    // 【Layer B】ThumbnailGridAtlas（低レベル）
     //=========================================================================
 
     ThumbnailGridAtlas& gridAtlas() { return gridAtlas_; }
     const ThumbnailGridAtlas& gridAtlas() const { return gridAtlas_; }
 
-    // Grid �֗����\�b�h�i�Ϗ��j
+    // Grid 便利メソッド（委譲）
     bool getGridUV(ThumbnailHandle handle, float& u0, float& v0, float& u1, float& v1) const {
         return gridAtlas_.getUV(handle, u0, v0, u1, v1);
     }
@@ -1102,7 +1102,7 @@ public:
         return gridAtlas_.isValid(handle);
     }
 
-    // �T���l�C���擾/�쐬����ImageId��Ԃ�
+    // サムネイル取得/作成してImageIdを返す
     ImageId acquireGridThumbnail(uint64_t contentId, bool& outNeedsLoad) {
         ImageId id = ImageIdGenerator::forThumbnail(contentId);
         ThumbnailHandle handle = gridAtlas_.acquire(contentId, outNeedsLoad);
@@ -1120,7 +1120,7 @@ public:
         return id;
     }
 
-    // �A�b�v���[�h�����ʒm
+    // アップロード完了通知
     void onGridUploadComplete(ImageId id) {
         std::lock_guard lock(locationMutex_);
         auto it = imageLocations_.find(id);
@@ -1129,7 +1129,7 @@ public:
         }
     }
 
-    // ���ڃA�N�Z�X
+    // 直接アクセス
     bool queueGridUpload(ImageId id, const void* data, uint16_t w, uint16_t h) {
         std::lock_guard lock(locationMutex_);
         auto it = imageLocations_.find(id);
@@ -1150,13 +1150,13 @@ public:
     }
 
     //=========================================================================
-    // �yLayer B�zThumbnailShelfAtlas�i�჌�x���j
+    // 【Layer B】ThumbnailShelfAtlas（低レベル）
     //=========================================================================
 
     ThumbnailShelfAtlas& shelfAtlas() { return shelfAtlas_; }
     const ThumbnailShelfAtlas& shelfAtlas() const { return shelfAtlas_; }
 
-    // Shelf �֗����\�b�h�i�Ϗ��j
+    // Shelf 便利メソッド（委譲）
     bool getShelfUV(ThumbnailHandle handle, float& u0, float& v0, float& u1, float& v1) const {
         return shelfAtlas_.getUV(handle, u0, v0, u1, v1);
     }
@@ -1219,10 +1219,10 @@ public:
     }
 
     //=========================================================================
-    // ImageLoader ����Ă΂��o�^���\�b�h�iID�w��Łj
+    // ImageLoader から呼ばれる登録メソッド（ID指定で）
     //=========================================================================
 
-    // FontAtlas�摜��o�^�iImageLoader�p�j
+    // FontAtlas画像を登録（ImageLoader用）
     void registerFontAtlasImage(ImageId id, uint16_t width, uint16_t height) {
         std::lock_guard lock(locationMutex_);
         auto& loc = imageLocations_[id];
@@ -1233,7 +1233,7 @@ public:
         loc.isPending = false;
     }
 
-    // Grid�摜��o�^�iImageLoader�p�j
+    // Grid画像を登録（ImageLoader用）
     void registerGridImage(ImageId id, ThumbnailHandle handle, uint16_t width, uint16_t height) {
         std::lock_guard lock(locationMutex_);
         auto& loc = imageLocations_[id];
@@ -1244,7 +1244,7 @@ public:
         loc.isPending = false;
     }
 
-    // Shelf�摜��o�^�iImageLoader�p�j
+    // Shelf画像を登録（ImageLoader用）
     void registerShelfImage(ImageId id, ThumbnailHandle handle, uint16_t width, uint16_t height) {
         std::lock_guard lock(locationMutex_);
         auto& loc = imageLocations_[id];
@@ -1255,7 +1255,7 @@ public:
         loc.isPending = false;
     }
 
-    // Standalone�쐬�iID�w��ŁAImageLoader�p�j
+    // Standalone作成（ID指定で、ImageLoader用）
     bool createStandaloneWithId(ImageId id, const void* pixels, uint16_t w, uint16_t h,
         int pitch, bool persistent) {
         return createStandaloneInternal(id, pixels, w, h, pitch, persistent,
@@ -1295,7 +1295,7 @@ public:
     }
 private:
     //=========================================================================
-    // ����resolve�֐�
+    // 内部resolve関数
     //=========================================================================
 
     ResolveResult resolveStandalone(ImageId id) {
@@ -1324,7 +1324,7 @@ private:
 
         float u0, v0, u1, v1;
         if (!gridAtlas_.getUV(loc.thumbnail.handle, u0, v0, u1, v1)) {
-            // eviction ����Ă���\��
+            // eviction されている可能性
             result.status = ResolveStatus::Evicted;
             return result;
         }
@@ -1361,7 +1361,7 @@ private:
     }
 
     //=========================================================================
-    // �����쐬�֐�
+    // 内部作成関数
     //=========================================================================
 
     bool createStandaloneInternal(ImageId id, const void* pixels, uint16_t w, uint16_t h,
@@ -1394,7 +1394,7 @@ private:
         info.origin = origin;
         info.isRenderTarget = isRenderTarget;
 
-        // �z�u����o�^
+        // 配置情報を登録
         {
             std::lock_guard locLock(locationMutex_);
             auto& loc = imageLocations_[id];
@@ -1463,7 +1463,7 @@ private:
     }
 
     //=========================================================================
-    // �����o
+    // メンバ
     //=========================================================================
 
     Config config_;
@@ -1483,7 +1483,7 @@ private:
 
 public:
     //=========================================================================
-    // RenderGroup �Ǘ��i�Ϗ� + �����j
+    // RenderGroup 管理（委譲 + 拡張）
     //=========================================================================
 
     ExtendedRenderGroup& createGroup(SurfaceId surfaceId,
@@ -1499,15 +1499,15 @@ public:
         auto* g = groupManager_.getGroup(id);
         if (!g) return;
 
-        // FontAtlas �ւ̒ʒm
+        // FontAtlas への通知
         fontAtlas_.onGroupDestroyed(*g);
 
-        // Standalone texture �̎Q�Ɖ��
+        // Standalone texture の参照解放
         for (auto texId : g->usedStandaloneTextures) {
             release(texId);
         }
 
-        // Surface ���X�g����폜
+        // Surface リストから削除
         auto& sv = groupManager_.surfaceGroups_[g->surfaceId];
         sv.erase(std::remove(sv.begin(), sv.end(), id), sv.end());
 
@@ -1546,7 +1546,7 @@ public:
 
     ImageMasterGroupManager& groupManager() { return groupManager_; }
 
-    // ImageId �� �z�u���̃}�b�s���O
+    // ImageId → 配置情報のマッピング
     mutable std::mutex locationMutex_;
     std::unordered_map<ImageId, ImageLocation> imageLocations_;
 
@@ -1556,7 +1556,7 @@ public:
 
 
 //=============================================================================
-// ImageSource - �摜�\�[�X
+// ImageSource - 画像ソース
 //=============================================================================
 struct ImageSource {
     enum class Type { File, Memory, SDL_Surface };
@@ -1579,16 +1579,16 @@ struct ImageSource {
 };
 
 //=============================================================================
-// ImageUsage - �z�u�q���g
+// ImageUsage - 配置ヒント
 //=============================================================================
 enum class ImageUsage : uint8_t {
-    Auto,           // �T�C�Y���玩�����f
-    Icon,           // �����Ȑ����` �� Grid
-    Thumbnail,      // �ʏ�T���l �� �T�C�Y�� Grid or Shelf
-    VideoThumb,     // �����T���l �� Shelf
-    Background,     // �w�i�摜 �� Standalone (persistent)
-    UIImage,        // UI�摜 �� Standalone or FontAtlas
-    Dynamic,        // ���I�X�V �� Standalone
+    Auto,           // サイズから自動判断
+    Icon,           // 小さな正方形 → Grid
+    Thumbnail,      // 通常サムネ → サイズ別 Grid or Shelf
+    VideoThumb,     // 動画サムネ → Shelf
+    Background,     // 背景画像 → Standalone (persistent)
+    UIImage,        // UI画像 → Standalone or FontAtlas
+    Dynamic,        // 動的更新 → Standalone
 };
 
 //=============================================================================
@@ -1606,7 +1606,7 @@ using FileDecoder = std::function<DecodedImage(const std::string& path)>;
 using MemoryDecoder = std::function<DecodedImage(const void* data, size_t size)>;
 
 //=============================================================================
-// PlacementPolicy - �z�u�|���V�[
+// PlacementPolicy - 配置ポリシー
 //=============================================================================
 struct PlacementPolicy {
     uint16_t gridMaxSize = 128;
@@ -1619,7 +1619,7 @@ struct PlacementPolicy {
 };
 
 //=============================================================================
-// CachedImage - CPU�L���b�V���G���g��
+// CachedImage - CPUキャッシュエントリ
 //=============================================================================
 struct CachedImage {
     ImageId imageId = 0;
@@ -1636,14 +1636,14 @@ struct CachedImage {
 };
 
 //=============================================================================
-// LoadRequest - �񓯊����[�h���N�G�X�g
+// LoadRequest - 非同期ロードリクエスト
 //=============================================================================
 struct LoadRequest {
-    ImageId imageId;              // �� �ύX: ���O�Ɍ��肳�ꂽID
+    ImageId imageId;              // ※ 変更: 事前に確定されたID
     ImageSource source;
     ImageUsage usage;
     bool persistent;
-    std::function<void(ImageId, bool success)> callback;  // �� �ύX: ImageId ��Ԃ�
+    std::function<void(ImageId, bool success)> callback;  // ※ 変更: ImageId を返す
 };
 
 //=============================================================================
@@ -1659,7 +1659,7 @@ public:
     ~ImageLoader() { shutdown(); }
 
     //=========================================================================
-    // �f�R�[�_�[�ݒ�
+    // デコーダー設定
     //=========================================================================
     void setFileDecoder(FileDecoder decoder) {
         fileDecoder_ = std::move(decoder);
@@ -1670,7 +1670,7 @@ public:
     }
 
     //=========================================================================
-    // �������E�I��
+    // 初期化・終了
     //=========================================================================
     bool initialize(int workerThreads = 2) {
         if (running_) return true;
@@ -1699,16 +1699,16 @@ public:
     }
 
     //=========================================================================
-    // �������[�h - ImageId ��Ԃ��i�ύX�j
+    // 同期ロード - ImageId を返す（変更）
     //=========================================================================
     ImageId loadSync(const ImageSource& source, ImageUsage usage = ImageUsage::Auto,
         bool persistent = false) {
-        // ImageId �����O�Ɍ���
+        // ImageId を事前に決定
         ImageId imageId = computeImageId(source);
 
-        // ���ɃA�b�v���[�h�ς݂Ȃ瑦�Ԃ�
+        // 既にアップロード済みなら即返す
         if (master_.exists(imageId) && !master_.isPending(imageId)) {
-            // touch ���ĕԂ�
+            // touch して返す
             master_.touch(imageId);
             std::lock_guard lock(cacheMutex_);
             auto it = cache_.find(imageId);
@@ -1718,13 +1718,13 @@ public:
             return imageId;
         }
 
-        // �f�R�[�h
+        // デコード
         auto decoded = decodeImage(source);
         if (!decoded.isValid()) {
             return 0;
         }
 
-        // �L���b�V���ɓo�^
+        // キャッシュに登録
         {
             std::lock_guard lock(cacheMutex_);
             auto& cached = cache_[imageId];
@@ -1738,7 +1738,7 @@ public:
             cached.refCount = 1;
         }
 
-        // GPU �ɃA�b�v���[�h
+        // GPU にアップロード
         if (!uploadToGpu(imageId)) {
             return 0;
         }
@@ -1746,43 +1746,43 @@ public:
         return imageId;
     }
 
-    // �t�@�C������ - ImageId ��Ԃ��i�ύX�j
+    // ファイルから - ImageId を返す（変更）
     ImageId loadFromFile(const std::string& path, ImageUsage usage = ImageUsage::Auto,
         bool persistent = false) {
         return loadSync(ImageSource::fromFile(path), usage, persistent);
     }
 
-    // ���������� - ImageId ��Ԃ��i�ύX�j
+    // メモリから - ImageId を返す（変更）
     ImageId loadFromMemory(const void* data, size_t size,
         ImageUsage usage = ImageUsage::Auto,
         bool persistent = false) {
         return loadSync(ImageSource::fromMemory(data, size), usage, persistent);
     }
 
-    // SDL_Surface ���� - ImageId ��Ԃ��i�ύX�j
+    // SDL_Surface から - ImageId を返す（変更）
     ImageId loadFromSurface(SDL_Surface* surface, ImageUsage usage = ImageUsage::Auto,
         bool persistent = false) {
         return loadSync(ImageSource::fromSurface(surface), usage, persistent);
     }
 
     //=========================================================================
-    // �񓯊����[�h - ImageId ��Ԃ��i�ύX: Pending��Ԃő����ɕԂ��j
+    // 非同期ロード - ImageId を返す（変更: Pending状態で即座に返す）
     //=========================================================================
     ImageId loadAsync(const ImageSource& source, ImageUsage usage = ImageUsage::Auto,
         bool persistent = false,
         std::function<void(ImageId, bool success)> callback = nullptr) {
-        // ImageId �����O�Ɍ���
+        // ImageId を事前に決定
         ImageId imageId = computeImageId(source);
 
-        // ���ɃA�b�v���[�h�ς݂Ȃ瑦����
+        // 既にアップロード済みなら即返却
         if (master_.exists(imageId) && !master_.isPending(imageId)) {
             if (callback) callback(imageId, true);
             return imageId;
         }
 
-        // ���� Pending �Ȃ�d�����[�h���Ȃ�
+        // 既に Pending なら重複ロードしない
         if (master_.isPending(imageId)) {
-            // �R�[���o�b�N�����o�^
+            // コールバックだけ登録
             if (callback) {
                 std::lock_guard lock(pendingCallbacksMutex_);
                 pendingCallbacks_[imageId].push_back(callback);
@@ -1790,7 +1790,7 @@ public:
             return imageId;
         }
 
-        // Pending �Ƃ��� ImageMaster �ɓo�^
+        // Pending として ImageMaster に登録
         master_.registerPending(imageId);
 
         LoadRequest req;
@@ -1806,11 +1806,11 @@ public:
         }
         queueCv_.notify_one();
 
-        return imageId;  // Pending ��Ԃ� ImageId �𑦍��ɕԂ�
+        return imageId;  // Pending 状態の ImageId を即座に返す
     }
 
     //=========================================================================
-    // ImageId ���O�v�Z�i�V�K�j
+    // ImageId 事前計算（新規）
     //=========================================================================
     static ImageId computeImageId(const ImageSource& source) {
         switch (source.type) {
@@ -1825,7 +1825,7 @@ public:
     }
 
     //=========================================================================
-    // ��Ԋm�F�i�ύX: ImageMaster �ɈϏ��j
+    // 状態確認（変更: ImageMaster に委譲）
     //=========================================================================
     bool isLoaded(ImageId imageId) const {
         return master_.exists(imageId) && !master_.isPending(imageId);
@@ -1835,21 +1835,21 @@ public:
         return master_.isPending(imageId);
     }
 
-    // ��API�݊�
+    // 旧API互換
     bool isUploaded(ImageId imageId) const {
         return isLoaded(imageId);
     }
 
     //=========================================================================
-    // getDrawInfo �͍폜 - ImageMaster.resolve() ���g�p
+    // getDrawInfo は削除 - ImageMaster.resolve() を使用
     //=========================================================================
-    // 
-    // �y���z
+    //
+    // 【旧】
     // bgfx::TextureHandle tex;
     // float u0, v0, u1, v1;
     // if (loader.getDrawInfo(handle, tex, u0, v0, u1, v1)) { ... }
     //
-    // �y�V�z
+    // 【新】
     // auto resolved = master.resolveForDraw(imageId);
     // if (resolved.isValid()) {
     //     // resolved.texture, resolved.u0, v0, u1, v1
@@ -1857,7 +1857,7 @@ public:
     //
 
     //=========================================================================
-    // �Q�ƃJ�E���g
+    // 参照カウント
     //=========================================================================
     void retain(ImageId imageId) {
         master_.retain(imageId);
@@ -1878,7 +1878,7 @@ public:
     }
 
     //=========================================================================
-    // eviction �ʒm�iImageMaster ����Ă΂��j
+    // eviction 通知（ImageMaster から呼ばれる）
     //=========================================================================
     void onEvicted(ImageId id) {
         std::lock_guard lock(cacheMutex_);
@@ -1889,7 +1889,7 @@ public:
     }
 
     //=========================================================================
-    // �ăA�b�v���[�h�ieviction ��ɍēx�K�v�ɂȂ����ꍇ�j
+    // 再アップロード（eviction 後に再度必要になった場合）
     //=========================================================================
     bool reupload(ImageId imageId) {
         std::lock_guard lock(cacheMutex_);
@@ -1901,7 +1901,7 @@ public:
     }
 
     //=========================================================================
-    // �t���[������
+    // フレーム処理
     //=========================================================================
     void beginFrame() {
         ++currentFrame_;
@@ -1909,7 +1909,7 @@ public:
     }
 
     //=========================================================================
-    // CPU�L���b�V���Ǘ�
+    // CPUキャッシュ管理
     //=========================================================================
     void collectGarbage() {
         std::lock_guard lock(cacheMutex_);
@@ -1960,7 +1960,7 @@ public:
     }
 
     //=========================================================================
-    // ���v���
+    // 統計情報
     //=========================================================================
     struct Stats {
         size_t cacheEntries;
@@ -2016,7 +2016,7 @@ public:
 
 private:
     //=========================================================================
-    // �z�u�挈��
+    // 配置先決定
     //=========================================================================
     ImageLocation::Type decidePlacement(uint16_t w, uint16_t h, ImageUsage usage) {
         switch (usage) {
@@ -2061,7 +2061,7 @@ private:
     }
 
     //=========================================================================
-    // �摜�f�R�[�h
+    // 画像デコード
     //=========================================================================
     DecodedImage decodeImage(const ImageSource& source) {
         DecodedImage decoded;
@@ -2173,7 +2173,7 @@ private:
     }
 
     //=========================================================================
-    // GPU �A�b�v���[�h - ImageMaster �ɓo�^
+    // GPU アップロード - ImageMaster に登録
     //=========================================================================
     bool uploadToGpu(ImageId imageId) {
 #if TARGET_OS_IOS || TARGET_OS_SIMULATOR
@@ -2265,7 +2265,7 @@ private:
     }
 
     //=========================================================================
-    // ���[�J�[�X���b�h
+    // ワーカースレッド
     //=========================================================================
     void workerThread() {
         while (running_) {
@@ -2283,12 +2283,12 @@ private:
                 loadQueue_.pop();
             }
 
-            // �f�R�[�h�i���b�N�O�j
+            // デコード（ロック外）
             auto decoded = decodeImage(req.source);
             bool success = decoded.isValid();
 
             if (success) {
-                // �L���b�V���ɓo�^
+                // キャッシュに登録
                 {
                     std::lock_guard lock(cacheMutex_);
                     auto& cached = cache_[req.imageId];
@@ -2303,7 +2303,7 @@ private:
                 }
             }
 
-            // �����L���[�ɒǉ�
+            // 完了キューに追加
             {
                 std::lock_guard lock(completedMutex_);
                 completedLoads_.push_back({ req.imageId, req.callback, success });
@@ -2312,7 +2312,7 @@ private:
     }
 
     //=========================================================================
-    // ���������i���C���X���b�h�ŌĂ΂��j
+    // 完了処理（メインスレッドで呼ばれる）
     //=========================================================================
     void processCompletedLoads() {
         std::vector<CompletedLoad> completed;
@@ -2323,16 +2323,16 @@ private:
 
         for (auto& c : completed) {
             if (c.success && c.imageId != 0) {
-                // GPU�A�b�v���[�h
+                // GPUアップロード
                 uploadToGpu(c.imageId);
             }
 
-            // ���C���R�[���o�b�N
+            // メインコールバック
             if (c.callback) {
                 c.callback(c.imageId, c.success);
             }
 
-            // �ǉ��R�[���o�b�N�i�d�����[�h������ɓo�^���ꂽ���́j
+            // 追加コールバック（重複ロード時後に登録されたもの）
             {
                 std::lock_guard lock(pendingCallbacksMutex_);
                 auto it = pendingCallbacks_.find(c.imageId);
@@ -2353,7 +2353,7 @@ private:
     };
 
     //=========================================================================
-    // �����o
+    // メンバ
     //=========================================================================
     ImageMaster& master_;
     PlacementPolicy policy_;
@@ -2375,7 +2375,7 @@ private:
     std::mutex completedMutex_;
     std::vector<CompletedLoad> completedLoads_;
 
-    // �d�����[�h���p�R�[���o�b�N
+    // 重複ロード時用コールバック
     std::mutex pendingCallbacksMutex_;
     std::unordered_map<ImageId, std::vector<std::function<void(ImageId, bool)>>> pendingCallbacks_;
 

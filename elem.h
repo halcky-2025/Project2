@@ -1,4 +1,4 @@
-// GlyphAtlas_bgfx.hpp
+﻿// GlyphAtlas_bgfx.hpp
 #pragma once
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
@@ -41,7 +41,14 @@ enum LetterType {
 	_Dolor, _Left, _Right, _HLetter, _StringTag, _AtLetter, _RightRight,
 	_Colon, _And, _Percent, _EqualEqual, _NotEqual, _LessEqual, _MoreEqual, _CommentSingle,
 	_Obj,
-	OT_Call1, OT_Call2, OT_Bracket, OT_Block, OT_Comment, OT_Dot, OT_Left, OT_Right, OT_None
+	OT_Call1, OT_Call2, OT_Bracket, OT_Block, OT_Comment, OT_Dot, OT_Left, OT_Right, OT_None,
+	OT_Wait, OT_Error, OT_NG, OT_Word, OT_Htm, OT_Number, OT_FloatVal, OT_BoolVal, OT_StrObj,
+	OT_Print, OT_Return, OT_Goto, OT_Continue, OT_Var, OT_If, OT_Elif, OT_Else,
+	OT_While, OT_For, OT_Switch, OT_GeneLabel, OT_Comment2,
+	OT_Client, OT_Server, OT_Signal, OT_ServerClient, OT_Dolor, OT_Mountain,
+	OT_Model, OT_Gene, OT_Class, OT_TagBlock, OT_CallBlock, OT_Array,
+	OT_ClassObj, OT_Generic, OT_GenericObj,
+	OT_VariClass, OT_ArrType, OT_FuncType, OT_Variable, OT_Function, OT_GenericFunction, OT_ObjBlock
 };
 class FontAtlas;
 #ifndef __MACTYPES__  // Avoid conflict with MacTypes.h Point on Apple platforms
@@ -138,12 +145,12 @@ FontId getFont(const char* name, int size) {
 }
 enum class ImageIdDomain : uint8_t {
 	Invalid = 0x00,
-	File = 0x01,  // �t�@�C���p�X���琶��
-	Memory = 0x02,  // �������f�[�^���琶��
-	Offscreen = 0x03,  // �I�t�X�N���[���e�N�X�`��
-	Generated = 0x04,  // ���I�����iprocedural�j
-	FontGlyph = 0x05,  // FontAtlas �̃O���t/�摜
-	Thumbnail = 0x06,  // �T���l�C�� (Grid/Shelf)
+	File = 0x01,  // ファイルパスから生成
+	Memory = 0x02,  // メモリデータから生成
+	Offscreen = 0x03,  // オフスクリーンテクスチャ
+	Generated = 0x04,  // 動的生成(procedural)
+	FontGlyph = 0x05,  // FontAtlas のグリフ/画像
+	Thumbnail = 0x06,  // サムネイル (Grid/Shelf)
 };
 
 using ImageId = uint64_t;

@@ -1458,6 +1458,7 @@ CustomModuleImpl* GoThread(ThreadGC* thgc) {
     //initHoppyWindow(thgc, hw);
 	NewLocal* local = (NewLocal*)GC_alloc(thgc, _LocalC);
     initNewLocal(thgc, local);
+    local->font = getFont("sans", 16);
     NewLetter* let = (NewLetter*)GC_alloc(thgc, _LetterC);
     initNewLetter(thgc, let, getFont("sans", 16), _Letter);
 	let->text = createString(thgc, (char*)"Hello,world!", 12, 1);

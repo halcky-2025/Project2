@@ -24,16 +24,13 @@ C:\Users\hayah\source\repos\Project2\Project2\arr.h(596,12): warning C4477: 'pri
 C:\Users\hayah\source\repos\Project2\Project2\arr.h(789,13): warning C4311: '型キャスト': ポインターを 'char *' から 'long' へ切り詰めます。
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\elem.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
+C:\Users\hayah\source\repos\Project2\Project2\elem.h(69,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'MemObj' の左辺を無視します。
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\elem.h(62,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'MemObj' の左辺を無視します。
+C:\Users\hayah\source\repos\Project2\Project2\elem.h(75,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'MemFunc' の左辺を無視します。
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\elem.h(68,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'MemFunc' の左辺を無視します。
-  (ソース ファイル 'main.cpp' をコンパイルしています)
-  
-C:\Users\hayah\source\repos\Project2\Project2\elem.h(74,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'PointI' の左辺を無視します。
+C:\Users\hayah\source\repos\Project2\Project2\elem.h(81,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'PointI' の左辺を無視します。
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
 C:\Users\hayah\source\repos\Project2\Project2\newelem.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
@@ -48,31 +45,19 @@ C:\Users\hayah\source\repos\Project2\Project2\newelem.h(13,16): warning C4091: '
 C:\Users\hayah\source\repos\Project2\Project2\Compile.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\elem.h(814,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
+C:\Users\hayah\source\repos\Project2\Project2\objz.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
+  (ソース ファイル 'main.cpp' をコンパイルしています)
+  
+C:\Users\hayah\source\repos\Project2\Project2\newelem.h(851,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
 C:\Users\hayah\source\repos\Project2\Project2\opt.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\ugui.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
+C:\Users\hayah\source\repos\Project2\Project2\shader.h(696,43): warning C5055: 演算子 '<=': 列挙型と浮動小数点型の間では非推奨です
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\shader.h(612,43): warning C5055: 演算子 '<=': 列挙型と浮動小数点型の間では非推奨です
-  (ソース ファイル 'main.cpp' をコンパイルしています)
-  
-C:\Users\hayah\source\repos\Project2\Project2\shader.h(612,73): warning C5055: 演算子 '<=': 列挙型と浮動小数点型の間では非推奨です
-  (ソース ファイル 'main.cpp' をコンパイルしています)
-  
-C:\Users\hayah\source\repos\Project2\Project2\thumnailAtlas.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
-  (ソース ファイル 'main.cpp' をコンパイルしています)
-  
-C:\Users\hayah\source\repos\Project2\Project2\thumnailAtlas.h(802,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
-  (ソース ファイル 'main.cpp' をコンパイルしています)
-  
-C:\Users\hayah\source\repos\Project2\Project2\thumnailAtlas.h(1593,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
-  (ソース ファイル 'main.cpp' をコンパイルしています)
-  
-C:\Users\hayah\source\repos\Project2\Project2\ugui.h(770,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
+C:\Users\hayah\source\repos\Project2\Project2\shader.h(696,73): warning C5055: 演算子 '<=': 列挙型と浮動小数点型の間では非推奨です
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
 C:\Users\hayah\source\repos\Project2\Project2\extorch.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
