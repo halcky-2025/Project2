@@ -1,4 +1,3 @@
-
 // ============================================================
 // objz.h - Z解析パス (静的解析 / 型チェック)
 // ============================================================
@@ -476,7 +475,7 @@ Obj* exepZ_Class(ThreadGC* thgc, Obj* self, int* n, Master* local, Primary* prim
 		(*n)++;
 		val2 = *(Obj**)get_list(primary->children, *n);
 		if (val2->objtype == LetterType::OT_Block) {
-			Generic* generic = (Generic*)GC_alloc(thgc, CType::_Generic);
+			Generic* generic = (Generic*)GC_alloc(thgc, CType::_GenericType);
 			generic->objtype = LetterType::OT_Generic;
 			generic->vmap = create_mapy(thgc, CType::_List);
 			(*n)++;

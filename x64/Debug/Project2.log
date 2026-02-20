@@ -36,10 +36,13 @@ C:\Users\hayah\source\repos\Project2\Project2\elem.h(81,16): warning C4091: 'typ
 C:\Users\hayah\source\repos\Project2\Project2\newelem.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\newelem.h(12,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'NewElement' の左辺を無視します。
+C:\Users\hayah\source\repos\Project2\Project2\newelem.h(11,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'NewElement' の左辺を無視します。
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\newelem.h(13,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'DrawCommand' の左辺を無視します。
+C:\Users\hayah\source\repos\Project2\Project2\newelem.h(12,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'DrawCommand' の左辺を無視します。
+  (ソース ファイル 'main.cpp' をコンパイルしています)
+  
+C:\Users\hayah\source\repos\Project2\Project2\newelem.h(729,53): warning C4834: [[nodiscard]] 属性を持つ関数の戻り値を破棄しています
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
 C:\Users\hayah\source\repos\Project2\Project2\Compile.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
@@ -48,7 +51,7 @@ C:\Users\hayah\source\repos\Project2\Project2\Compile.h(1,1): warning C4819: フ
 C:\Users\hayah\source\repos\Project2\Project2\objz.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\newelem.h(851,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
+C:\Users\hayah\source\repos\Project2\Project2\newelem.h(846,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
 C:\Users\hayah\source\repos\Project2\Project2\opt.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
@@ -85,7 +88,7 @@ C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\
           [
               _Ty=int
           ]
-          C:\Users\hayah\source\repos\Project2\Project2\main.cpp(532,1):
+          C:\Users\hayah\source\repos\Project2\Project2\main.cpp(537,1):
           コンパイル対象の関数 テンプレート インスタンス化 'std::_Optional_destruct_base<_Ty,true>::_Optional_destruct_base<const unsigned __int64>(std::in_place_t,const unsigned __int64 &&) noexcept' のリファレンスを確認してください
           with
           [

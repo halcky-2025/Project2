@@ -1,4 +1,3 @@
-
 #pragma once
 #include <map>
 #include <string>
@@ -175,6 +174,7 @@ struct KeyEvent {
 	int key;
 	Uint8* keys;
 	enum KeyCall call;
+	bool shift, ctrl, alt;
 };
 struct NewMeasure {
 	NewElement* base;
@@ -320,10 +320,10 @@ void initNewEndElement(ThreadGC* thgc, NewEndElement* end, NewElement* parent) {
 }
 void ResetId(NewElement* elem, int* n) {
 	for (NewElement* child = elem->childend->next; child->type != LetterType::_ElemEnd; child = child->next) {
-		child->id = (*n)++ * 65536 * 65536 * 65536;
-		ResetId(child, n);
+		child->id = (uint64_t)(*n)++ * 65536ULL * 65536ULL * 65536ULL;
+		if (child->childend != NULL) ResetId(child, n);
 	}
-	elem->childend->id = (*n)++ * 65536 * 65536 * 65536;
+	elem->childend->id = (uint64_t)(*n)++ * 65536ULL * 65536ULL * 65536ULL;
 }
 void SetChildIds(NewElement* elem) {
 
@@ -387,8 +387,8 @@ void NewBefore(ThreadGC* thgc, NewLocal* local, NewElement* self, NewElement* el
 			ResetId(local, &n);
 		}
 		else {
-			elem->id = self->id - (self->id - before->id) / 3;
-			elem->childend->id = self->id - (self ->id - before->id) / 3 * 2;
+			elem->id = self->id - (self->id - before->id) * 2 / 3;
+			elem->childend->id = self->id - (self ->id - before->id) / 3;
 		}
 		SetChildIds(elem);
 	}
@@ -415,12 +415,12 @@ void NewNext(ThreadGC* thgc, NewLocal* local, NewElement* self, NewElement* elem
 			ResetId(local, &n);
 		}
 		else {
-			elem->id = (next->id - before->id) / 3;
-			elem->childend->id = (next->id - before->id) / 3 * 2;
+			elem->id = before->id + (next->id - before->id) / 3;
+			elem->childend->id = before->id + (next->id - before->id) / 3 * 2;
 		}
 		SetChildIds(elem);
 	}
-	else elem->id = (self->id + next->id) / 2;
+	else elem->id = (before->id + next->id) / 2;
 }
 Offscreen* FindOffscreen(NewElement* elem) {
 	for (; elem != NULL; elem = elem->parent) {
@@ -591,6 +591,8 @@ void NewMeasureCall(ThreadGC* thgc, NewElement* elem, NewMeasure* measure, NewLo
 		measure->pos = { 0, 0 };
 		measure->size = { elem->size.x, elem->size.y };
 	}
+	elem->pos2.x = measure->pos.x;
+	elem->pos2.y = measure->pos.y;
 	measure->pos.x += elem->margins[3] + elem->borderRadius + elem->paddings[3];
 	measure->pos.y += elem->margins[0] + elem->borderRadius + elem->paddings[0];
 	measure->start = measure->pos;
@@ -724,7 +726,7 @@ void initNewLocal(ThreadGC* thgc, NewLocal* local) {
 	local->parent = NULL;
 	NewEndElement* end = (NewEndElement*)GC_alloc(thgc, CType::_EndC);
 	initNewEndElement(thgc, end, (NewElement*)local);
-	end->id = std::numeric_limits<unsigned long>::max();
+	end->id = 65536; std::numeric_limits<uint64_t>::max();
 	local->childend = (NewElement*)end;
 	local->margins[0] = local->margins[1] = local->margins[2] = local->margins[3] = 0;
 	local->paddings[0] = local->paddings[1] = local->paddings[2] = local->paddings[3] = 0;
@@ -870,6 +872,8 @@ void NewLetterMeasureCall(ThreadGC* thgc, NewElement* elem, NewMeasure* measure,
 		add_list(thgc, letter->renderspans, (char *)r);
 	}
 	letter->size = letter->size2;
+	letter->pos2.x = measure->pos.x;
+	letter->pos2.y = measure->pos.y;
 }
 void SelectDraw(ThreadGC* thgc, NewLocal* local, NewGraphic* g, RenderCommandQueue* q) {
 	if (local->select.m == local->select.from->len(local->select.from)) {
@@ -918,7 +922,7 @@ void SelectDraw(ThreadGC* thgc, NewLocal* local, NewGraphic* g, RenderCommandQue
 		start->DrawSelection(thgc, local, start, s, start->len(start), g, q);
 		s = 0;
 		if (start->childend != NULL) {
-			start = start->childend;
+			start = start->childend->next;
 			continue;
 		}
 		else if (start->type == _ElemEnd) {
@@ -949,6 +953,7 @@ void LetterDrawSelect(ThreadGC* thgc, NewLocal* local, NewElement* self, int m, 
 			for (;;) {
 				if (n <= s->end) {
 					float w, h;
+					str = SubString(thgc, letter->text, s->start, s->end);
 					MeasureString(*getAtlas(thgc), s->font, str, n - s->start, 10000, &w, &h, &n2, NULL);
 					g->layer->pushFill(self->pos.x + self->pos2.x + s->x + w0, self->pos.y + self->pos2.y + s->y, w - w0 + 1, s->height, 0.0f, 0.0f, 0.0f, 0x4477ff66, 0, 0.0f, 0.0f, 1.0f, 0, 12000.0f, g->fb, g->fbsize, g->viewId);
 					break;
@@ -970,7 +975,7 @@ void NewLetterDrawCall(ThreadGC* thgc, NewElement* elem, NewGraphic* g, NewLocal
 	NewLetter* letter = (NewLetter*)elem;
 	for (int i = 0; i < letter->renderspans->size; i++) {
 		auto rs = *(RenderSpan**)get_list(letter->renderspans, i);
-		drawString((LayerInfo*)g->layer, *getAtlas(thgc), rs->font, SubString(thgc, letter->text, rs->start, rs->end - rs->start), g->pos.x + rs->x, g->pos.y + rs->y, std::floor(elem->zIndex) + 0.9,
+		drawString((LayerInfo*)g->layer, *getAtlas(thgc), rs->font, SubString(thgc, letter->text, rs->start, rs->end - rs->start), g->pos.x + letter->pos2.x + rs->x, g->pos.y + letter->pos2.y + rs->y, std::floor(elem->zIndex) + 0.9,
 			rs->color, g->group, g->fb, g->fbsize, g->viewId);
 	}
 }
@@ -1038,6 +1043,29 @@ int ElementMouse(ThreadGC* thgc, NewElement* self, MouseEvent* e, NewLocal* loca
 	}
 	return -1;
 }
+void NewMoveElement(ThreadGC* thgc, NewLocal* local, NewElement* before, NewElement* from, NewElement* to) {
+	if (from->type == LetterType::_ElemEnd || to->type == LetterType::_ElemEnd) return;
+	NewElement* b, *a = before->next;
+	if (before->type == _ElemEnd) {
+		b = before->parent;
+	}
+	else b = before;
+	from->before->next = to->next;
+	to->next->before = from->before;
+	to->next = before->next;
+	before->next->before = to;
+	before->next = from;
+	from->before = before;
+	int n = 2;
+	for (NewElement* elem = from; elem != to; elem = elem->next) n++;
+	int c = 1;
+	for (; ; from = from->next) {
+		from->id = b->id + (a->id - b->id) * c / n;
+		from->parent = before->parent;
+		if (from == to) break;
+	}
+	
+}
 void SelectKey(ThreadGC* thgc, NewLocal* local, KeyEvent* e) {
 	if (local->select.m == local->select.from->len(local->select.from)) {
 		local->select.from = local->select.from->next;
@@ -1101,14 +1129,18 @@ void SelectKey(ThreadGC* thgc, NewLocal* local, KeyEvent* e) {
 		}
 		NewElement* next = start->next;
 		int n = start->Key(thgc, start, s, start->len(start), e, local);
+		s = 0;
 		if (n == 1) break;
 		else if (n == -1) {
 			start = next;
 			break;
 		}
-		s = 0;
+		else if (n == -2) {
+			start = start->before->next;
+			continue;
+		}
 		if (start->childend != NULL) {
-			start = start->childend;
+			start = start->childend->next;
 			continue;
 		}
 		else if (start->type == _ElemEnd) {
@@ -1188,21 +1220,30 @@ int AddText(ThreadGC* thgc, NewLocal* local, NewLetter* letter, int m, int n, St
 	letter->recompile = true;
 	return 0;
 }
-void UniteLine(ThreadGC* thgc, NewLocal* local, NewLine* before, NewLine* next) {
-	if (before->childend->before->type == LetterType::_Letter && next->childend->next->type == LetterType::_Letter) {
-		NewLetter* bef = (NewLetter*)before->childend->before, * nex = (NewLetter*)next->childend->next;
+void UniteText(ThreadGC* thgc, NewLocal* local, NewElement* before, NewElement* next) {
+	if (before->type == LetterType::_Letter && next->type == LetterType::_Letter) {
+		NewLetter* bef = (NewLetter*)before, * nex = (NewLetter*)next;
 		AddText(thgc, local, bef, bef->len(bef), bef->len(bef), nex->text);
 		NewRemoveElement(thgc, local, nex);
 	}
-	for (NewElement* elem = next->childend->next; elem->type != _ElemEnd; ) {
-		NewElement* nex = elem->next;
-		NewNext(thgc, local, before->childend->before, elem);
-		elem = nex;
+
+}
+void UniteLine(ThreadGC* thgc, NewLocal* local, NewLine* before, NewLine* next) {
+	for (NewElement* elem = before->childend->before; elem->type != _ElemEnd; ) {
+		NewElement* bef = elem->before;
+		NewNext(thgc, local, next->childend, elem);
+		elem = bef;
 	}
-	NewRemoveElement(thgc, local, next);
+	if (local->select.from == before->childend) {
+		local->select.from = next->childend;
+	}
+	else if (local->select.to == before->childend) {
+		local->select.to = next->childend;
+	}
+	NewRemoveElement(thgc, local, before);
 }
 int EndKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLocal* local) {
-	if (!self->parent->parent->editable) return 0;
+	if (!self->parent->parent->editable) return 1;
 	if (m == 1) return 0;
 	if (e->key == SDLK_LEFT) {
 		local->select.count = -1;
@@ -1210,52 +1251,119 @@ int EndKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLocal
 			if (m == 0) {
 				if (self->before->type == _ElemEnd) {
 					if (self->parent->before->type == _ElemEnd) return 0;
-					local->select.from = local->select.to = self->parent->before->childend;
-					local->select.fromid = local->select.toid = local->select.from->id;
-					local->select.m = local->select.n = 0;
+					local->select.to = self->parent->before->childend;
+					local->select.toid = local->select.to->id;
+					local->select.n = 0;
 				}
 				else {
-					local->select.from = local->select.to = self->before;
-					local->select.fromid = local->select.toid = local->select.from->id;
-					local->select.m = local->select.n = self->before->len(self->before) - 1;
+					local->select.to = self->before;
+					local->select.toid = local->select.to->id;
+					local->select.n = self->before->len(self->before) - 1;
+				}
+				if (!e->shift) {
+					local->select.from = local->select.to;
+					local->select.fromid = local->select.to->id;
+					local->select.m = local->select.n;
 				}
 			}
 			else {
 				local->select.m = local->select.n = m - 1;
+				if (!e->shift) {
+					local->select.m = local->select.n;
+				}
 			}
+			FindOffscreen(self)->markPaint(local);
 			return 0;
 		}
 		else {
-			local->select.from = local->select.to = local->select.start;
-			local->select.fromid = local->select.toid = local->select.from->id;
-			local->select.m = local->select.n = local->select.s;
+			if (e->shift) {
+				self = local->select.to;
+				if (m == 0) {
+					if (self->before->type == _ElemEnd) {
+						if (self->parent->before->type == _ElemEnd) return 1;
+						local->select.to = self->parent->before->childend;
+						local->select.toid = local->select.to->id;
+						local->select.n = 0;
+					}
+					else {
+						local->select.to = self->before;
+						local->select.toid = local->select.to->id;
+						local->select.n = self->before->len(self->before) - 1;
+					}
+				}
+				else {
+					local->select.n--;
+				}
+				FindOffscreen(self)->markPaint(local);
+				return 1;
+			}
+			else {
+				local->select.from = local->select.to = local->select.start;
+				local->select.fromid = local->select.toid = local->select.from->id;
+				local->select.m = local->select.n = local->select.s;
+			}
+			FindOffscreen(self)->markPaint(local);
 			return 1;
 		}
 	}
 	else if (e->key == SDLK_RIGHT) {
 		local->select.count = -1;
 		if (local->select.from == local->select.to && local->select.m == local->select.n) {
-			if (self->next->type == _ElemEnd) {
-				if (self->parent->before->type == _ElemEnd) return 0;
-				local->select.from = local->select.to = self->parent->next->childend->next;
-				local->select.fromid = local->select.toid = local->select.from->id;
-				local->select.m = local->select.n = 0;
+			if (self->parent->next->type == _ElemEnd) return 0;
+			local->select.to = self->parent->next->childend->next;
+			local->select.toid = local->select.to->id;
+			local->select.n = 0;
+			if (!e->shift) {
+				local->select.from = local->select.to;
+				local->select.fromid = local->select.from->id;
+				local->select.m = local->select.n;
 			}
-			return 0;
+			FindOffscreen(self)->markPaint(local);
+			return 1;
 		}
 		else {
-			local->select.from = local->select.to = local->select.end;
-			local->select.fromid = local->select.toid = local->select.from->id;
-			local->select.m = local->select.n = local->select.e;
+			if (e->shift) {
+				self = local->select.to;
+				if (m == self->len(self)) {
+					if (self->next->type == _ElemEnd) {
+						if (self->parent->next->type == _ElemEnd) return 0;
+						local->select.to = self->parent->next->childend->next;
+						local->select.toid = local->select.to->id;
+						local->select.n = 0;
+					}
+					else {
+						local->select.to = self->next;
+						local->select.toid = local->select.to->id;
+						local->select.n = 1;
+					}
+				}
+				else {
+					if (self->type == _ElemEnd) {
+						if (self->parent->next->type == _ElemEnd) return 0;
+						local->select.to = self->parent->next->childend->next;
+						local->select.toid = local->select.to->id;
+						local->select.n = 0;
+					}
+					local->select.n++;
+				}
+				FindOffscreen(self)->markPaint(local);
+				return 0;
+			}
+			else {
+				local->select.from = local->select.to = local->select.end;
+				local->select.fromid = local->select.toid = local->select.from->id;
+				local->select.m = local->select.n = local->select.e;
+			}
+			FindOffscreen(self)->markPaint(local);
 			return 1;
 		}
 	}
 	else if (e->key == SDLK_UP) {
 		if (local->select.from == local->select.to && local->select.m == local->select.n) {
 			if (self->parent->before->type == _ElemEnd) {
-				local->select.from = local->select.to = self->parent->childend->next;
-				local->select.fromid = local->select.toid = local->select.from->id;
-				local->select.m = local->select.n = 0;
+				local->select.to = self->parent->childend->next;
+				local->select.toid = local->select.to->id;
+				local->select.n = 0;
 			}
 			else {
 				if (local->select.count < 0) {
@@ -1266,34 +1374,75 @@ int EndKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLocal
 				}
 				for (NewElement* elem = self->parent->before->childend->next; ; elem = elem->next) {
 					if (elem->type == _ElemEnd) {
-						local->select.from = local->select.to = elem;
-						local->select.fromid = local->select.toid = local->select.from->id;
-						local->select.m = local->select.n = 0;
-						return 0;
+						local->select.to = elem;
+						local->select.toid = local->select.to->id;
+						local->select.n = 0;
+						break;
 					}
 					else if (local->select.count <= elem->len(elem)) {
-						local->select.from = local->select.to = elem;
-						local->select.fromid = local->select.toid;
-						local->select.m = local->select.n = local->select.count;
-						return 0;
+						local->select.to = elem;
+						local->select.toid = local->select.toid;
+						local->select.n = local->select.count;
+						break;
 					}
 				}
 			}
-			return 0;
+			if (!e->shift) {
+				local->select.from = local->select.to;
+				local->select.fromid = local->select.from->id;
+				local->select.m = local->select.n;
+			}
+			FindOffscreen(self)->markPaint(local);
+			return 1;
 		}
 		else {
-			local->select.from = local->select.to = local->select.start;
-			local->select.fromid = local->select.toid = local->select.from->id;
-			local->select.m = local->select.n = local->select.s;
+			if (e->shift) {
+				self = local->select.to;
+				if (self->parent->before->type == _ElemEnd) {
+					local->select.to = self->parent->childend->next;
+					local->select.toid = local->select.to->id;
+					local->select.n = 0;
+				}
+				else {
+					if (local->select.count < 0) {
+						local->select.count = local->select.n;
+						for (NewElement* elem = self->before; elem->type != _ElemEnd; elem = elem->before) {
+							local->select.count += elem->len(elem);
+						}
+					}
+					for (NewElement* elem = self->parent->before->childend->next; ; elem = elem->next) {
+						if (elem->type == _ElemEnd) {
+							local->select.to = elem;
+							local->select.toid = local->select.to->id;
+							local->select.n = 0;
+							break;
+						}
+						else if (local->select.count <= elem->len(elem)) {
+							local->select.to = elem;
+							local->select.toid = local->select.to->id;
+							local->select.n = local->select.count;
+							break;
+						}
+					}
+				}
+				FindOffscreen(self)->markPaint(local);
+				return 1;
+			}
+			else {
+				local->select.from = local->select.to = local->select.start;
+				local->select.fromid = local->select.toid = local->select.from->id;
+				local->select.m = local->select.n = local->select.s;
+			}
+			FindOffscreen(self)->markPaint(local);
 			return 1;
 		}
 	}
 	else if (e->key == SDLK_DOWN) {
 		if (local->select.from == local->select.to && local->select.m == local->select.n) {
 			if (self->parent->next->type == _ElemEnd) {
-				local->select.from = local->select.to = self->parent->childend;
-				local->select.fromid = local->select.toid = local->select.from->id;
-				local->select.m = local->select.n = 0;
+				local->select.to = self->parent->childend;
+				local->select.toid = local->select.to->id;
+				local->select.n = 0;
 			}
 			else {
 				if (local->select.count < 0) {
@@ -1304,25 +1453,66 @@ int EndKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLocal
 				}
 				for (NewElement* elem = self->parent->next->childend->next; ; elem = elem->next) {
 					if (elem->type == _ElemEnd) {
-						local->select.from = local->select.to = elem;
-						local->select.fromid = local->select.toid = local->select.from->id;
-						local->select.m = local->select.n = 0;
-						return 0;
+						local->select.to = elem;
+						local->select.toid = local->select.to->id;
+						local->select.n = 0;
+						break;
 					}
 					else if (local->select.count <= elem->len(elem)) {
-						local->select.from = local->select.to = elem;
-						local->select.fromid = local->select.toid;
-						local->select.m = local->select.n = local->select.count;
-						return 0;
+						local->select.to = elem;
+						local->select.toid = local->select.to->id;
+						local->select.n = local->select.count;
+						break;
 					}
 				}
 			}
-			return 0;
+			if (!e->shift) {
+				local->select.from = local->select.to;
+				local->select.fromid = local->select.from->id;
+				local->select.m = local->select.n;
+			}
+			FindOffscreen(self)->markPaint(local);
+			return 1;
 		}
 		else {
-			local->select.from = local->select.to = local->select.end;
-			local->select.fromid = local->select.toid = local->select.from->id;
-			local->select.m = local->select.n = local->select.e;
+			if (e->shift) {
+				self = local->select.to;
+				if (self->parent->next->type == _ElemEnd) {
+					local->select.to = self->parent->childend;
+					local->select.toid = local->select.to->id;
+					local->select.n = 0;
+				}
+				else {
+					if (local->select.count < 0) {
+						local->select.count = local->select.n;
+						for (NewElement* elem = self->before; elem->type != _ElemEnd; elem = elem->before) {
+							local->select.count += elem->len(elem);
+						}
+					}
+					for (NewElement* elem = self->parent->next->childend->next; ; elem = elem->next) {
+						if (elem->type == _ElemEnd) {
+							local->select.to = elem;
+							local->select.toid = local->select.to->id;
+							local->select.n = 0;
+							break;
+						}
+						else if (local->select.count <= elem->len(elem)) {
+							local->select.to = elem;
+							local->select.toid = local->select.to->id;
+							local->select.n = local->select.count;
+							break;
+						}
+					}
+				}
+				FindOffscreen(self)->markPaint(local);
+				return 1;
+			}
+			else {
+				local->select.from = local->select.to = local->select.end;
+				local->select.fromid = local->select.toid = local->select.from->id;
+				local->select.m = local->select.n = local->select.e;
+				FindOffscreen(self)->markPaint(local);
+			}
 			return 1;
 		}
 	}
@@ -1330,26 +1520,27 @@ int EndKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLocal
 	if (e->key == SDLK_UNKNOWN) {
 		FindOffscreen(self)->markLayout(local);
 		UniteLine(thgc, local, (NewLine*)self->parent, (NewLine*)self->parent->next);
+		return -2;
 	}
 	if (e->key == SDLK_KP_ENTER || e->key == SDLK_RETURN) {
 		NewLine* newline = (NewLine*)GC_alloc(thgc, _LineC);
 		initNewLine(thgc, newline);
-		NewNext(thgc, local, self->parent, newline);
-		local->select.from = local->select.to = newline->childend;
-		local->select.fromid = local->select.toid = local->select.from->id;
-		local->select.m = local->select.n = 1;
+		NewBefore(thgc, local, self->parent, newline);
+		NewMoveElement(thgc, local, newline->childend, self->parent->childend->next, self->before);
 		e->key = SDLK_UNKNOWN;
 		FindOffscreen(self)->markLayout(local);
-		return 0;
+		return -1;
 	}
 	else if (e->key == SDLK_BACKSPACE) {
 		if (local->select.from == local->select.to && local->select.m == local->select.n) {
 			if (self->before->type == _ElemEnd) {
 				if (self->parent->before->type == _ElemEnd) return 0;
-				local->select.from = local->select.to = self->parent->before->childend->before;
+				NewElement* el = self->parent->before->childend->before;
+				local->select.from = local->select.to = el;
 				local->select.fromid = local->select.toid = local->select.from->id;
 				local->select.m = local->select.n = local->select.from->len(local->select.from);
 				UniteLine(thgc, local, (NewLine*)self->parent->before, (NewLine*)self->parent);
+				UniteText(thgc, local, el, el->next);
 			}
 			else {
 				if (self->before->type == LetterType::_Letter) {
@@ -1371,27 +1562,33 @@ int EndKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLocal
 			}
 		}
 		else {
-			local->select.from = local->select.to = self->parent->before->childend->before;
+			local->select.from = local->select.to = self->before;
 			local->select.fromid = local->select.toid = local->select.from->id;
 			local->select.m = local->select.n = local->select.from->len(local->select.from);
 			UniteLine(thgc, local, (NewLine*)self->parent->before, (NewLine*)self->parent);
 			e->key = SDLK_UNKNOWN;
+			FindOffscreen(self)->markLayout(local);
+			return -2;
 		}
 		FindOffscreen(self)->markLayout(local);
 	}
 	else if (e->key == SDLK_DELETE) {
 		if (local->select.from == local->select.to && local->select.m == local->select.n) {
-			local->select.from = local->select.to = self->parent->childend->before;
+			NewElement* el = self->parent->childend->before;
+			local->select.from = local->select.to = el;
 			local->select.fromid = local->select.toid = local->select.from->id;
 			local->select.m = local->select.n = local->select.from->len(local->select.from);
 			UniteLine(thgc, local, (NewLine*)self->parent, (NewLine*)self->parent->next);
+			UniteText(thgc, local, el, el->next);
 		}
 		else {
-			local->select.from = local->select.to = self->parent->before->childend->before;
+			local->select.from = local->select.to = self->parent->childend->before;
 			local->select.fromid = local->select.toid = local->select.from->id;
 			local->select.m = local->select.n = local->select.from->len(local->select.from);
 			UniteLine(thgc, local, (NewLine*)self->parent->before, (NewLine*)self->parent);
 			e->key = SDLK_UNKNOWN;
+			FindOffscreen(self)->markLayout(local);
+			return -2;
 		}
 		FindOffscreen(self)->markLayout(local);
 	}
@@ -1421,6 +1618,8 @@ int EndKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLocal
 			local->select.m = local->select.n = local->select.from->len(local->select.from);
 			UniteLine(thgc, local, (NewLine*)self->parent->before, (NewLine*)self->parent);
 			e->key = SDLK_UNKNOWN;
+			FindOffscreen(self)->markLayout(local);
+			return -2;
 		}
 		FindOffscreen(self)->markLayout(local);
 	}
@@ -1484,26 +1683,59 @@ int LetterKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLo
 		if (local->select.from == local->select.to && local->select.m == local->select.n) {
 			if (m == 0) {
 				if (self->before->type == _ElemEnd) {
-					if (self->parent->before->type == _ElemEnd) return 0;
-					local->select.from = local->select.to = self->parent->before->childend;
-					local->select.fromid = local->select.toid = local->select.from->id;
-					local->select.m = local->select.n = 0;
+					if (self->parent->before->type == _ElemEnd) return 1;
+					local->select.to = self->parent->before->childend;
+					local->select.toid = local->select.to->id;
+					local->select.n = 0;
 				}
 				else {
-					local->select.from = local->select.to = self->before;
-					local->select.fromid = local->select.toid = local->select.from->id;
-					local->select.m = local->select.n = self->before->len(self->before) - 1;
+					local->select.to = self->before;
+					local->select.toid = local->select.to->id;
+					local->select.n = self->before->len(self->before) - 1;
+				}
+				if (!e->shift) {
+					local->select.from = local->select.to;
+					local->select.fromid = local->select.to->id;
+					local->select.m = local->select.n;
 				}
 			}
 			else {
-				local->select.m = local->select.n = m - 1;
+				local->select.n = m - 1;
+				if (!e->shift) {
+					local->select.m = local->select.n;
+				}
 			}
-			return 0;
+			FindOffscreen(letter)->markPaint(local);
+			return 1;
 		}
 		else {
-			local->select.from = local->select.to = local->select.start;
-			local->select.fromid = local->select.toid = local->select.from->id;
-			local->select.m = local->select.n = local->select.s;
+			if (e->shift) {
+				self = local->select.to;
+				if (local->select.n == 0) {
+					if (self->before->type == _ElemEnd) {
+						if (self->parent->before->type == _ElemEnd) return 1;
+						local->select.to = self->parent->before->childend;
+						local->select.toid = local->select.to->id;
+						local->select.n = 0;
+					}
+					else {
+						local->select.to = self->before;
+						local->select.toid = local->select.to->id;
+						local->select.n = self->before->len(self->before) - 1;
+					}
+				}
+				else {
+					local->select.n--;
+				}
+				FindOffscreen(letter)->markPaint(local);
+				return 1;
+			}
+			else {
+				local->select.from = local->select.to = local->select.start;
+				local->select.fromid = local->select.toid = local->select.from->id;
+				local->select.m = local->select.n = local->select.s;
+			}
+			FindOffscreen(letter)->markPaint(local);
 			return 1;
 		}
 	}
@@ -1512,35 +1744,74 @@ int LetterKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLo
 		if (local->select.from == local->select.to && local->select.m == local->select.n) {
 			if (m == letter->text->size) {
 				if (self->next->type == _ElemEnd) {
-					if (self->parent->before->type == _ElemEnd) return 0;
-					local->select.from = local->select.to = self->parent->next->childend->next;
-					local->select.fromid = local->select.toid = local->select.from->id;
-					local->select.m = local->select.n = 0;
+					if (self->parent->before->type == _ElemEnd) return 1;
+					local->select.to = self->parent->next->childend->next;
+					local->select.toid = local->select.to->id;
+					local->select.n = 0;
 				}
 				else {
-					local->select.from = local->select.to = self->next;
-					local->select.fromid = local->select.toid = local->select.from->id;
-					local->select.m = local->select.n = 1;
+					local->select.to = self->next;
+					local->select.toid = local->select.to->id;
+					local->select.n = 1;
+				}
+				if (!e->shift) {
+					local->select.from = local->select.to;
+					local->select.fromid = local->select.to->id;
+					local->select.m = local->select.n;
 				}
 			}
 			else {
-				local->select.m = local->select.n = m + 1;
+				local->select.n = m + 1;
+				if (!e->shift) {
+					local->select.m = local->select.n;
+				}
 			}
-			return 0;
+			FindOffscreen(letter)->markPaint(local);
+			return 1;
 		}
 		else {
-			local->select.from = local->select.to = local->select.end;
-			local->select.fromid = local->select.toid = local->select.from->id;
-			local->select.m = local->select.n = local->select.e;
+			if (e->shift) {
+				self = local->select.to;
+				if (local->select.n == self->len(self)) {
+					if (self->next->type == _ElemEnd) {
+						if (self->parent->next->type == _ElemEnd) return 0;
+						local->select.to = self->parent->next->childend->next;
+						local->select.toid = local->select.to->id;
+						local->select.n = 0;
+					}
+					else {
+						local->select.to = self->next;
+						local->select.toid = local->select.to->id;
+						local->select.n = 1;
+					}
+				}
+				else {
+					if (self->type == _ElemEnd) {
+						if (self->parent->next->type == _ElemEnd) return 0;
+						local->select.to = self->parent->next->childend->next;
+						local->select.toid = local->select.to->id;
+						local->select.n = 0;
+					}
+					local->select.n++;
+				}
+				FindOffscreen(letter)->markPaint(local);
+				return 1;
+			}
+			else {
+				local->select.from = local->select.to = local->select.end;
+				local->select.fromid = local->select.toid = local->select.from->id;
+				local->select.m = local->select.n = local->select.e;
+			}
+			FindOffscreen(letter)->markPaint(local);
 			return 1;
 		}
 	}
 	else if (e->key == SDLK_UP) {
 		if (local->select.from == local->select.to && local->select.m == local->select.n) {
 			if (self->parent->before->type == _ElemEnd) {
-				local->select.from = local->select.to = self->parent->childend->next;
-				local->select.fromid = local->select.toid = local->select.from->id;
-				local->select.m = local->select.n = 0;
+				local->select.to = self->parent->childend->next;
+				local->select.toid = local->select.to->id;
+				local->select.n = 0;
 			}
 			else {
 				if (local->select.count < 0) {
@@ -1551,34 +1822,75 @@ int LetterKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLo
 				}
 				for (NewElement* elem = self->parent->before->childend->next; ; elem = elem->next) {
 					if (elem->type == _ElemEnd) {
-						local->select.from = local->select.to = elem;
-						local->select.fromid = local->select.toid = local->select.from->id;
-						local->select.m = local->select.n = 0;
-						return 0;
+						local->select.to = elem;
+						local->select.toid = local->select.to->id;
+						local->select.n = 0;
+						break;
 					}
 					else if (local->select.count <= elem->len(elem)) {
-						local->select.from = local->select.to = elem;
-						local->select.fromid = local->select.toid;
-						local->select.m = local->select.n = local->select.count;
-						return 0;
+						local->select.to = elem;
+						local->select.toid = local->select.toid;;
+						local->select.n = local->select.count;
+						break;
 					}
 				}
 			}
-			return 0;
+			if (!e->shift) {
+				local->select.from = local->select.to;
+				local->select.fromid = local->select.from->id;
+				local->select.m = local->select.n;
+			}
+			FindOffscreen(letter)->markPaint(local);
+			return 1;
 		}
 		else {
-			local->select.from = local->select.to = local->select.start;
-			local->select.fromid = local->select.toid = local->select.from->id;
-			local->select.m = local->select.n = local->select.s;
+			if (e->shift) {
+				self = local->select.to;
+				if (self->parent->before->type == _ElemEnd) {
+					local->select.to = self->parent->childend->next;
+					local->select.toid = local->select.to->id;
+					local->select.n = 0;
+				}
+				else {
+					if (local->select.count < 0) {
+						local->select.count = local->select.n;
+						for (NewElement* elem = self->before; elem->type != _ElemEnd; elem = elem->before) {
+							local->select.count += elem->len(elem);
+						}
+					}
+					for (NewElement* elem = self->parent->before->childend->next; ; elem = elem->next) {
+						if (elem->type == _ElemEnd) {
+							local->select.to = elem;
+							local->select.toid = local->select.to->id;
+							local->select.n = 0;
+							break;
+						}
+						else if (local->select.count <= elem->len(elem)) {
+							local->select.to = elem;
+							local->select.toid = local->select.to->id;
+							local->select.n = local->select.count;
+							break;
+						}
+					}
+				}
+				FindOffscreen(letter)->markPaint(local);
+				return 1;
+			}
+			else {
+				local->select.from = local->select.to = local->select.start;
+				local->select.fromid = local->select.toid = local->select.from->id;
+				local->select.m = local->select.n = local->select.s;
+			}
+			FindOffscreen(letter)->markPaint(local);
 			return 1;
 		}
 	}
 	else if (e->key == SDLK_DOWN) {
 		if (local->select.from == local->select.to && local->select.m == local->select.n) {
 			if (self->parent->next->type == _ElemEnd) {
-				local->select.from = local->select.to = self->parent->childend;
-				local->select.fromid = local->select.toid = local->select.from->id;
-				local->select.m = local->select.n = 0;
+				local->select.to = self->parent->childend;
+				local->select.toid = local->select.to->id;
+				local->select.n = 0;
 			}
 			else {
 				if (local->select.count < 0) {
@@ -1589,76 +1901,123 @@ int LetterKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLo
 				}
 				for (NewElement* elem = self->parent->next->childend->next; ; elem = elem->next) {
 					if (elem->type == _ElemEnd) {
-						local->select.from = local->select.to = elem;
-						local->select.fromid = local->select.toid = local->select.from->id;
-						local->select.m = local->select.n = 0;
-						return 0;
+						local->select.to = elem;
+						local->select.toid = local->select.to->id;
+						local->select.n = 0;
+						break;
 					}
 					else if (local->select.count <= elem->len(elem)) {
-						local->select.from = local->select.to = elem;
-						local->select.fromid = local->select.toid;
-						local->select.m = local->select.n = local->select.count;
-						return 0;
+						local->select.to = elem;
+						local->select.toid = local->select.to->id;
+						local->select.n = local->select.count;
+						break;
 					}
 				}
 			}
-			return 0;
+			if (!e->shift) {
+				local->select.from = local->select.to;
+				local->select.fromid = local->select.from->id;
+				local->select.m = local->select.n;
+			}
+			FindOffscreen(letter)->markPaint(local);
+			return 1;
 		}
 		else {
-			local->select.from = local->select.to = local->select.end;
-			local->select.fromid = local->select.toid = local->select.from->id;
-			local->select.m = local->select.n = local->select.e;
+			if (e->shift) {
+				self = local->select.to;
+				if (self->parent->next->type == _ElemEnd) {
+					local->select.to = self->parent->childend;
+					local->select.toid = local->select.to->id;
+					local->select.n = 0;
+				}
+				else {
+					if (local->select.count < 0) {
+						local->select.count = local->select.n;
+						for (NewElement* elem = self->before; elem->type != _ElemEnd; elem = elem->before) {
+							local->select.count += elem->len(elem);
+						}
+					}
+					for (NewElement* elem = self->parent->next->childend->next; ; elem = elem->next) {
+						if (elem->type == _ElemEnd) {
+							local->select.to = elem;
+							local->select.toid = local->select.to->id;
+							local->select.n = 0;
+							break;
+						}
+						else if (local->select.count <= elem->len(elem)) {
+							local->select.to = elem;
+							local->select.toid = local->select.to->id;
+							local->select.n = local->select.count;
+							break;
+						}
+					}
+				}
+				FindOffscreen(letter)->markPaint(local);
+				return 1;
+			}
+			else {
+				local->select.from = local->select.to = local->select.end;
+				local->select.fromid = local->select.toid = local->select.from->id;
+				local->select.m = local->select.n = local->select.e;
+				FindOffscreen(letter)->markPaint(local);
+			}
 			return 1;
 		}
 	}
 	local->select.count = -1;
 	if (e->key == SDLK_UNKNOWN) {
-		return AddText(thgc, local, letter, m, n, NULL);
 		FindOffscreen(letter)->markLayout(local);
+		int n2 = AddText(thgc, local, letter, m, n, NULL);
+		if (n2 != -1) {
+			UniteText(thgc, local, letter->before, letter);
+		}
+		return n2;
 	}
-	if (e->key == SDLK_KP_ENTER || e->key == SDLK_RETURN) {
+	else if (e->key == SDLK_KP_ENTER || e->key == SDLK_RETURN) {
 		String* head = SubString(thgc, letter->text, 0, m);
-		String* tail = SubString(thgc, letter->text, n, letter->text->size);
+		String* tail = SubString(thgc, letter->text, n, letter->text->size - n);
+		NewElement* nowline = self->parent;
 		NewLine* newline = (NewLine*)GC_alloc(thgc, _LineC);
 		initNewLine(thgc, newline);
-		NewNext(thgc, local, letter->parent, newline);
-		letter->text = head;
-		for (NewElement* elem = letter->next; elem->type != _ElemEnd; ) {
-			NewElement* nex = elem->next;
-			NewNext(thgc, local, newline->childend->before, nex);
-			elem = nex;
-		}
-		if (tail->size != 0) {
-			NewLetter* let2 = (NewLetter*)GC_alloc(thgc, CType::_LetterC);
-			initNewLetter(thgc, let2, letter->font, LetterType::_Letter);
-			let2->text = tail;
-			NewNext(thgc, local, letter, let2);
-		}
+		NewBefore(thgc, local, self->parent, newline);
+		NewMoveElement(thgc, local, newline->childend, self->parent->childend->next, letter);
 		if (head->size == 0) {
-			local->select.from = local->select.to = self->before;
-			local->select.fromid = local->select.toid = local->select.fromid;
-			local->select.m = local->select.n = self->before->len(self->before);
 			NewRemoveElement(thgc, local, self);
 			return -1;
 		}
 		else {
-			local->select.from = local->select.to = self;
-			local->select.fromid = local->select.toid = local->select.from->id;
-			local->select.m = local->select.n = letter->text->size;
+			letter->text = head;
+			letter->recompile = true;
+		}
+		if (tail->size != 0) {
+			NewLetter* let2 = (NewLetter*)GC_alloc(thgc, CType::_LetterC);
+			initNewLetter(thgc, let2, letter->font, LetterType::_Letter);
+			NewNext(thgc, local, nowline->childend, let2);
+			let2->text = tail;
+			local->select.from = local->select.to = let2;
+			local->select.fromid = local->select.toid = let2->id;
+			local->select.m = local->select.n = 0;
+		}
+		else {
+			local->select.from = local->select.to = nowline->childend;
+			local->select.fromid = local->select.toid = nowline->id;
+			local->select.m = local->select.n = 1;
 		}
 		e->key = SDLK_UNKNOWN;
 		FindOffscreen(letter)->markLayout(local);
-		return 0;
+		return -1;
 	}
 	else if (e->key == SDLK_BACKSPACE) {
 		if (local->select.from == local->select.to && local->select.m == local->select.n) {
 			if (m == 0) {
 				if (letter->before->type == _ElemEnd) {
 					if (letter->parent->before->type == _ElemEnd) return 0;
-					local->select.from = local->select.to = letter->parent->before->childend->before;
+					NewElement* el = self->parent->before->childend->before;
+					local->select.from = local->select.to = el;
 					local->select.fromid = local->select.toid = local->select.from->id;
 					local->select.m = local->select.n = local->select.from->len(local->select.from);
 					UniteLine(thgc, local, (NewLine*)letter->parent->before, (NewLine*)letter->parent);
+					UniteText(thgc, local, el, el->next);
 				}
 				else {
 					if (letter->before->type == LetterType::_Letter) {
@@ -1706,10 +2065,12 @@ int LetterKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLo
 			if (m == letter->text->size) {
 				if (letter->next->type == _ElemEnd) {
 					if (letter->parent->next->type == _ElemEnd) return 0;
-					local->select.from = local->select.to = letter->parent->childend->before;
+					NewElement* el = self->parent->childend->before;
+					local->select.from = local->select.to = el;
 					local->select.fromid = local->select.toid = local->select.from->id;
 					local->select.m = local->select.n = local->select.from->len(local->select.from);
 					UniteLine(thgc, local, (NewLine*)letter->parent, (NewLine*)letter->parent->next);
+					UniteText(thgc, local, el, el->next);
 				}
 				else {
 					if (letter->next->type == LetterType::_Letter) {
@@ -1759,9 +2120,13 @@ int LetterKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLo
 	}
 	else {
 		AddText(thgc, local, letter, m, n, e->text);
-		local->select.m += e->text->size;
+		local->select.from = local->select.to = self;
+		local->select.fromid = local->select.toid = self->id;
+		local->select.m = m + e->text->size;
 		local->select.n = local->select.m;
 		FindOffscreen(letter)->markLayout(local);
+		e->key = SDLK_UNKNOWN;
+		return 0;
 	}
 	return -1;
 }

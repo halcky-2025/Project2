@@ -398,6 +398,11 @@ int main() {
 						e.key = event.key.key;
                         e.text = (String*)GC_alloc(hoppy->target, _String);
                         e.text->size = 0;
+                        SDL_Keymod mod = event.key.mod;
+
+                        e.shift = (mod & SDL_KMOD_SHIFT);
+                        e.ctrl = (mod & SDL_KMOD_CTRL);
+                        e.alt = (mod & SDL_KMOD_ALT);
                         auto ke = KeyButton(hoppy, &e);
                         hoppy->target->queue->push(ke.coro);
                         ke.coro = {};
