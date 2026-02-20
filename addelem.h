@@ -1,5 +1,3 @@
-
-
 void TreeElementCheck(ThreadGC* thgc, char* self) {
 	TreeElement* tree = (TreeElement*)self;
 	GC_UPDATE_PTR_C(thgc, tree->id, String*);

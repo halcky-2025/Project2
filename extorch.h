@@ -1438,7 +1438,7 @@ CustomModuleImpl* GoThread(ThreadGC* thgc) {
     GC_register_class(thgc, CType::_CallBlock, "CallBlock", sizeof(Block), NULL, NULL);
     GC_register_class(thgc, CType::_TagBlock, "TagBlock", sizeof(TagBlock), NULL, NULL);
     GC_register_class(thgc, CType::_Primary, "Primary", sizeof(Primary), NULL, NULL);
-    GC_register_class(thgc, CType::_COperator, "COperator", sizeof(Obj), NULL, NULL);
+    GC_register_class(thgc, CType::_COperator, "COperator", sizeof(Operator), NULL, NULL);
     GC_register_class(thgc, CType::_Word, "Word", sizeof(Obj), NULL, NULL);
     GC_register_class(thgc, CType::_CNumber, "CNumber", sizeof(Obj), NULL, NULL);
     GC_register_class(thgc, CType::_FloatVal, "FloatVal", sizeof(Obj), NULL, NULL);
@@ -1453,7 +1453,7 @@ CustomModuleImpl* GoThread(ThreadGC* thgc) {
     GC_register_class(thgc, CType::_PrimOp, "PrimOp", sizeof(PrimOp), NULL, NULL);
     GC_register_class(thgc, CType::_SingleOp, "SingleOp", sizeof(SingleOp), NULL, NULL);
     GC_register_class(thgc, CType::_Label, "Label", sizeof(Label), NULL, NULL);
-    GC_register_class(thgc, CType::_Local, "Local", sizeof(Master), NULL, NULL);
+    GC_register_class(thgc, CType::_Master, "Local", sizeof(Master), NULL, NULL);
     GC_register_class(thgc, CType::_Operator, "Operator", sizeof(Operator), NULL, NULL);
     //initHoppyWindow(thgc, hw);
 	NewLocal* local = (NewLocal*)GC_alloc(thgc, _LocalC);

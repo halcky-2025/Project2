@@ -4,3 +4,13 @@ FBO FBODrawCommand
 _ElemEnd NewEndElement
 _Main NewLocal
 _Line NewLine
+_Letter NewLetter
+_ATSSpan ATSSpan
+_StyleSpan StyleSpan
+_RenderSpan RenderSpan
+_CObj Obj
+_Block Block
+_CallBlock CallBlock
+_TagBlock TagBlock
+_Primary Primary
+_COperator Operator

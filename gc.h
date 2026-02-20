@@ -1,5 +1,4 @@
-﻿
-#if defined(__ANDROID__) || defined(__APPLE__)
+﻿#if defined(__ANDROID__) || defined(__APPLE__)
 #include <coroutine>
 namespace coro = std;
 #else
@@ -258,9 +257,9 @@ enum CType {
     _FloatVal, _StrObj, _Address, _Comment,
     _Comment2, _HtmObj, _CMountain, _CQuestion,
     _CDolor, _PrimOp, _SingleOp, _Label,
-    _Local, _Operator,
+    _Master, _Operator,
     _VariClass, _ArrType, _FuncType2, _Variable, _Function, _GenericFunction,
-    _ClassObj, _ModelObj, _GeneObj, _GenericObj, _ObjBlock, _Generic
+    _ClassObj, _ModelObj, _GeneObj, _GenericObj, _ObjBlock, _GenericType
 };
 // =============================================================================
 // クラス定義
