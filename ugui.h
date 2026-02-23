@@ -688,10 +688,13 @@ public:
         std::lock_guard lock(m);
         target = thgcs.begin()[n];
     }
-
+    void RootOffscreen(ThreadGC* thgc, List* list, Offscreen* offscreen) {
+        add_list(thgc, list, (char*)offscreen);
+        for (Offscreen* off = offscreen->child; off != offscreen->child; off = off->next) {
+            RootOffscreen(thgc, list, off);
+        }
+    }
     void buildFrame(uint64_t frameId) {
-
-
         if (invalidate == 0) {
             return;
         }
@@ -705,27 +708,18 @@ public:
         time += deltaTime;
         TreeElement* te = (TreeElement*)get_mapy(target->map, createString(target, (char*)"main", 4, 1));
         local = (NewLocal*)te->elem;
-		local->dirty = DirtyType::RebuildValue;
+        if ((local->dirty & DirtyType::Rebuild) > 0) {
+            int n = 0;
+            local->offscreen->child->next = local->offscreen->child->before;
+            RebuildOffscreen(target, local->offscreen->child, local, &n);
+        }
+        if ((local->dirty & DirtyType::OffscreenLayout) > 0) {
+            local->screens = (List*)create_list(target, sizeof(Offscreen*), CType::_Offscreen);
+            RootOffscreen(target, local->screens, local->offscreen);
+        }
         if ((local->dirty & DirtyType::Partial) > 0) {
             q->begin(frameId, 1024);
             auto& layer = q->setCurrentSlotLayer({}, 1.0f, true, true, 800, 600);
-            if ((local->dirty & DirtyType::Rebuild) > 0) {
-                List* screens = create_list(target, sizeof(Offscreen*), _List);
-                add_list(target, screens, (char*)local->offscreen);
-                RebuildOffscreen(target, screens, local);
-                for (int i = 0; i < local->screens->size; i++) {
-                    auto offscreen = *(Offscreen**)get_list(local->screens, i);
-                    for (int j = 0; ; j++) {
-                        if (j == screens->size) {
-                            master.destroyOffscreenInternal(offscreen->imPing);
-							master.destroyOffscreenInternal(offscreen->imPong);
-                        }
-                        auto offscreen2 = *(Offscreen**)get_list(screens, j);
-                        if (offscreen == offscreen2) break;
-                    }
-                }
-                local->screens = screens;
-            }
             for (int i = 0; i < local->screens->size; i++) {
                 Offscreen* screen = (Offscreen*)*get_list(local->screens, i);
                 if (screen->layout) {

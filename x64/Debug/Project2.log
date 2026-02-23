@@ -42,7 +42,7 @@ C:\Users\hayah\source\repos\Project2\Project2\newelem.h(11,16): warning C4091: '
 C:\Users\hayah\source\repos\Project2\Project2\newelem.h(12,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'DrawCommand' の左辺を無視します。
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\newelem.h(729,53): warning C4834: [[nodiscard]] 属性を持つ関数の戻り値を破棄しています
+C:\Users\hayah\source\repos\Project2\Project2\newelem.h(730,53): warning C4834: [[nodiscard]] 属性を持つ関数の戻り値を破棄しています
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
 C:\Users\hayah\source\repos\Project2\Project2\Compile.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。

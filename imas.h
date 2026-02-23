@@ -665,6 +665,10 @@ public:
         std::lock_guard lock(offscreenQueueMutex_);
         offscreenResizeQueue_.push_back({ id, newW, newH });
     }
+    void queueOffscreenDestroy(ImageId id) {
+        std::lock_guard lock(offscreenQueueMutex_);
+        offscreenDestroyQueue_.push_back(id);
+    }
     // 通常テクスチャ予約（ロード前にポインタ取得）
     ImageId reserveTexture(bgfx::TextureHandle** outTexPtr, uint16_t w, uint16_t h) {
         ImageId id = ImageIdGenerator::fromMemory();
@@ -823,6 +827,8 @@ public:
         // 古いリソース破棄
         if (bgfx::isValid(info.fbo)) {
             bgfx::destroy(info.fbo);
+            info.fbo = BGFX_INVALID_HANDLE;
+            info.handle = BGFX_INVALID_HANDLE;
         }
 
         // 新しいテクスチャ作成 (BGRA8 for Metal compatibility)
@@ -893,18 +899,46 @@ public:
     std::mutex offscreenQueueMutex_;
     std::vector<OffscreenCreateRequest> offscreenCreateQueue_;
     std::vector<OffscreenResizeRequest> offscreenResizeQueue_;
+    std::vector<ImageId> offscreenDestroyQueue_;
 
     void processOffscreenQueue() {
         std::vector<OffscreenCreateRequest> creates;
         std::vector<OffscreenResizeRequest> resizes;
+        std::vector<ImageId> destroys;
         {
             std::lock_guard lock(offscreenQueueMutex_);
             creates.swap(offscreenCreateQueue_);
             resizes.swap(offscreenResizeQueue_);
+            destroys.swap(offscreenDestroyQueue_);
         }
-        int size = creates.size() + resizes.size();
-        // 作成
+
+        // 破棄対象のIDを集めて、create/resizeから除外する
+        std::unordered_set<ImageId> destroySet(destroys.begin(), destroys.end());
+
+        int size = creates.size() + resizes.size() + destroys.size();
+
+        // 破棄（レンダースレッドで安全に実行）
+        for (auto& id : destroys) {
+            std::lock_guard lock(standaloneMutex_);
+            auto it = standaloneTextures_.find(id);
+            if (it != standaloneTextures_.end()) {
+                if (bgfx::isValid(it->second.fbo)) {
+                    bgfx::destroy(it->second.fbo);
+                }
+                else if (bgfx::isValid(it->second.handle)) {
+                    bgfx::destroy(it->second.handle);
+                }
+                standaloneTextures_.erase(it);
+            }
+            {
+                std::lock_guard locLock(locationMutex_);
+                imageLocations_.erase(id);
+            }
+        }
+
+        // 作成（破棄対象はスキップ）
         for (auto& req : creates) {
+            if (destroySet.count(req.id)) continue;
             if (createOffscreenInternal(req.id, req.width, req.height, req.persistent)) {
                 if (req.dest) {
                     auto textureInfo = getStandaloneTexture(req.id);
@@ -912,7 +946,9 @@ public:
             }
         }
 
+        // リサイズ（破棄対象はスキップ）
         for (auto& req : resizes) {
+            if (destroySet.count(req.id)) continue;
             if (resizeOffscreenInternal(req.id, req.width, req.height)) {
                 if (req.dest) {
                     auto textureInfo = getStandaloneTexture(req.id);
