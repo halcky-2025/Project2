@@ -1429,6 +1429,7 @@ CustomModuleImpl* GoThread(ThreadGC* thgc) {
     //GC_SetClass(thgc, _MouseEvent, "MouseEvent", sizeof(MouseEvent), NULL, NULL);
     //GC_SetClass(thgc, _KeyEvent, "KeyEvent", sizeof(KeyEvent), NULL, NULL);
     GC_register_class(thgc, _Offscreen, "Offscreen", sizeof(Offscreen), NULL, NULL);
+    GC_register_class(thgc, CType::_OffscreenEnd, "Offscreen", sizeof(OffscreenEnd), NULL, NULL);
     //HoppyWindow* hw = (HoppyWindow*)GC_malloc(thgc, _HoppyWindow);
     GC_register_class(thgc, CType::_ATSSpan, "ATSSpan", sizeof(ATSSpan), NULL, NULL);
     GC_register_class(thgc, CType::_StyleSpan, "StyleSpan", sizeof(StyleSpan), NULL, NULL);
@@ -1478,6 +1479,7 @@ CustomModuleImpl* GoThread(ThreadGC* thgc) {
             thgc->first->resume_all();
         }*/
         thgc->queue->resume_all();
+        if (local->resetid) AllResetId(local);
         thgc->hoppy->buildFrame(now_us());
         auto end = std::chrono::high_resolution_clock::now();
         auto ms = std::chrono::duration<double, std::milli>(end - start).count();

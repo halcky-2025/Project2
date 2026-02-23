@@ -233,8 +233,9 @@ struct NewElement : NewEndElement {
 enum DirtyType {
 	None,
 	Partial = 1,
-	Rebuild = 2,
-	RebuildValue = 3,
+	OffscreenLayout = 2,
+	Rebuild = 4,
+	RebuildValue = 7,
 };
 struct NewSelect {
 	NewElement* from, * to;
@@ -245,6 +246,7 @@ struct NewSelect {
 	int count;
 };
 struct NewLocal : NewElement {
+	bool resetid;
 	HoppyWindow* window;
 	DirtyType dirty;
 	List* screens;
@@ -253,11 +255,14 @@ struct NewLocal : NewElement {
 	NewSelect select;
 };
 struct RenderGroup;
-struct Offscreen {
+struct OffscreenEnd {
+	Offscreen* next, * before;
+	Offscreen* child, * parent;
+	int id;
+};
+struct Offscreen : OffscreenEnd {
 	ImageId imPing;
 	ImageId imPong;
-	bgfx::FrameBufferHandle fbPing;
-	bgfx::FrameBufferHandle fbPong;
 	PointI fbsize;
 	bool ping = true;
 	bool layout = true;
@@ -267,6 +272,7 @@ struct Offscreen {
 	void markPaint(NewLocal* local) { paint = true; local->dirty = (DirtyType)(local->dirty | DirtyType::Partial); }
 	int viewId = 0;
 	ExtendedRenderGroup *group;
+	bool dirty = false;
 };
 static int viewId = 0;
 
@@ -318,12 +324,20 @@ void initNewEndElement(ThreadGC* thgc, NewEndElement* end, NewElement* parent) {
 	end->Key = EndKey;
 	end->len = len1;
 }
-void ResetId(NewElement* elem, int* n) {
+void RootResetId(NewElement* elem, int* n) {
 	for (NewElement* child = elem->childend->next; child->type != LetterType::_ElemEnd; child = child->next) {
-		child->id = (uint64_t)(*n)++ * 65536ULL * 65536ULL * 65536ULL;
-		if (child->childend != NULL) ResetId(child, n);
+		child->id = (uint64_t)++(*n) * 65536ULL * 65536ULL * 65536ULL;
+		if (child->childend != NULL) RootResetId(child, n);
 	}
-	elem->childend->id = (uint64_t)(*n)++ * 65536ULL * 65536ULL * 65536ULL;
+	elem->childend->id = (uint64_t)++(*n) * 65536ULL * 65536ULL * 65536ULL;
+}
+void ResetId(NewLocal* local) {
+	int n = 0;
+	local->resetid = false;
+	RootResetId(local, &n);
+}
+void MarkResetId(NewLocal* local) {
+	local->resetid = true;
 }
 void SetChildIds(NewElement* elem) {
 
@@ -376,23 +390,25 @@ void NewBefore(ThreadGC* thgc, NewLocal* local, NewElement* self, NewElement* el
 		before = self->before;
 		if (before->childend != NULL) before = before->childend;
 	}
+	elem->before->next = elem->next;
+	elem->next->before = elem->before;
 	elem->next = self;
 	elem->before = self->before;
 	self->before->next = elem;
 	self->before = elem;
 	elem->parent = self->parent;
 	if (elem->childend != NULL) {
-		if (self->id - before->id <= 2) {
-			int n = 1;
-			ResetId(local, &n);
-		}
+		if (self->id - before->id <= 2) MarkResetId(local);
 		else {
 			elem->id = self->id - (self->id - before->id) * 2 / 3;
 			elem->childend->id = self->id - (self ->id - before->id) / 3;
 		}
 		SetChildIds(elem);
 	}
-	else elem->id = (self->id + before->id) / 2;
+	else {
+		if (self->id - before->id <= 1) MarkResetId(local);
+		else elem->id = (self->id + before->id) / 2;
+	}
 }
 void NewNext(ThreadGC* thgc, NewLocal* local, NewElement* self, NewElement* elem) {
 	NewElement* next = self->next;
@@ -404,109 +420,281 @@ void NewNext(ThreadGC* thgc, NewLocal* local, NewElement* self, NewElement* elem
 		before = self;
 		if (next->childend != NULL) next = next->childend->next;
 	}
+	elem->before->next = elem->next;
+	elem->next->before = elem->before;
 	elem->before = self;
 	elem->next = self->next;
 	self->next->before = elem;
 	self->next = elem;
 	elem->parent = self->parent;
 	if (elem->childend != NULL) {
-		if (next->id - before->id <= 2) {
-			int n = 1;
-			ResetId(local, &n);
-		}
+		if (next->id - before->id <= 2) MarkResetId(local);
 		else {
 			elem->id = before->id + (next->id - before->id) / 3;
 			elem->childend->id = before->id + (next->id - before->id) / 3 * 2;
 		}
 		SetChildIds(elem);
 	}
-	else elem->id = (before->id + next->id) / 2;
+	else {
+		if (next->id - before->id <= 1) MarkResetId(local);
+		else elem->id = (before->id + next->id) / 2;
+	}
 }
 Offscreen* FindOffscreen(NewElement* elem) {
 	for (; elem != NULL; elem = elem->parent) {
+		if (elem->type == LetterType::_ElemEnd) continue;
 		if (elem->offscreen != NULL) return elem->offscreen;
 	}
 	return NULL;
 }
-void NewRemoveElement(ThreadGC* thgc, NewLocal* local, NewElement* elem) {
+void NewRemove(ThreadGC* thgc, NewLocal* local, NewElement* elem) {
 	elem->before->next = elem->next;
 	elem->next->before = elem->before;
+	elem->parent = NULL;
 }
-void RebuildOffscreen(ThreadGC* thgc, List* screens, NewElement* elem) {
+void RebuildOffscreen(ThreadGC* thgc, Offscreen* off, NewElement* elem, int *n) {
 	for(NewElement* child = elem->childend->next; child->type != LetterType::_ElemEnd; child = child->next) {
-		if (child->offscreen != NULL) add_list(thgc, screens, (char *)child->offscreen);
-		if (child->childend != NULL) RebuildOffscreen(thgc, screens, child);
+		child->id = ++(*n) * 65535ULL * 65535ULL * 65535ULL;
+		if (child->offscreen != NULL) {
+			child->offscreen->next = off;
+			child->offscreen->before = off;
+			off->before->next = child->offscreen;
+			off->before = child->offscreen;
+			child->offscreen->parent = off->parent;
+			child->offscreen->child->next = child->offscreen->child->before = child->offscreen->child;
+			child->offscreen->child->parent = child->offscreen;
+			if (child->childend != NULL) RebuildOffscreen(thgc, child->offscreen->child, child, n);
+		}
+		else if (child->childend != NULL) {
+			RebuildOffscreen(thgc, off, child, n);
+		}
+	}
+	elem->childend->id = ++(*n) * 65535ULL * 65535ULL * 65535ULL;
+}
+void BeforeOffscreen(NewLocal* local, Offscreen* next, Offscreen* screen) {
+	screen->next->before = screen->before;
+	screen->before->next = screen->next;
+	screen->before = next->before;
+	screen->next = next;
+	next->before->next = screen;
+	next->before = screen;
+	screen->paint = next->parent;
+}
+void NextOffscreen(NewLocal* local, Offscreen* before, Offscreen* screen) {
+	screen->next->before = screen->before;
+	screen->before->next = screen->next;
+	screen->next = before->next;
+	screen->before = before;
+	before->next->before = screen;
+	before->next = screen;
+	screen->parent = before->parent;
+}
+void RemoveOffscreen(Offscreen* screen) {
+	screen->next->before = screen->before;
+	screen->before->next = screen->next;
+	screen->next->before = screen;
+	screen->parent = NULL;
+}
+Offscreen* FindNextOffscreen(NewElement* elem) {
+	for (; elem->type != _ElemEnd; elem = elem->next) {
+		if (elem->childend != NULL) {
+			Offscreen* ret = FindNextOffscreen(elem->childend->next);
+			if (ret != NULL) return ret;
+		}
+	}
+	return NULL;
+}
+void RootBeforeOffscreen(ThreadGC* thgc, NewLocal* local, NewElement* elem, Offscreen* offscreen) {
+	if (elem->offscreen != NULL) {
+		BeforeOffscreen(local, offscreen, elem->offscreen);
+		return;
+	}
+	if (elem->childend != NULL) {
+		for (NewElement* e = elem->childend->next; e->type != _ElemEnd; e = e->next) {
+			RootBeforeOffscreen(thgc, local, e, offscreen);
+		}
+	}
+}
+void RootBeforeOffscreen2(ThreadGC* thgc, NewLocal* local, NewElement* elem, Offscreen* offscreen) {
+	if (CheckOffscreen(elem)) {
+		elem->offscreen = (Offscreen*)GC_alloc(thgc, CType::_Offscreen);
+		elem->offscreen->group = &createGroup(thgc);
+		elem->offscreen->elem = elem;
+		elem->offscreen->dirty = true;
+		elem->offscreen->child = (Offscreen*)GC_alloc(thgc, CType::_OffscreenEnd);
+		elem->offscreen->child->next = elem->offscreen->child->before = elem->offscreen->child;
+		BeforeOffscreen(local, offscreen, elem->offscreen);
+		offscreen = elem->offscreen->child;
+	}
+	if (elem->childend != NULL) {
+		for (NewElement* e = elem->childend->next; e->type != _ElemEnd; e = e->next) {
+			RootBeforeOffscreen2(thgc, local, e, offscreen);
+		}
+	}
+}
+void RootBeforeOffscreen3(ThreadGC* thgc, NewLocal* local, NewElement* elem, Offscreen* offscreen) {
+	if (elem->childend != NULL) {
+		for (NewElement* e = elem->childend->next; e->type != _ElemEnd; e = e->next) {
+			RootBeforeOffscreen(thgc, local, e, offscreen);
+		}
+	}
+}
+void RootDeleteOffscreen(ThreadGC* thgc, NewLocal* local, NewElement* elem) {
+	if (elem->offscreen != NULL) {
+		elem->offscreen = NULL;
+		RemoveOffscreen(elem->offscreen);
+	}
+	if (elem->childend != NULL) {
+		for (NewElement* e = elem->childend->next; e->type != _ElemEnd; e = e->next) {
+			RootDeleteOffscreen(thgc, local, e);
+		}
 	}
 }
 void NewNextElement(ThreadGC* thgc, NewLocal* local, NewElement* before, NewElement* elem) {
-	if (elem->parent != NULL) {
-		NewNext(thgc, local, before, elem);
-		local->dirty = DirtyType::RebuildValue;
+	Offscreen* bscreen = FindOffscreen(elem);
+	NewNext(thgc, local, before, elem);
+	if (bscreen != NULL) {
+		bscreen->markLayout(local);
+		Offscreen* ascreen = FindOffscreen(elem);
+		if (ascreen != NULL) {
+			ascreen->markLayout(local);
+			Offscreen* screen = FindNextOffscreen(elem->next);
+			if (screen == NULL) screen = ascreen->child;
+			RootBeforeOffscreen(thgc, local, elem, screen);
+		}
+		else {
+			RootDeleteOffscreen(thgc, local, elem);
+		}
 	}
 	else {
-		NewNext(thgc, local, before, elem);
-		if (CheckOffscreen(elem)) {
-			elem->offscreen = (Offscreen*)GC_alloc(thgc, CType::_Offscreen);
-			elem->offscreen->group = &createGroup(thgc);
-			elem->offscreen->elem = elem;
+		Offscreen* ascreen = FindOffscreen(elem);
+		if (ascreen != NULL) {
+			ascreen->markLayout(local);
+			Offscreen* screen = FindNextOffscreen(elem->next);
+			if (screen == NULL) screen = ascreen->child;
+			RootBeforeOffscreen2(thgc, local, elem, screen);
 		}
-		FindOffscreen(elem->parent)->markLayout(local);
 	}
-
+}
+void NewNextMoveElement(ThreadGC* thgc, NewLocal* local, NewElement* before, NewElement* elem) {
+	NewRemoveElement(thgc, local, elem);
+	NewNextElement(thgc, local, before, elem);
+}
+void NewRemoveElement(ThreadGC* thgc, NewLocal* local, NewElement* elem) {
+	Offscreen* screen = FindOffscreen(elem);
+	if (screen != NULL) {
+		RootDeleteOffscreen(thgc, local, elem);
+		screen->markLayout(local);
+	}
+	NewRemove(thgc, local, elem);
 }
 void changeOrient(NewLocal* local, NewElement* elem, bool orient) {
 	elem->orient = orient;
-	FindOffscreen(elem)->markLayout(local);
+	Offscreen* screen = FindOffscreen(elem);
+	if (screen != NULL) screen->markLayout(local);
 }
 void changeXtype(ThreadGC* thgc, NewLocal* local, NewElement* elem, SizeType xtype) {
 	if (elem->xtype == xtype) return;
-	FindOffscreen(elem)->markLayout(local);
 	elem->xtype = xtype;
-	if (elem->offscreen == NULL) {
-		if (CheckOffscreen(elem)) {
-			elem->offscreen = (Offscreen*)GC_alloc(thgc, CType::_Offscreen);
-			elem->offscreen->group = &createGroup(thgc);
-			elem->offscreen->elem = elem;
+	Offscreen* off = FindOffscreen(elem);
+	if (off != NULL) {
+		off->markLayout(local);
+		if (elem->offscreen == NULL) {
+			if (CheckOffscreen(elem)) {
+				elem->offscreen = (Offscreen*)GC_alloc(thgc, CType::_Offscreen);
+				elem->offscreen->group = &createGroup(thgc);
+				elem->offscreen->elem = elem;
+				elem->offscreen->dirty = true;
+				elem->offscreen->child = (Offscreen*)GC_alloc(thgc, CType::_OffscreenEnd);
+				elem->offscreen->child->next = elem->offscreen->child->before = elem->offscreen->child;
+				elem->offscreen->child->parent = elem->offscreen;
+				RootBeforeOffscreen3(thgc, local, elem, elem->offscreen->child);
+				Offscreen* next = FindNextOffscreen(elem->next);
+				if (next == NULL) next = off->child;
+				BeforeOffscreen(local, next, elem->offscreen);
+
+			}
 		}
-	}
-	else {
-		if (!CheckOffscreen(elem)) {
-			elem->offscreen = NULL;
+		else {
+			if (!CheckOffscreen(elem)) {
+				for (Offscreen* offscreen = elem->offscreen->parent->child->before;offscreen != offscreen->parent->child; ) {
+					Offscreen* before = offscreen->before;
+					NextOffscreen(local, elem->offscreen, offscreen);
+					offscreen = before;
+				}
+				RemoveOffscreen(elem->offscreen);
+				elem->offscreen = NULL;
+			}
 		}
 	}
 }
 void changeYType(ThreadGC* thgc, NewLocal* local, NewElement* elem, SizeType ytype) {
 	if (elem->ytype == ytype) return;
 	elem->ytype = ytype;
-	FindOffscreen(elem)->markLayout(local);
-	if (elem->offscreen == NULL) {
-		if (CheckOffscreen(elem)) {
-			elem->offscreen = (Offscreen*)GC_alloc(thgc, CType::_Offscreen);
-			elem->offscreen->group = &createGroup(thgc);
-			elem->offscreen->elem = elem;
+	Offscreen* off = FindOffscreen(elem);
+	if (off != NULL) {
+		off->markLayout(local);
+		if (elem->offscreen == NULL) {
+			if (CheckOffscreen(elem)) {
+				elem->offscreen = (Offscreen*)GC_alloc(thgc, CType::_Offscreen);
+				elem->offscreen->group = &createGroup(thgc);
+				elem->offscreen->elem = elem;
+				elem->offscreen->dirty = true;
+				elem->offscreen->child = (Offscreen*)GC_alloc(thgc, CType::_OffscreenEnd);
+				elem->offscreen->child->next = elem->offscreen->child->before = elem->offscreen->child;
+				elem->offscreen->child->parent = elem->offscreen;
+				RootBeforeOffscreen3(thgc, local, elem, elem->offscreen->child);
+				Offscreen* next = FindNextOffscreen(elem->next);
+				if (next == NULL) next = off->child;
+				BeforeOffscreen(local, next, elem->offscreen);
+
+			}
 		}
-	}
-	else {
-		if (!CheckOffscreen(elem)) {
-			elem->offscreen = NULL;
+		else {
+			if (!CheckOffscreen(elem)) {
+				for (Offscreen* offscreen = elem->offscreen->parent->child->before; offscreen != offscreen->parent->child; ) {
+					Offscreen* before = offscreen->before;
+					NextOffscreen(local, elem->offscreen, offscreen);
+					offscreen = before;
+				}
+				RemoveOffscreen(elem->offscreen);
+				elem->offscreen = NULL;
+			}
 		}
 	}
 }
 void changeOffscreen(ThreadGC* thgc, NewLocal* local, NewElement* elem, bool offscreened) {
 	if (elem->offscreened == offscreened) return;
 	elem->offscreened = offscreened;
-	if (offscreened) {
+	Offscreen* off = FindOffscreen(elem);
+	if (off != NULL) {
+		off->markLayout(local);
 		if (elem->offscreen == NULL) {
-			FindOffscreen(elem)->markLayout(local);
-			elem->offscreen = (Offscreen*)GC_alloc(thgc, CType::_Offscreen);
-			elem->offscreen->group = &createGroup(thgc);
-			elem->offscreen->elem = elem;
+			if (CheckOffscreen(elem)) {
+				elem->offscreen = (Offscreen*)GC_alloc(thgc, CType::_Offscreen);
+				elem->offscreen->group = &createGroup(thgc);
+				elem->offscreen->elem = elem;
+				elem->offscreen->dirty = true;
+				elem->offscreen->child = (Offscreen*)GC_alloc(thgc, CType::_OffscreenEnd);
+				elem->offscreen->child->next = elem->offscreen->child->before = elem->offscreen->child;
+				elem->offscreen->child->parent = elem->offscreen;
+				RootBeforeOffscreen3(thgc, local, elem, elem->offscreen->child);
+				Offscreen* next = FindNextOffscreen(elem->next);
+				if (next == NULL) next = off->child;
+				BeforeOffscreen(local, next, elem->offscreen);
+
+			}
 		}
-	}
-	else {
-		if (elem->offscreen != NULL) {
-			FindOffscreen(elem)->markLayout(local);
-			elem->offscreen = NULL;
+		else {
+			if (!CheckOffscreen(elem)) {
+				for (Offscreen* offscreen = elem->offscreen->parent->child->before; offscreen != offscreen->parent->child; ) {
+					Offscreen* before = offscreen->before;
+					NextOffscreen(local, elem->offscreen, offscreen);
+					offscreen = before;
+				}
+				RemoveOffscreen(elem->offscreen);
+				elem->offscreen = NULL;
+			}
 		}
 	}
 }
@@ -985,8 +1173,7 @@ int LetterLen(NewElement* elem) {
 }
 void initNewLetter(ThreadGC* thgc, NewLetter* letter, FontId font, enum LetterType type) {
 	letter->type = type;
-	letter->next = NULL;
-	letter->before = NULL;
+	letter->next = letter->before = letter;
 	letter->parent = NULL;
 	letter->childend = NULL;
 	letter->id = 0;
@@ -1168,7 +1355,7 @@ int ElementKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewL
 }
 int AddText(ThreadGC* thgc, NewLocal* local, NewLetter* letter, int m, int n, String* text) {
 	if (m == 0 && n == letter->text->size && (text == NULL || text->size == 0)) {
-		NewRemoveElement(thgc, local, letter);
+		NewRemove(thgc, local, letter);
 		return -1;
 	}
 
@@ -1224,7 +1411,7 @@ void UniteText(ThreadGC* thgc, NewLocal* local, NewElement* before, NewElement* 
 	if (before->type == LetterType::_Letter && next->type == LetterType::_Letter) {
 		NewLetter* bef = (NewLetter*)before, * nex = (NewLetter*)next;
 		AddText(thgc, local, bef, bef->len(bef), bef->len(bef), nex->text);
-		NewRemoveElement(thgc, local, nex);
+		NewRemove(thgc, local, nex);
 	}
 
 }
@@ -1240,7 +1427,7 @@ void UniteLine(ThreadGC* thgc, NewLocal* local, NewLine* before, NewLine* next) 
 	else if (local->select.to == before->childend) {
 		local->select.to = next->childend;
 	}
-	NewRemoveElement(thgc, local, before);
+	NewRemove(thgc, local, before);
 }
 int EndKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLocal* local) {
 	if (!self->parent->parent->editable) return 1;
@@ -1610,6 +1797,7 @@ int EndKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLocal
 		else {
 			NewLetter* let = (NewLetter*)GC_alloc(thgc, CType::_LetterC);
 			initNewLetter(thgc, let, self->parent->parent->font, LetterType::_Letter);
+			let->text = e->text;
 			NewBefore(thgc, local, self, let);
 		}
 		if (n == 1) {
@@ -1982,8 +2170,7 @@ int LetterKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLo
 		NewBefore(thgc, local, self->parent, newline);
 		NewMoveElement(thgc, local, newline->childend, self->parent->childend->next, letter);
 		if (head->size == 0) {
-			NewRemoveElement(thgc, local, self);
-			return -1;
+			NewRemove(thgc, local, self);
 		}
 		else {
 			letter->text = head;
