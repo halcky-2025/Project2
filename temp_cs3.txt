@@ -1,0 +1,2149 @@
+﻿partial class Word
+    {
+        public override Obj SelfA(Local local)
+        {
+            var obj = local.getA(name);
+            return obj;
+        }
+        public override Obj GetterA(Local local)
+        {
+            var obj = local.getA(name).GetterA(local);
+            return obj;
+        }
+        public override Obj exepA(ref int n, Local local, Primary primary)
+        {
+            return this;
+        }
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            n++;
+            return this;
+        }
+    }
+    partial class Value
+    {
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            if (val2.type == ObjType.Dot)
+            {
+                n++;
+                val2 = primary.children[n];
+                if (val2.type == ObjType.Word)
+                {
+                    n++;
+                    return this;
+                }
+                else return Obj.Error(ObjType.Error, val2.letter, ".縺ｮ蠕後・蜷榊燕繧呈欠螳壹＠縺ｦ縺上□縺輔＞");
+            }
+            else if (val2.type == ObjType.Bracket)
+            {
+                var blk = val2.exeA(local) as Block;
+                n++;
+                return this;
+            }
+            else if (val2.type == ObjType.Block)
+            {
+                var blk = val2.exeA(local) as Block;
+                n++;
+                return this;
+            }
+            return Obj.Error(ObjType.NG, val2.letter, "蛟､縺ｮ蠕檎ｶ壹′驕ｩ蛻・〒縺ｯ縺ｪ縺・〒縺兔");
+        }
+        public override string Info()
+        {
+            return "val:" + cls.LetterName();
+        }
+    }
+    partial class Class
+    {
+        public override Obj exepA(ref int n, Local local, Primary primary)
+        {
+            return this;
+        }
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            Obj obj = new ClassObj();
+            if (val2.type == ObjType.Word)
+            {
+                var word = val2 as Word;
+                obj = local.getA(word.name);
+                n++;
+                val2 = primary.children[n];
+                if (local.comments.Count > 0)
+                {
+                    return Obj.Error(ObjType.Error, letter, "comment蜀・〒繧ｯ繝ｩ繧ｹ繧貞ｮ｣險縺ｧ縺阪∪縺帙ｓ縲・");
+                }
+                if (val2.type == ObjType.Block)
+                {
+                    var generic = obj as Generic;
+                    var val = val2.exeA(local);
+                    if (val.type == ObjType.Wait || val.type == ObjType.Error || val.type == ObjType.NG) return val;
+                    var block = val as Block;
+                    local.blocks[local.blocks.Count - 1].childblocks.Add(block);
+                    local.blocks.Add(block);
+                    for (var i = 0; i < block.rets.Count; i++)
+                    {
+                        val2 = block.rets[i];
+                        if (val2.type == ObjType.Word)
+                        {
+                            generic.vmap[(val2 as Word).name] = new VariClass(i);
+                        }
+                        else return Obj.Error(ObjType.Error, val2.letter, "繧ｸ繧ｧ繝阪Μ繝・け繧ｯ繝ｩ繧ｹ縺ｮ蠑墓焚縺碁←蛻・〒縺ｯ縺ゅｊ縺ｾ縺帙ｓ");
+                    }
+                    local.blocks.RemoveAt(local.blocks.Count - 1);
+                    generic.block = block;
+                    n++;
+                    val2 = primary.children[n];
+                    obj = generic;
+                }
+                obj.letter = word.letter;
+                if (val2.type == ObjType.Right)
+                {
+                    n++;
+                    val2 = primary.children[n];
+                    if (val2.type == ObjType.Word)
+                    {
+                        n++;
+                        val2 = primary.children[n];
+                        obj.rename = (val2 as Word).name;
+                        if (val2.type == ObjType.Block)
+                        {
+                            n++;
+                            val2 = primary.children[n];
+                            var blk = val2 as Block;
+                            if (blk.children.Count == 1)
+                            {
+                                if (blk.children[0].type == ObjType.FloatVal)
+                                {
+                                    obj.version = blk.children[0].letter.name;
+                                }
+                                else if (blk.children[0].type == ObjType.Number)
+                                {
+                                    obj.version = blk.children[0].letter.name;
+                                }
+                                else return Obj.Error(ObjType.Error, blk.children[0].letter, "version縺ｮ蠑墓焚縺ｯ蟆乗焚縺区紛謨ｰ縺縺代〒縺兔");
+                            }
+                            else return Obj.Error(ObjType.Error, val2.letter, "version縺ｮ蠑墓焚縺ｯ蟆乗焚縺区紛謨ｰ縺縺代〒縺兔");
+                        }
+                        else obj.version = "0";
+                    }
+                    else return Obj.Error(ObjType.Error, val2.letter, "繝・・繝悶Ν蜷阪ｒ謖・ｮ壹＠縺ｦ縺上□縺輔＞縲・");
+                }
+                else
+                {
+                    obj.rename = word.name;
+                    obj.version = "0";
+                }
+                local.declareRA(obj.rename, obj);
+            }
+        head:
+            if (val2.type == ObjType.Left)
+            {
+                n++;
+                val2 = primary.children[n];
+                if (val2.type == ObjType.Bracket)
+                {
+                    val2 = val2.exeA(local).GetterA(local);
+                    if (val2.type == ObjType.Wait || val2.type == ObjType.Error || val2.type == ObjType.NG) return val2;
+                    var blk = val2 as Block;
+                    for (var i = 0; i < blk.rets.Count; i++)
+                    {
+                        if (blk.rets[i].type == ObjType.ClassObj || blk.rets[i].type == ObjType.GenericObj)
+                        {
+                            var cls = blk.rets[i] as Type;
+                            if (obj.type == ObjType.ClassObj) (obj as ClassObj).extends.Add(cls);
+                            else if (obj.type == ObjType.Generic) (obj as Generic).extends.Add(cls);
+                        }
+                        else return Obj.Error(ObjType.Error, blk.letters[i], "邯呎価蜈・・繧ｯ繝ｩ繧ｹ縺九ず繧ｧ繝阪Μ繝・け繧ｹ縺ｧ縺ｪ縺代ｌ縺ｰ縺ｪ繧翫∪縺帙ｓ");
+                    }
+                }
+                if (val2.type == ObjType.ClassObj)
+                {
+                    var cls = val2 as ClassObj;
+                    if (obj.type == ObjType.ClassObj) (obj as ClassObj).extends.Add(cls);
+                    else if (obj.type == ObjType.Generic) (obj as Generic).extends.Add(cls);
+                    else return Obj.Error(ObjType.Error, val2.letter, "邯呎価蜈・・繧ｯ繝ｩ繧ｹ縺ｯ繧ｯ繝ｩ繧ｹ縺ｨ繧ｸ繧ｧ繝阪Μ繝・け繧ｯ繝ｩ繧ｹ縺縺代〒縺兔");
+                    n++;
+                    val2 = primary.children[n];
+                    goto head;
+                }
+                else if (val2.type == ObjType.Generic)
+                {
+                    var generic = val2 as Generic;
+                    n++;
+                    val2 = primary.children[n];
+                    if (val2.type == ObjType.Block)
+                    {
+                        val2 = val2.exeA(local).GetterA(local);
+                        if (val2.type == ObjType.NG || val2.type == ObjType.Error || val2.type == ObjType.NG) return val2;
+                        var block = val2 as Block;
+                        var genericobj = new GenericObj(generic);
+                        for (var i = 0; i < block.rets.Count; i++)
+                        {
+                            val2 = block.rets[i];
+                            if (val2 is Type)
+                            {
+                                genericobj.draws.Add(val2 as Type);
+                            }
+                            else return Obj.Error(ObjType.Error, val2.letter, "繧ｸ繧ｧ繝阪Μ繝・け繧ｹ繧ｯ繝ｩ繧ｹ縺ｮ蠑墓焚縺ｯ蝙九〒縺ｪ縺代ｌ縺ｰ縺ｪ繧峨↑縺Ы");
+                        }
+                        n++;
+                        val2 = primary.children[n];
+                        if (generic.vmap.Count != genericobj.draws.Count) return Obj.Error(ObjType.Error, val2.letter, "繧ｸ繧ｧ繝阪Μ繝・け繧ｯ繝ｩ繧ｹ縺ｮ蠑墓焚縺ｮ謨ｰ縺悟粋縺｣縺ｦ縺・∪縺帙ｓ");
+                        if (obj.type == ObjType.ClassObj) (obj as ClassObj).extends.Add(genericobj);
+                        else if (obj.type == ObjType.Generic) (obj as Generic).extends.Add(genericobj);
+                        else return Obj.Error(ObjType.Error, val2.letter, "邯呎価縺ｯ繧ｯ繝ｩ繧ｹ縺九ず繧ｧ繝阪Μ繝・け繧ｯ繝ｩ繧ｹ縺縺代〒縺吶・");
+                        goto head;
+                    }
+                    else return Obj.Error(ObjType.Error, val2.letter, "繧ｸ繧ｧ繝阪Μ繝・け繧ｯ繝ｩ繧ｹ縺ｯ[]縺ｧ蠑墓焚繧偵ｂ縺溘↑縺代ｌ縺ｰ縺ｪ繧峨↑縺・〒縺兔");
+                }
+                else return Obj.Error(ObjType.Error, val2.letter, "繧ｯ繝ｩ繧ｹ縺ｮ邯呎価蜈・・繧ｯ繝ｩ繧ｹ縺ｧ縺ｪ縺代ｌ縺ｰ縺ｪ繧翫∪縺帙ｓ");
+            }
+            if (val2.type == ObjType.CallBlock)
+            {
+                if (obj.type == ObjType.Generic)
+                {
+                    var generic = obj as Generic;
+                    local.declareA2(val2 as CallBlock, generic);
+                    generic.letter2 = (val2.children[1] as Block).letter2;
+                    generic.draw = val2 as CallBlock;
+                    var blk1 = val2.children[0] as Block;
+                    if (local.comments.Count > 0) blk1.comment = true;
+                    blk1.obj = new ObjBlock() { obj = obj, n = 0 };
+                    local.blocks[local.blocks.Count - 1].childblocks.Add(blk1);
+                    local.blocks.Add(blk1);
+                    for (var i = 0; i < local.blocks.Count; i++) blk1.blocks.Add(local.blocks[i]);
+                    blk1.exeA(local);
+                    var blk2 = val2.children[1] as Block;
+                    if (local.comments.Count > 0) blk2.comment = true;
+                    if (generic.extends.Count > 0)
+                    {
+                        blk2.vmapA["base"] = new Base(null, generic.extends);
+                    }
+                    blk2.obj = new ObjBlock() { obj = obj, n = 1 };
+                    local.blocks[local.blocks.Count - 1].childblocks.Add(blk2);
+                    local.blocks.Add(blk2);
+                    for (var i = 0; i < local.blocks.Count; i++) blk2.blocks.Add(local.blocks[i]);
+                    blk2.exeA(local);
+                    local.blocks.RemoveAt(local.blocks.Count - 1);
+                    local.blocks.RemoveAt(local.blocks.Count - 1);
+                }
+                else if (obj.type == ObjType.ClassObj)
+                {
+                    var cbj = obj as ClassObj;
+                    local.declareA2(val2 as CallBlock, cbj);
+                    cbj.letter2 = (val2.children[1] as Block).letter2;
+                    cbj.draw = val2 as CallBlock;
+                    var blk1 = val2.children[0] as Block;
+                    if (local.comments.Count > 0) blk1.comment = true;
+                    blk1.obj = new ObjBlock() { obj = cbj, n = 0 };
+                    local.blocks[local.blocks.Count - 1].childblocks.Add(blk1);
+                    local.blocks.Add(blk1);
+                    for (var i = 0; i < local.blocks.Count; i++) blk1.blocks.Add(local.blocks[i]);
+                    blk1.exeA(local);
+                    var blk2 = val2.children[1] as Block;
+                    if (local.comments.Count > 0) blk2.comment = true;
+                    if (cbj.extends.Count > 0)
+                    {
+                        blk2.vmapA["base"] = new Base(null, cbj.extends);
+                    }
+                    blk2.obj = new ObjBlock() { obj = obj, n = 1 };
+                    local.blocks[local.blocks.Count - 1].childblocks.Add(blk2);
+                    local.blocks.Add(blk2);
+                    for (var i = 0; i < local.blocks.Count; i++) blk2.blocks.Add(local.blocks[i]);
+                    blk2.exeA(local);
+                    local.blocks.RemoveAt(local.blocks.Count - 1);
+                    local.blocks.RemoveAt(local.blocks.Count - 1);
+                }
+                n++;
+                return obj;
+            }
+            else return Obj.Error(ObjType.NG, val2.letter, "繧ｯ繝ｩ繧ｹ縺ｮ螳｣險縺ｮ{|}縺梧栢縺代※縺・∪縺兔");
+        }
+    }
+    partial class Type
+    {
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            Type type = this;
+        head:
+            if (val2.type == ObjType.Block)
+            {
+                var blk = val2 as Block;
+                if (blk.children.Count == 0)
+                {
+                    type = new ArrType(type) { letter = val2.letter };
+                    n++;
+                    val2 = primary.children[n];
+                    goto head;
+                }
+                else return Obj.Error(ObjType.Error, val2.letter, "驟榊・蝙九・蠑墓焚縺ｮ謨ｰ縺・縺ｧ縺兔");
+            }
+            else if (val2.type == ObjType.Left)
+            {
+                var functype = new FuncType(type);
+                type = functype;
+                n++;
+                val2 = primary.children[n];
+                if (val2.type == ObjType.Bracket)
+                {
+                    val2 = val2.exeA(local).GetterA(local);
+                    if (val2.type == ObjType.Wait || val2.type == ObjType.Error || val2.type == ObjType.NG) return val2;
+                    var blk = val2 as Block;
+                    for (var i = 0; i < blk.rets.Count; i++)
+                    {
+                        val2 = blk.rets[i];
+                        if (val2.type == ObjType.Wait || val2.type == ObjType.Error || val2.type == ObjType.NG) return val2;
+                        else if (val2.type == ObjType.ClassObj || val2.type == ObjType.GenericObj)
+                        {
+                            functype.draws.Add(val2 as Type);
+                        }
+                        else return Obj.Error(ObjType.Error, val2.letter, "邯呎価蜈・・繧ｯ繝ｩ繧ｹ縺ｧ縺ｪ縺代ｌ縺ｰ縺ｪ繧峨↑縺Ы");
+                    }
+                    n++;
+                    val2 = primary.children[n];
+                }
+                else
+                {
+                    val2 = val2.GetterA(local);
+                    if (val2.type == ObjType.Var)
+                    {
+                        functype.draws.Add(val2 as Var);
+                        n++;
+                        val2 = primary.children[n];
+                        goto head;
+                    }
+                    else if (val2.type == ObjType.ClassObj)
+                    {
+                        functype.draws.Add(val2 as ClassObj);
+                        n++;
+                        val2 = primary.children[n];
+                        goto head;
+                    }
+                    else if (val2.type == ObjType.Generic)
+                    {
+                        var generic = val2 as Generic;
+                        n++;
+                        val2 = primary.children[n];
+                        if (val2.type == ObjType.Block)
+                        {
+                            val2 = val2.exeA(local).GetterA(local);
+                            if (val2.type == ObjType.Wait || val2.type == ObjType.Error || val2.type == ObjType.NG) return val2;
+                            var blk = val2 as Block;
+                            var genericobj = new GenericObj(generic);
+                            for (var i = 0; i < blk.rets.Count; i++)
+                            {
+                                val2 = blk.rets[i];
+                                if (val2 is Type)
+                                {
+                                    genericobj.draws.Add(val2 as Type);
+                                }
+                                else return Obj.Error(ObjType.Error, val2.letter, "繧ｸ繧ｧ繝阪Μ繝・け繧ｹ繧ｯ繝ｩ繧ｹ縺ｮ蠑墓焚縺ｯ蝙九〒縺ｪ縺代ｌ縺ｰ縺・￠縺ｾ縺帙ｓ");
+                            }
+                            if (generic.vmap.Count != genericobj.draws.Count) return Obj.Error(ObjType.Error, val2.letter, "繧ｸ繧ｧ繝阪Μ繝・け繧ｹ繧ｯ繝ｩ繧ｹ縺ｮ蠑墓焚縺悟粋縺｣縺ｦ縺・∪縺帙ｓ");
+                            n++;
+                            val2 = primary.children[n];
+                            functype.draws.Add(genericobj);
+                            goto head;
+                        }
+                        else return Obj.Error(ObjType.Error, val2.letter, "繧ｸ繧ｧ繝阪Μ繝・け繧ｹ繧ｯ繝ｩ繧ｹ縺ｮ蠑墓焚縺ｨ縺励※[]繧偵♀鬘倥＞縺励∪縺兔");
+                    }
+                    else return Obj.Error(ObjType.Error, val2.letter, "邯呎価蜈・・繧ｯ繝ｩ繧ｹ縺ｧ縺ｪ縺代ｌ縺ｰ縺ｪ繧峨↑縺Ы");
+                }
+            }
+            Word word = null, wordre = null;
+            if (val2.type == ObjType.Dot)
+            {
+                n++;
+                val2 = primary.children[n];
+                if (val2.type == ObjType.Word)
+                {
+                    var word2 = val2 as Word;
+                    n++;
+                    if (type.type == ObjType.ArrayType)
+                    {
+                        if (word2.name == "new") return new ArrayConstructor(type as ArrType);
+                        else return Obj.Error(ObjType.Error, val2.letter, word2.name + "縺ｯ" + type.letter.name + "縺ｮ蠕檎ｶ壹↓縺薙ｌ縺ｾ縺帙ｓ");
+                    }
+                    else if (type.type == ObjType.ClassObj || type.type == ObjType.ArrayType)
+                    {
+                        if (word2.name == "new") return new Constructor(type as ClassObj);
+                        else return Obj.Error(ObjType.Error, val2.letter, word2.name + "縺ｯ" + type.letter.name + "縺ｮ蠕檎ｶ壹↓縺薙ｌ縺ｾ縺帙ｓ");
+                    }
+                    else if (type.type == ObjType.ModelObj || type.type == ObjType.GeneObj)
+                    {
+                        var model = type as ModelObj;
+                        var blk0 = model.draw.children[0] as Block;
+                        if (blk0.vmapA.ContainsKey(word2.name))
+                        {
+                            return new SqlString(word2.name);
+                        }
+                        var blk1 = model.draw.children[1] as Block;
+                        if (blk1.vmapA.ContainsKey(word2.name))
+                        {
+                            return new SqlString(word2.name);
+                        }
+                        if (word2.name == "new") return new Constructor(type as ClassObj);
+                        else return Obj.Error(ObjType.Error, val2.letter, word2.name + "縺ｯ" + type.letter.name + "縺ｮ蠕檎ｶ壹↓縺薙ｌ縺ｾ縺帙ｓ");
+                    }
+                    else return Obj.Error(ObjType.Error, val2.letter, "髢｢謨ｰ蝙九・.縺梧擂繧後∪縺帙ｓ");
+                }
+                else return Obj.Error(ObjType.Error, val2.letter, ".縺ｮ蠕後↓縺ｯ蜊倩ｪ槭′蠢・ｦ√〒縺兔");
+            }
+            else if (val2.type == ObjType.Dolor)
+            {
+                n++;
+                val2 = primary.children[n];
+                if (val2.type == ObjType.Word)
+                {
+                    var word2 = val2 as Word;
+                    n++;
+                    if (local.comments.Count > 0)
+                    {
+                        var letter = local.comments.Last().ValueAdd(word.name);
+                        var variable = new Variable(type) { comment = letter };
+                        return type;
+                    }
+                    else return Obj.Error(ObjType.Error, val2.letter, "繧ｳ繝｡繝ｳ繝亥､画焚縺ｯ繧ｳ繝｡繝ｳ繝医・荳ｭ縺ｫ螳｣險縺励※縺上□縺輔＞縲・");
+                }
+                else return Obj.Error(ObjType.Error, val2.letter, "繧ｳ繝｡繝ｳ繝亥､画焚縺ｮ蜷榊燕繧呈欠螳壹＠縺ｦ縺上□縺輔＞縲・");
+            }
+            else if (val2.type == ObjType.Word)
+            {
+                word = val2 as Word;
+                n++;
+                val2 = primary.children[n];
+                var last = local.blocks.Last().obj;
+                if (last.obj.type == ObjType.ModelObj || last.obj.type == ObjType.GeneObj)
+                {
+                    var obj = type;
+                head2:
+                    if (obj.type == ObjType.ClassObj || obj.type == ObjType.FuncType) return Obj.Error(ObjType.Error, val2.letter, "model,gene縺ｮ荳ｭ縺ｧ縺ｯmodel縺吉ene縺ｮ蝙九＠縺句ｮ｣險縺ｧ縺阪∪縺帙ｓ");
+                    else if (obj.type == ObjType.ArrayType)
+                    {
+                        obj = (obj as ArrType).cls;
+                        goto head2;
+                    }
+                }
+                if (val2.type == ObjType.Right)
+                {
+                    n++;
+                    val2 = primary.children[n];
+                    if (val2.type == ObjType.Word)
+                    {
+                        n++;
+                        wordre = val2 as Word;
+                    }
+                    else return Obj.Error(ObjType.Error, val2.letter, "繧ｫ繝ｩ繝蜷阪↓縺ｯ蜷榊燕縺悟ｿ・ｦ√〒縺兔");
+                }
+            }
+            else if (val2.type == ObjType.Bracket)
+            {
+                var blk = val2.exeA(local) as Block;
+                n++;
+                for (var i = 0; i < blk.rets.Count; i++)
+                {
+                    val2 = blk.rets[i];
+                    if (val2.type == ObjType.Word)
+                    {
+                        var variable = new Variable(type);
+                        local.declareB((val2 as Word).name, variable);
+                        variable.rename = (val2 as Word).name;
+                        local.declareRA(variable.rename, variable);
+                        variable.letter = val2.letter;
+                    }
+                    else return Obj.Error(ObjType.Error, blk.letters[i], "螟画焚螳｣險縺ｯ蜷榊燕縺縺代〒縺兔");
+                }
+                return blk;
+            }
+            if (val2.type == ObjType.Block)
+            {
+                var func = new GenericFunction(type);
+                var val = val2.exeA(local);
+                if (val.type == ObjType.Wait || val.type == ObjType.Error || val.type == ObjType.NG) return val;
+                var blk = val.exeA(local) as Block;
+                for (var i = 0; i < blk.rets.Count; i++)
+                {
+                    if (blk.rets[i].type == ObjType.Word)
+                    {
+                        var word2 = blk.rets[i] as Word;
+                        func.vmap[word2.name] = new VariClass(i);
+                    }
+                    else return Obj.Error(ObjType.Error, blk.letters[i], "繧ｸ繧ｧ繝阪Μ繝・け髢｢謨ｰ縺ｮ螳｣險縺ｯ蜷榊燕縺励°蠑墓焚繧偵→繧後∪縺帙ｓ");               }
+                n++;
+                val2 = primary.children[n];
+                if (val2.type == ObjType.CallBlock)
+                {
+                    if (local.comments.Count > 0)
+                    {
+                        return Obj.Error(ObjType.Error, val2.letter, "comment蜀・〒髢｢謨ｰ繧貞ｮ｣險縺ｧ縺阪∪縺帙ｓ縲・");
+                    }
+                    func.draw = val2 as CallBlock;
+                    local.declareA2(func.draw, func);
+                    var blk1 = val2.children[0] as Block;
+                    if (local.comments.Count > 0) blk1.comment = true;
+                    blk1.obj = new ObjBlock() { obj = func, n = 0 };
+                    local.blocks[local.blocks.Count - 1].childblocks.Add(blk1);
+                    local.blocks.Add(blk1);
+                    for (var i = 0; i < local.blocks.Count; i++) blk1.blocks.Add(local.blocks[i]);
+                    blk1.exeA(local);
+                    var blk2 = val2.children[1] as Block;
+                    if (local.comments.Count > 0) blk2.comment = true;
+                    blk2.obj = new ObjBlock() { obj = func, n = 1 };
+                    local.blocks[local.blocks.Count - 1].childblocks.Add(blk2);
+                    local.blocks.Add(blk2);
+                    for (var i = 0; i < local.blocks.Count; i++) blk2.blocks.Add(local.blocks[i]);
+                    blk2.exeA(local);
+                    local.blocks.RemoveAt(local.blocks.Count - 1);
+                    local.blocks.RemoveAt(local.blocks.Count - 1);
+                    n++;
+                    if (word != null)
+                    {
+                        if (wordre == null) func.rename = word.name;
+                        else func.rename = wordre.name;
+                        local.declareA(word.name, func);
+                        local.declareRA(func.rename, func);
+                    }
+                    return func;
+                }
+                else return Obj.Error(ObjType.Error, val2.letter, "繧ｸ繧ｧ繝阪Μ繝・け髢｢謨ｰ縺ｮ{|}縺梧欠螳壹＆繧後※縺・∪縺帙ｓ");
+            }
+            else if (val2.type == ObjType.CallBlock)
+            {
+                var func = new Function(type);
+                func.draw = val2 as CallBlock;
+                local.declareA2(func.draw, func);
+                var blk1 = val2.children[0] as Block;
+                if (local.comments.Count > 0) blk1.comment = true;
+                blk1.obj = new ObjBlock() { obj = func, n = 0 };
+                local.blocks[local.blocks.Count - 1].childblocks.Add(blk1);
+                local.blocks.Add(blk1);
+                for (var i = 0; i < local.blocks.Count; i++) blk1.blocks.Add(local.blocks[i]);
+                blk1.exeA(local);
+                var blk2 = val2.children[1] as Block;
+                if (local.comments.Count > 0) blk2.comment = true;
+                blk2.obj = new ObjBlock() { obj = func, n = 1 };
+                local.blocks[local.blocks.Count - 1].childblocks.Add(blk2);
+                local.blocks.Add(blk2);
+                for (var i = 0; i < local.blocks.Count; i++) blk2.blocks.Add(local.blocks[i]);
+                blk2.exeA(local);
+                local.blocks.RemoveAt(local.blocks.Count - 1);
+                local.blocks.RemoveAt(local.blocks.Count - 1);
+                foreach (var b in local.blocks) func.blocks.Add(b);
+                n++;
+                if (word != null)
+                {
+                    local.declareA(word.name, func);
+                    if (wordre == null) func.rename = word.name;
+                    else func.rename = wordre.name;
+                    local.declareRA(func.rename, func);
+                    func.letter = word.letter;
+                }
+                else func.letter = val2.letter;
+                return func;
+            }
+            else
+            {
+                if (word == null) return type;
+                else
+                {
+                    var variable = new Variable(type);
+                    local.declareA(word.name, variable);
+                    variable.letter = word.letter;
+                    if (wordre == null) variable.rename = word.name;
+                    else variable.rename = wordre.name;
+                    local.declareRA(variable.rename, variable);
+                    /*
+                head1:
+                    if (val2.type == ObjType.Left)
+                    {
+                        var func = new Function(this);
+                        n++;
+                        val2 = primary.children[n];
+                        if (val2.type == ObjType.Word)
+                        {
+                            var gj = local.blocks.Last().obj.obj as Type;
+                            if (gj.type != ObjType.GeneObj && gj.type == ObjType.ModelObj) gj = null;
+                            var val = val2.GetterA(local);
+                            if (val.type == ObjType.Wait || val.type == ObjType.Error || val.type == ObjType.NG) return val;
+                            var func2 = val as Function;
+                            n++;
+                            val2 = primary.children[n];
+                            if (val2.type == ObjType.Block)
+                            {
+                                n++;
+                                val2 = primary.children[n];
+                            }
+                            if (val2.type == ObjType.Bracket)
+                            {
+                                n++;
+                                val2 = primary.children[n];
+                            }
+                            goto head1;
+                        }
+                        else if (val2.type == ObjType.CallBlock)
+                        {
+                            var gj = local.blocks.Last().obj.obj as Type;
+                            if (gj.type != ObjType.GeneObj && gj.type == ObjType.ModelObj) gj = null;
+                            func.draw = val2 as CallBlock;
+                            func.letter = val2.letter;
+                            local.declareA2(func.draw, func);
+                            var blk1 = val2.children[0] as Block;
+                            blk1.obj = new ObjBlock() { obj = func, n = 0 };
+                            local.blocks[local.blocks.Count - 1].childblocks.Add(blk1);
+                            local.blocks.Add(blk1);
+                            for (var i = 0; i < local.blocks.Count; i++) blk1.blocks.Add(local.blocks[i]);
+                            blk1.exeA(local);
+                            var blk2 = val2.children[1] as Block;
+                            var value = Value.New(type, local, null);
+                            if (value.type == ObjType.Wait || value.type == ObjType.Error || value.type == ObjType.NG) return value;
+                            var value2 = Value.New(gj, local, null);
+                            if (value2.type == ObjType.Wait || value2.type == ObjType.Error || value2.type == ObjType.NG) return value2;
+                            blk2.vmapA["v1"] = blk2.vmapA["v2"] = value;
+                            blk2.vmapA["g1"] = blk2.vmapA["g2"] = value2;
+                            blk2.obj = new ObjBlock() { obj = func, n = 1 };
+                            local.blocks[local.blocks.Count - 1].childblocks.Add(blk2);
+                            local.blocks.Add(blk2);
+                            for (var i = 0; i < local.blocks.Count; i++) blk2.blocks.Add(local.blocks[i]);
+                            blk2.exeA(local);
+                            local.blocks.RemoveAt(local.blocks.Count - 1);
+                            local.blocks.RemoveAt(local.blocks.Count - 1);
+                            variable.right = func;
+                            variable.left = func;
+                            n++;
+                            val2 = primary.children[n];
+                            goto head1;
+                        }
+                        else return Obj.Error(ObjType.Error, val2.letter, "騾ｲ蛹悶・繝ｭ繧ｰ繝ｩ繝溘Φ繧ｰ縺ｮ{|}繧呈欠螳壹＠縺ｦ縺上□縺輔＞");
+                    }
+                    else if (val2.type == ObjType.Right)
+                    {
+                        var func = new Function(this);
+                        n++;
+                        val2 = primary.children[n];
+                        if (val2.type == ObjType.Word)
+                        {
+                            var val = val2.GetterA(local);
+                            if (val.type == ObjType.Wait || val.type == ObjType.Error || val.type == ObjType.NG) return val;
+                            var func2 = val as Function;
+                            n++;
+                            val2 = primary.children[n];
+                            if (val2.type == ObjType.Block)
+                            {
+                                func.block = val2 as Block;
+                                n++;
+                                val2 = primary.children[n];
+                            }
+                            if (val2.type == ObjType.Bracket)
+                            {
+                                func.bracket = val2 as Block;
+                                n++;
+                                val2 = primary.children[n];
+                            }
+                            variable.right = func2;
+                            goto head1;
+                        }
+                        else if (val2.type == ObjType.CallBlock)
+                        {
+                            var gj = local.blocks.Last().obj.obj as Type;
+                            if (gj.type != ObjType.GeneObj && gj.type == ObjType.ModelObj) gj = null;
+                            func.draw = val2 as CallBlock;
+                            func.letter = val2.letter;
+                            local.declareA2(func.draw, func);
+                            n++;
+                            val2 = primary.children[n];
+                            var blk1 = val2.children[0] as Block;
+                            blk1.obj = new ObjBlock() { obj = func, n = 0 };
+                            local.blocks[local.blocks.Count - 1].returns.Add(blk1);
+                            local.blocks.Add(blk1);
+                            for (var i = 0; i < local.blocks.Count; i++) blk1.blocks.Add(local.blocks[i]);
+                            blk1.exeA(local);
+                            var blk2 = val2.children[1] as Block;
+                            blk2.obj = new ObjBlock() { obj = func, n = 1 };
+                            local.blocks[local.blocks.Count - 1].returns.Add(blk2);
+                            local.blocks.Add(blk2);
+                            for (var i = 0; i < local.blocks.Count; i++) blk2.blocks.Add(local.blocks[i]);
+                            blk2.exeA(local);
+                            local.blocks.RemoveAt(local.blocks.Count - 1);
+                            local.blocks.RemoveAt(local.blocks.Count - 1);
+                            variable.right = func;
+                            goto head1;
+                        }
+                        else return Obj.Error(ObjType.Error, val2.letter, "騾ｲ蛹悶・繝ｭ繧ｰ繝ｩ繝溘Φ繧ｰ縺ｮ{|}繧呈欠螳壹＠縺ｦ縺上□縺輔＞");
+                    }*/
+                    return variable;
+                }
+            }
+        }
+        public virtual String LetterName()
+        {
+            return letter.text;
+        }
+    }
+    partial class Var
+    {
+        public override Obj exepA(ref int n, Local local, Primary primary)
+        {
+            return this;
+        }
+        public override string LetterName()
+        {
+            var ret = "var";
+            if (cls != null) ret += " " + cls.LetterName();
+            return ret;
+        }
+    }
+    partial class ClassObj
+    {
+        public override string Info()
+        {
+            var text = "cbj:" + letter.name;
+            return text;
+        }
+    }
+    partial class ArrType
+    {
+        public override string LetterName()
+        {
+            return cls.LetterName() + "[]";
+        }
+    }
+    partial class FuncType
+    {
+        public override string LetterName()
+        {
+            var ret = cls.LetterName() + "(";
+            for(var i = 0; i < draws.Count; i++)
+            {
+                if (i != 0) ret += ",";
+                ret += draws[i].LetterName();
+            }
+            return ret + ")";
+        }
+    }
+    partial class Generic
+    {
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            if (val2.type == ObjType.Block)
+            {
+                var val = val2.exeA(local).GetterA(local);
+                if (val.type == ObjType.Wait || val.type == ObjType.Error || val.type == ObjType.NG) return val;
+                var block = val as Block;
+                var geneobj = new GenericObj(this);
+                if (this.block.vmap.Count != block.rets.Count) return Obj.Error(ObjType.Error, val2.letter, "繧ｸ繧ｧ繝阪Μ繝・け繧ｹ繧ｯ繝ｩ繧ｹ縺ｮ蠑墓焚縺後≠縺｣縺ｦ縺・∪縺帙ｓ縲・");
+                for (var i = 0; i < block.rets.Count; i++)
+                {
+                    if (block.rets[i] is Type)
+                    {
+                        geneobj.draws.Add(block.rets[i] as Type);
+                    }
+                    else return Obj.Error(ObjType.Error, block.letters[i], "繧ｸ繧ｧ繝阪Μ繝・け繧ｹ繧ｯ繝ｩ繧ｹ縺ｯ蝙九ｒ蠑墓焚縺ｫ縺ｨ繧句ｿ・ｦ√′縺ゅｊ縺ｾ縺吶・");
+                }
+                var list = new List<Obj>(this.block.vmap.Values);
+            }
+            return Obj.Error(ObjType.NG, val2.letter, "繧ｸ繧ｧ繝阪Μ繝・け繧ｯ繝ｩ繧ｹ縺ｯ[]繧貞ｼ墓焚縺ｫ縺ｨ繧翫∪縺兔");
+        }
+    }
+    partial class Number
+    {
+        public override Obj exeA(Local local)
+        {
+            return this;
+        }
+        public override Obj exepA(ref int n, Local local, Primary primary)
+        {
+            return this;
+        }
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            if (val2.type == ObjType.Dot)
+            {
+                n++;
+                val2 = primary.children[n];
+                if (val2.type == ObjType.Word)
+                {
+                    var word = val2 as Word;
+                    n++;
+                    val2 = primary.children[n];
+                    if (word.name == "random")
+                    {
+                        if (val2.type == ObjType.Bracket)
+                        {
+                            n++;
+                            if (val2.children.Count != 0) return Obj.Error(ObjType.Error, val2.letter, "random縺ｮ蠑墓焚縺ｯ0蛟九〒縺兔");
+                            return new Number(0) { cls = local.Int };
+                        }
+                        else return Obj.Error(ObjType.Error, val2.letter, "random縺ｮ()縺梧欠螳壹＆繧後※縺・∪縺帙ｓ");
+                    }
+                    else return Obj.Error(ObjType.Error, val2.letter, word.name + "縺ｯ驕ｩ蛻・↑蠕檎ｶ壹・蜊倩ｪ槭〒縺ｯ縺ゅｊ縺ｾ縺帙ｓ");
+                }
+                else return Obj.Error(ObjType.Error, val2.letter, ".縺ｮ蠕後↓蜊倩ｪ槭′譚･縺ｦ縺・∪縺帙ｓ");
+            }
+            return Obj.Error(ObjType.NG, val2.letter, ".縺梧擂縺ｦ縺・∪縺帙ｓ");
+        }
+        public override string Info()
+        {
+            return "int **";
+        }
+    }
+    partial class FloatVal
+    {
+        public override Obj exepA(ref int n, Local local, Primary primary)
+        {
+            return this;
+        }
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            return Obj.Error(ObjType.NG, val2.letter, "蟆乗焚縺ｫ縺ｯ蠕檎ｶ壹′譚･繧後∪縺帙ｓ");
+        }
+        public override string Info()
+        {
+            return "float **";
+        }
+    }
+    partial class SqlString
+    {
+        public override Obj exeA(Local local)
+        {
+            return this;
+        }
+        public override Obj exepA(ref int n, Local local, Primary primary)
+        {
+            return this;
+        }
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            return Obj.Error(ObjType.NG, val2.letter, "SQL譁・ｭ怜・縺ｫ縺ｯ蠕檎ｶ壹′譚･繧後∪縺帙ｓ");
+        }
+        public override string Info()
+        {
+            return "sqlstr **";
+        }
+        public override Obj opeA(string key, Local local, Obj val2)
+        {
+            if (key == "+" || key == "-" || key == "*" || key == "/" || key == "=")
+            {
+                return this;
+            }
+            else if (key == "==" || key == "!=" || key == ">" || key == "<" || key == ">=" || key == "<=")
+            {
+                return this;
+            }
+            else if (key == "and" || key == "or")
+            {
+                return this;
+            }
+            return Obj.Error(ObjType.Error, letter, "SQL縺ｧ荳埼←蛻・↑貍皮ｮ怜ｭ申" + key);
+        }
+    }
+    partial class StrObj
+    {
+        public override Obj exeA(Local local)
+        {
+            return this;
+        }
+        public override Obj exepA(ref int n, Local local, Primary primary)
+        {
+            return this;
+        }
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            return Obj.Error(ObjType.NG, val2.letter, "譁・ｭ怜・縺ｫ縺ｯ蠕檎ｶ壹′譚･繧後∪縺帙ｓ");
+        }
+        public override string Info()
+        {
+            return "strobj **";
+        }
+    }
+    partial class BoolVal
+    {
+        public override Obj exeA(Local local)
+        {
+            return this;
+        }
+        public override Obj exepA(ref int n, Local local, Primary primary)
+        {
+            return this;
+        }
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            return Obj.Error(ObjType.NG, val2.letter, "bool蛟､縺ｫ縺ｯ蠕檎ｶ壹′縺薙ｌ縺ｾ縺帙ｓ");
+        }
+        public override string Info()
+        {
+            return "bool **";
+        }
+    }
+    partial class VoiVal
+    {
+        public override Obj exepA(ref int n, Local local, Primary primary)
+        {
+            return new Obj(ObjType.NG);
+        }
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            return Obj.Error(ObjType.NG, val2.letter, "void蛟､縺ｫ縺ｯ蠕檎ｶ壹′縺薙ｌ縺ｾ縺帙ｓ");
+        }
+        public override string Info()
+        {
+            return "void **";
+        }
+    }
+    partial class Null
+    {
+        public override Obj exeA(Local local)
+        {
+            return this;
+        }
+        public override Obj exepA(ref int n, Local local, Primary primary)
+        {
+            return this;
+        }
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            return Obj.Error(ObjType.NG, val2.letter, "null縺ｫ縺ｯ蠕檎ｶ壹′譚･縺ｾ縺帙ｓ");
+        }
+    }
+    partial class ArrayConstructor
+    {
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            if (val2.type == ObjType.Bracket)
+            {
+                var val = val2.exeA(local).GetterA(local);
+                if (val.type == ObjType.Wait || val.type == ObjType.Error || val.type == ObjType.NG) return val;
+                var blk = val as Block;
+                if (blk.rets.Count != 1) Obj.Error(ObjType.Error, val2.letter, "驟榊・蝙九・繧ｳ繝ｳ繧ｹ繝医Λ繧ｯ繧ｿ縺ｮ蠑墓焚縺ｯ1縺ｧ縺兔");
+                n++;
+                if (blk.rets[0].type == ObjType.Number)
+                {
+                    var value = Value.New(cls, local, letter);
+                    if (value.type == ObjType.Wait || value.type == ObjType.Error || value.type == ObjType.NG) return value;
+                    return new Block(ObjType.Array) { rets = new List<Obj> { value } };
+                }
+                else return Obj.Error(ObjType.Error, blk.letters[0], "驟榊・蝙九・繧ｳ繝ｳ繧ｹ繝医Λ繧ｯ繧ｿ縺ｮ蠑墓焚縺ｯ1縺ｧ縺兔");
+            }
+            var val3 = val2.GetterA(local);
+            if (val3.type == ObjType.Wait || val3.type == ObjType.Error || val3.type == ObjType.NG) return val3;
+            if (val3.type == ObjType.Number)
+            {
+                if (val3.type == ObjType.Number)
+                {
+                    var value = Value.New(cls, local, letter);
+                    if (value.type == ObjType.Wait || value.type == ObjType.Error || value.type == ObjType.NG) return value;
+                    return new Block(ObjType.Array) { rets = new List<Obj> { value } };
+                }
+                else return Obj.Error(ObjType.Error, val2.letter, "驟榊・蝙九・繧ｳ繝ｳ繧ｹ繝医Λ繧ｯ繧ｿ縺ｮ蠑墓焚縺ｯ1縺ｧ縺兔");
+            }
+            return Obj.Error(ObjType.NG, val2.letter, "繧ｳ繝ｳ繧ｹ繝医Λ繧ｯ繧ｿ縺ｮ蠑墓焚縺碁←蛻・〒縺ｯ縺ゅｊ縺ｾ縺帙ｓ");
+        }
+    }
+    partial class Constructor
+    {
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            if (val2.type == ObjType.Bracket)
+            {
+                val2 = val2.exeA(local).GetterA(local);
+                if (val2.type == ObjType.Wait || val2.type == ObjType.Error || val2.type == ObjType.NG) return val2;
+                var blk = val2 as Block;
+                var block1 = cls.draw.children[0] as Block;
+                block1.exeRangeA(0, block1.children.Count, local, false);
+                n++;
+                return new Value(cls);
+            }
+            var val3 = val2.GetterA(local);
+            if (val3.type == ObjType.Wait || val3.type == ObjType.Error || val3.type == ObjType.NG) return val3;
+            if (val3.type == ObjType.Number || val3.type == ObjType.StrObj || val3.type == ObjType.BoolVal || val3.type == ObjType.Value)
+            {
+                var block1 = cls.draw.children[0] as Block;
+                block1.exeRangeA(0, block1.children.Count, local, false);
+                n++;
+                return new Value(cls);
+            }
+            return Obj.Error(ObjType.NG, val2.letter, "繧ｳ繝ｳ繧ｹ繝医Λ繧ｯ繧ｿ縺ｮ蠑墓焚縺碁←蛻・〒縺ｯ縺ゅｊ縺ｾ縺帙ｓ");
+        }
+    }
+    partial class Base
+    {
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            var m = 0;
+            if (val2.type == ObjType.Block)
+            {
+                if (val2.children.Count == 1 && val2.children[0].type == ObjType.Number)
+                {
+                    m = (val2.children[0] as Number).value;
+                }
+                n++;
+                val2 = primary.children[n];
+            }
+            var cls = extends[m] as ClassObj;
+            if (val2.type == ObjType.Bracket)
+            {
+                val2 = val2.Clone().exeA(local).GetterA(local);
+                if (val2.type == ObjType.Wait || val2.type == ObjType.Error || val2.type == ObjType.NG) return val2;
+                var blk = val2.exeA(local) as Block;
+                n++;
+                return new VoiVal();
+            }
+            var val3 = val2.GetterA(local);
+            if (val3.type == ObjType.Wait || val3.type == ObjType.Error || val3.type == ObjType.NG) return val3;
+            if (val3.type == ObjType.Number || val3.type == ObjType.StrObj || val3.type == ObjType.BoolVal || val3.type == ObjType.Value)
+            {
+                n++;
+                return new VoiVal();
+            }
+            return Obj.Error(ObjType.Error, val2.letter, "base縺ｮ蠑墓焚縺碁←蛻・↓險ｭ螳壹＆繧後※縺・∪縺帙ｓ");
+        }
+    }
+    partial class Variable
+    {
+        public override Obj GetterA(Local local)
+        {
+            return Value.New(cls, local, letter);
+        }
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            return new Value(cls).PrimaryA(ref n, local, primary, val2);
+        }
+        public override string Info()
+        {
+            return "var:" + letter.name + " " + cls.LetterName();
+        }
+    }
+    partial class Function
+    {
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            if (bracket != null) throw new Exception();
+            if (val2.type == ObjType.Bracket)
+            {
+                var val = val2.exeA(local).GetterA(local);
+                if (val.type == ObjType.Wait || val.type == ObjType.Error || val.type == ObjType.NG) return val;
+                return new Value(ret);
+            }
+            val2 = null;
+            for (; n < primary.children.Count - 1;)
+            {
+                Primary.NextA(primary, local, ref n, ref val2);
+                if (val2.type == ObjType.Wait || val2.type == ObjType.Error || val2.type == ObjType.NG) return val2;
+            }
+            if (val2 != null)
+            {
+                val2 = val2.GetterA(local);
+                if (val2.type == ObjType.Wait || val2.type == ObjType.Error || val2.type == ObjType.NG) return val2;
+                if (val2.type == ObjType.Number || val2.type == ObjType.StrObj || val2.type == ObjType.BoolVal || val2.type == ObjType.Value)
+                {
+                    n++;
+                    return new Value(ret);
+                }
+            }
+            return Obj.Error(ObjType.NG, val2.letter, "()縺ｮ繧医≧縺ｪ髢｢謨ｰ縺ｫ驕ｩ蛻・↑蠑墓焚縺梧擂縺ｦ縺・∪縺帙ｓ");
+        }
+        public override string Info()
+        {
+            return "fun:" + letter.name + " " + ret.letter.name;
+        }
+    }
+    partial class IfBlock: Obj
+    {
+        public CallBlock call;
+        public Obj iflabel;
+        public If ifobj;
+        public IfBlock() : base(ObjType.IfBlock)
+        {
+        }
+        public override string Info()
+        {
+            return "if :" + iflabel.letter.name;
+        }
+    }
+    partial class If
+    {
+        public List<IfBlock> calls = new List<IfBlock>();
+        public override Obj exepA(ref int n, Local local, Primary primary)
+        {
+            return this;
+        }
+        public override string Info()
+        {
+            return "if :" + letter.name;
+        }
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            if (val2.type == ObjType.CallBlock)
+            {
+                var ifb = new IfBlock() { call = val2 as CallBlock, iflabel = this, ifobj = this };
+                calls.Add(ifb);
+                var block1 = val2.children[0] as Block;
+                if (local.comments.Count > 0) block1.comment = true;
+                block1.obj = new ObjBlock() { obj = ifb, n = 0 };
+                local.blocks[local.blocks.Count - 1].childblocks.Add(block1);
+                local.blocks.Add(block1);
+                for (var i = 0; i < local.blocks.Count; i++) block1.blocks.Add(local.blocks[i]);
+                block1.exeA(local);
+                var ret = block1.rets.Last().GetterA(local);
+                var block2 = val2.children[1] as Block;
+                if (local.comments.Count > 0) block2.comment = true;
+                block2.obj = new ObjBlock() { obj = ifb, n = 1 };
+                local.blocks[local.blocks.Count - 1].childblocks.Add(block2);
+                local.blocks.Add(block2);
+                for (var i = 0; i < local.blocks.Count; i++) block2.blocks.Add(local.blocks[i]);
+                block2.exeA(local);
+                local.blocks.RemoveAt(local.blocks.Count - 1);
+                local.blocks.RemoveAt(local.blocks.Count - 1);
+                n++;
+                val2 = primary.children[n];
+            head:
+                var elif = val2;
+                if (val2.type == ObjType.Elif)
+                {
+                    var iflabel = val2;
+                    n++;
+                    val2 = primary.children[n];
+                    if (val2.type == ObjType.CallBlock)
+                    {
+                        ifb = new IfBlock() { call = val2 as CallBlock, iflabel = iflabel, ifobj = this };
+                        calls.Add(ifb);
+                        block1 = val2.children[0] as Block;
+                        if (local.comments.Count > 0) block1.comment = true;
+                        block1.obj = new ObjBlock() { obj = ifb, n = 0 };
+                        local.blocks[local.blocks.Count - 1].childblocks.Add(block1);
+                        local.blocks.Add(block1);
+                        for (var i = 0; i < local.blocks.Count; i++) block1.blocks.Add(local.blocks[i]);
+                        block1.exeA(local);
+                        ret = block1.rets.Last().GetterA(local);
+                        var block22 = val2.children[1] as Block;
+                        if (local.comments.Count > 0) block22.comment = true;
+                        block22.obj = new ObjBlock() { obj = ifb, n = 1 };
+                        local.blocks[local.blocks.Count - 1].childblocks.Add(block22);
+                        local.blocks.Add(block22);
+                        for (var i = 0; i < local.blocks.Count; i++) block22.blocks.Add(local.blocks[i]);
+                        block22.exeA(local);
+                        local.blocks.RemoveAt(local.blocks.Count - 1);
+                        local.blocks.RemoveAt(local.blocks.Count - 1);
+                        n++;
+                        val2 = primary.children[n];
+                        goto head;
+                    }
+                    else return Obj.Error(ObjType.Error, val2.letter, "elif譁・・荳ｭ霄ｫ縺悟ｮ｣險縺輔ｌ縺ｦ縺・∪縺帙ｓ縲・");
+                }
+                else if (val2.type == ObjType.Else)
+                {
+                    var iflabel = val2;
+                    n++;
+                    val2 = primary.children[n];
+                    if (val2.type == ObjType.CallBlock)
+                    {
+                        ifb = new IfBlock() { call = val2 as CallBlock, iflabel = iflabel, ifobj = this };
+                        calls.Add(ifb);
+                        block1 = val2.children[0] as Block;
+                        if (local.comments.Count > 0) block1.comment = true;
+                        block1.obj = new ObjBlock() { obj = ifb, n = 0 };
+                        local.blocks[local.blocks.Count - 1].childblocks.Add(block1);
+                        local.blocks.Add(block1);
+                        for (var i = 0; i < local.blocks.Count; i++) block1.blocks.Add(local.blocks[i]);
+                        block1.exeA(local);
+                        var block22 = val2.children[1] as Block;
+                        if (local.comments.Count > 0) block22.comment = true;
+                        block22.obj = new ObjBlock() { obj = ifb, n = 0 };
+                        local.blocks[local.blocks.Count - 1].childblocks.Add(block22);
+                        local.blocks.Add(block22);
+                        for (var i = 0; i < local.blocks.Count; i++) block22.blocks.Add(local.blocks[i]);
+                        block22.exeA(local);
+                        local.blocks.RemoveAt(local.blocks.Count - 1);
+                        local.blocks.RemoveAt(local.blocks.Count - 1);
+                        n++;
+                        return new Value(local.Int);
+                    }
+                    else return Obj.Error(ObjType.Error, val2.letter, "else譁・・荳ｭ霄ｫ縺悟ｮ｣險縺輔ｌ縺ｦ縺・∪縺帙ｓ縲・");
+                }
+                else return new Value(local.Int);
+            }
+            return Obj.Error(ObjType.Error, val2.letter, "if譁・・荳ｭ霄ｫ縺悟ｮ｣險縺輔ｌ縺ｦ縺・∪縺帙ｓ");
+        }
+    }
+    partial class While
+    {
+        public override string Info()
+        {
+            return "whi:" + letter.name;
+        }
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            if (val2.type == ObjType.CallBlock)
+            {
+                local.declareA2(val2 as CallBlock, this);
+                var block1 = val2.children[0] as Block;
+                if (local.comments.Count > 0) block1.comment = true;
+                block1.obj = new ObjBlock() { obj = this, n = 0 };
+                local.blocks[local.blocks.Count - 1].childblocks.Add(block1);
+                local.blocks.Add(block1);
+                for (var i = 0; i < local.blocks.Count; i++) block1.blocks.Add(local.blocks[i]);
+                block1.exeA(local);
+                var block2 = val2.children[1] as Block;
+                if (local.comments.Count > 0) block2.comment = true;
+                block2.obj = new ObjBlock() { obj = this, n = 1 };
+                local.blocks[local.blocks.Count - 1].childblocks.Add(block2);
+                local.blocks.Add(block2);
+                for (var i = 0; i < local.blocks.Count; i++) block2.blocks.Add(local.blocks[i]);
+                block2.exeA(local);
+                var retobj = block2.rets.Last().Getter(local);
+                local.blocks.RemoveAt(local.blocks.Count - 1);
+                local.blocks.RemoveAt(local.blocks.Count - 1);
+                n++;
+                return retobj;
+            }
+            return Obj.Error(ObjType.Error, val2.letter, "while譁・・荳ｭ霄ｫ縺悟ｮ｣險縺輔ｌ縺ｦ縺・∪縺帙ｓ");
+        }
+        public override Obj exepA(ref int n, Local local, Primary primary)
+        {
+            return this;
+        }
+    }
+    partial class For
+    {
+        public override string Info()
+        {
+            return "for:" + letter.name;
+        }
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            if (val2.type == ObjType.CallBlock)
+            {
+                var block1 = val2.children[0] as Block;
+                if (local.comments.Count > 0) block1.comment = true;
+                block1.obj = new ObjBlock() { obj = this, n = 0 };
+                local.blocks[local.blocks.Count - 1].childblocks.Add(block1);
+                local.blocks.Add(block1);
+                for (var i = 0; i < local.blocks.Count; i++) block1.blocks.Add(local.blocks[i]);
+                var loop = false;
+                var result = false;
+                block1.exeA(local);
+                var block2 = val2.children[1] as Block;
+                if (local.comments.Count > 0) block2.comment = true;
+                block2.obj = new ObjBlock() { obj = this, n = 1 };
+                local.blocks[local.blocks.Count - 1].childblocks.Add(block2);
+                local.blocks.Add(block2);
+                for (var i = 0; i < local.blocks.Count; i++) block2.blocks.Add(local.blocks[i]);
+                block2.exeA(local);
+                var retobj = block2.rets.Last().Getter(local);
+                local.blocks.RemoveAt(local.blocks.Count - 1);
+                local.blocks.RemoveAt(local.blocks.Count - 1);
+                n++;
+                return retobj;
+            }
+            return Obj.Error(ObjType.Error, val2.letter, "for譁・・荳ｭ霄ｫ縺悟ｮ｣險縺輔ｌ縺ｦ縺・∪縺帙ｓ縲・");
+        }
+        public override Obj exepA(ref int n, Local local, Primary primary)
+        {
+            return this;
+        }
+    }
+    partial class Switch
+    {
+        public override string Info()
+        {
+            return "swi:" + letter.name;
+        }
+        public override Obj exepA(ref int n, Local local, Primary primary)
+        {
+            return this;
+        }
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            if (val2.type == ObjType.CallBlock)
+            {
+                var block1 = val2.children[0] as Block;
+                if (local.comments.Count > 0) block1.comment = true;
+                block1.obj = new ObjBlock() { obj = this, n = 0 };
+                local.blocks[local.blocks.Count - 1].childblocks.Add(block1);
+                local.blocks.Add(block1);
+                for (var i = 0; i < local.blocks.Count; i++) block1.blocks.Add(local.blocks[i]);
+                block1.exeA(local);
+                var block2 = val2.children[1] as Block;
+                if (local.comments.Count > 0) block2.comment = true;
+                block2.obj = new ObjBlock() { obj = this, n = 1 };
+                local.blocks[local.blocks.Count - 1].childblocks.Add(block2);
+                local.blocks.Add(block2);
+                for (var i = 0; i < local.blocks.Count; i++) block2.blocks.Add(local.blocks[i]);
+                block2.exeA(local);
+                var retobj = block2.rets.Last();
+                local.blocks.RemoveAt(local.blocks.Count - 1);
+                local.blocks.RemoveAt(local.blocks.Count - 1);
+                n++;
+                return retobj;
+            }
+            return Obj.Error(ObjType.Error, val2.letter, "switch譁・・荳ｭ霄ｫ縺悟ｮ｣險縺輔ｌ縺ｦ縺・∪縺帙ｓ");
+        }
+    }
+    partial class Break
+    {
+        public override Obj exepA(ref int n, Local local, Primary primary)
+        {
+            n++;
+            Obj val2 = null;
+            val2 = null;
+            for (; n < primary.children.Count - 1;)
+            {
+                Primary.NextA(primary, local, ref n, ref val2);
+                if (val2.type == ObjType.Wait || val2.type == ObjType.Error || val2.type == ObjType.NG) return val2;
+            }
+            if (val2 != null) val2 = val2.GetterA(local);
+            n--;
+            return val2;
+        }
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            val2 = null;
+            for (; n < primary.children.Count - 1;)
+            {
+                Primary.NextA(primary, local, ref n, ref val2);
+                if (val2.type == ObjType.Wait || val2.type == ObjType.Error || val2.type == ObjType.NG) return val2;
+            }
+            if (val2 != null) val2 = val2.GetterA(local);
+            return val2;
+        }
+    }
+    partial class Continue
+    {
+        public override Obj exepA(ref int n, Local local, Primary primary)
+        {
+            return this;
+        }
+    }
+    partial class Return
+    {
+        public override Obj exepA(ref int n, Local local, Primary primary)
+        {
+            n++;
+            Obj val2 = null;
+            val2 = null;
+            for (; n < primary.children.Count - 1;)
+            {
+                Primary.NextA(primary, local, ref n, ref val2);
+                if (val2.type == ObjType.Wait || val2.type == ObjType.Error || val2.type == ObjType.NG) return val2;
+            }
+            if (val2 != null) val2 = val2.GetterA(local);
+            n--;
+            return val2;
+        }
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            val2 = null;
+            for (; n < primary.children.Count - 1;)
+            {
+                Primary.NextA(primary, local, ref n, ref val2);
+                if (val2.type == ObjType.Wait || val2.type == ObjType.Error || val2.type == ObjType.NG) return val2;
+            }
+            if (val2 != null) val2 = val2.GetterA(local);
+            return val2;
+        }
+    }
+    partial class Goto
+    {
+        public override Obj exepA(ref int n, Local local, Primary primary)
+        {
+            return this;
+        }
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            if (val2.type == ObjType.Number)
+            {
+                value = (val2 as Number).value.ToString();
+                return this;
+            }
+            else if (val2.type == ObjType.StrObj)
+            {
+                value = (val2 as StrObj).value;
+                return this;
+            }
+            else if (val2.type == ObjType.Word)
+            {
+                value = (val2 as Word).name;
+                return this;
+            }
+            return Obj.Error(ObjType.Error, val2.letter, "goto譁・・陦後″蜈医ｒ謖・ｮ壹＠縺ｦ縺上□縺輔＞縲・");
+        }
+    }
+    partial class Print
+    {
+        public override Obj exepA(ref int n, Local local, Primary primary)
+        {
+            return this;
+        }
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            if (val2.type == ObjType.Bracket || val2.type == ObjType.Block)
+            {
+                var val = val2.exeA(local).GetterA(local);
+                if (val.type == ObjType.Wait || val.type == ObjType.Error || val.type == ObjType.NG) return val;
+                var block = val as Block;
+                if (val2.type == ObjType.Bracket) local.console.Text += "(";
+                else local.console.Text += "[";
+                if (val2.type == ObjType.Bracket) local.console.Text += ")\
+";
+                else local.console.Text += "]\
+";
+                n++;
+                return new VoiVal();
+            }
+            val2 = val2.GetterA(local);
+            if (val2.type == ObjType.Number)
+            {
+                local.console.Text += (val2 as Number).value.ToString() + "\
+";
+                n++;
+                return new VoiVal();
+            }
+            else if (val2.type == ObjType.StrObj)
+            {
+                local.console.Text += (val2 as StrObj).value + "\
+";
+                n++;
+                return new VoiVal();
+            }
+            val2 = null;
+            for (; n < primary.children.Count - 1;)
+            {
+                Primary.NextA(primary, local, ref n, ref val2);
+                if (val2.type == ObjType.Wait || val2.type == ObjType.Error || val2.type == ObjType.NG) return val2;
+            }
+            if (val2 != null)
+            {
+                val2 = val2.GetterA(local);
+                if (val2.type == ObjType.Wait || val2.type == ObjType.Error || val2.type == ObjType.NG) return val2;
+                if (val2.type == ObjType.Number || val2.type == ObjType.StrObj || val2.type == ObjType.BoolVal || val2.type == ObjType.Value)
+                {
+                    n++;
+                    return new VoiVal();
+                }
+            }
+            return Obj.Error(ObjType.Error, val2.letter, "()縺ｧprint縺ｮ蠑墓焚繧呈欠螳壹＠縺ｦ縺上□縺輔＞");
+        }
+    }
+    partial class Iterator
+    {
+    }
+    partial class GenericFunction
+    {
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            if (val2.type == ObjType.Block)
+            {
+                var val = val2.GetterA(local);
+                if (val.type == ObjType.Wait || val.type == ObjType.Error || val.type == ObjType.NG) return val;
+                var blk = val as Block;
+                if (blk.rets.Count != vmap.Count) return Obj.Error(ObjType.Error, val2.let, "蠑墓焚縺ｮ謨ｰ縺後≠縺｣縺ｦ縺・∪縺帙ｓ縲・");
+                for (var i = 0; i < blk.rets.Count; i++)
+                {
+                    if (blk.rets[i] as Type == null) return Obj.Error(ObjType.Error, blk.letters[i], "繧ｸ繧ｧ繝阪Μ繝・け髢｢謨ｰ縺ｫ縺ｯ蝙九ｒ蠑墓焚縺ｫ縺励※縺上□縺輔＞");
+                }
+                n++;
+                val2 = primary.children[n];
+                return new Function(ret) { blocks = blocks, draw = draw, bracket = bracket, block = blk };
+            }
+            return Obj.Error(ObjType.NG, val2.letter, "[]縺ｧ繧ｸ繧ｧ繝ｪ繝・け髢｢謨ｰ縺ｮ蠑墓焚繧呈欠螳壹＠縺ｦ縺上□縺輔＞");
+        }
+    }
+    partial class Model
+    {
+        public override Obj exepA(ref int n, Local local, Primary primary)
+        {
+            return this;
+        }
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            if (val2.type == ObjType.Block)
+            {
+                val2 = val2.exeA(local).GetterA(local);
+                if (val2.type == ObjType.Wait || val2.type == ObjType.Error || val2.type == ObjType.NG) return val2;
+                n++;
+                val2 = primary.children[n];
+            head:
+                if (val2.type == ObjType.Dot)
+                {
+                    n++;
+                    val2 = primary.children[n];
+                    if (val2.type == ObjType.Word)
+                    {
+                        var word2 = val2 as Word;
+                        n++;
+                        val2 = primary.children[n];
+                        if (val2.type == ObjType.Bracket)
+                        {
+                            var val = val2.exeA(local).GetterA(local);
+                            if (val.type == ObjType.Wait || val.type == ObjType.Error || val.type == ObjType.NG) return val;
+                            var blk = val as Block;
+                            n++;
+                            if (word2.name == "Where")
+                            {
+                                if (blk.rets.Count != 1) return Obj.Error(ObjType.Error, blk.letter, "First縺ｯ蠑墓焚縺・縺､縺ｧ縺兔");
+                                goto head;
+                            }
+                            else if (word2.name == "FirstAwait")
+                            {
+                                if (blk.rets.Count != 0) return Obj.Error(ObjType.Error, blk.letter, "First縺ｯ蠑墓焚縺・縺､縺ｧ縺兔");
+                                return new Block(ObjType.Array);
+                            }
+                            else if (word2.name == "Select")
+                            {
+                                if (blk.rets.Count != 1) return Obj.Error(ObjType.Error, blk.letter, "Select縺ｮ蠑墓焚縺ｯ1縺､縺ｧ縺兔");
+                                return new Block(ObjType.Array);
+                            }
+                            else if (word2.name == "Sort")
+                            {
+                                if (blk.rets.Count != 1) return Obj.Error(ObjType.Error, blk.letter, "Sort縺ｮ蠑墓焚縺ｯ1縺､縺ｧ縺兔");
+                                return new Block(ObjType.Array);
+                            }
+                            else return Obj.Error(ObjType.Error, word2.letter, "First,Select,Sort縺後″縺ｾ縺兔");
+                        }
+                        else return Obj.Error(ObjType.NG, val2.letter, "()縺後″縺ｾ縺兔");
+                    }
+                    else return Obj.Error(ObjType.Error, val2.letter, ".縺ｮ蠕後↓縺ｯ蜷榊燕縺後″縺ｾ縺兔");
+                }
+                else return new VoiVal();
+            }
+            else if (val2.type == ObjType.Dot)
+            {
+                n++;
+                val2 = primary.children[n];
+                if (val2.type == ObjType.Word)
+                {
+                    var word = val2 as Word;
+                    n++;
+                    val2 = primary.children[n];
+                    if (word.name == "Store")
+                    {
+                        if (val2.type == ObjType.Dot)
+                        {
+                            n++;
+                            val2 = primary.children[n];
+                            if (val2.type == ObjType.Word)
+                            {
+                                n++;
+                                val2 = primary.children[n];
+                            }
+                            else return Obj.Error(ObjType.Error, val2.letter, ".縺ｮ蠕後↓縺ｯawait縺梧擂縺ｾ縺兔");
+                        }
+                        if (val2.type == ObjType.Bracket)
+                        {
+                            var val = val2.exeA(local);
+                            if (val.type == ObjType.Wait || val.type == ObjType.Error || val.type == ObjType.NG) return val;
+                            n++;
+                            return new VoiVal();
+                        }
+                        else return Obj.Error(ObjType.Error, val2.letter, "Store縺ｮ蠕後↓()縺後≠繧翫∪縺帙ｓ");
+                    }
+                    else if (word.name == "await")
+                    {
+                        if (val2.type == ObjType.CallBlock)
+                        {
+                            var blk1 = val2.children[0] as Block;
+                            blk1.obj = new ObjBlock() { obj = this, n = 0 };
+                            local.blocks[local.blocks.Count - 1].childblocks.Add(blk1);
+                            local.blocks.Add(blk1);
+                            for (var i = 0; i < local.blocks.Count; i++) blk1.blocks.Add(local.blocks[i]);
+                            blk1.exeA(local);
+                            var blk2 = val2.children[1] as Block;
+                            blk2.obj = new ObjBlock() { obj = this, n = 1 };
+                            local.blocks[local.blocks.Count - 1].childblocks.Add(blk2);
+                            local.blocks.Add(blk2);
+                            for (var i = 0; i < local.blocks.Count; i++) blk2.blocks.Add(local.blocks[i]);
+                            blk2.exeA(local);
+                            local.blocks.RemoveAt(local.blocks.Count - 1);
+                            local.blocks.RemoveAt(local.blocks.Count - 1);
+                            n++;
+                            return new VoiVal();
+                        }
+                    }
+                    else return Obj.Error(ObjType.Error, val2.letter, "model縺ｫ縺ｯ" + word.name + "縺ｯ螳｣險縺輔ｌ縺ｦ縺・∪縺帙ｓ");
+                }
+                else return Obj.Error(ObjType.Error, val2.letter, ".縺ｮ谺｡縺ｫ縺ｯ蜷榊燕縺梧擂縺ｾ縺兔");
+            }
+            else if (val2.type == ObjType.Word)
+            {
+                var word = val2 as Word;
+                n++;
+                val2 = primary.children[n];
+                var gj = local.getA(word.name) as ModelObj;
+                (gj.draw.children[1] as Block).vmapA["id"] = new Variable(local.Int) { letter = val2.letter };
+                local.declare(word.name, gj);
+                gj.letter = word.letter;
+                if (val2.type == ObjType.Right)
+                {
+                    n++;
+                    val2 = primary.children[n];
+                    if (val2.type == ObjType.Word)
+                    {
+                        n++;
+                        val2 = primary.children[n];
+                        gj.rename = (val2 as Word).name;
+                        if (val2.type == ObjType.Block)
+                        {
+                            n++;
+                            val2 = primary.children[n];
+                            var blk = val2 as Block;
+                            if (blk.children.Count == 1)
+                            {
+                                if (blk.children[0].type == ObjType.FloatVal)
+                                {
+                                    gj.version = blk.children[0].letter.name;
+                                }
+                                else if (blk.children[0].type == ObjType.Number)
+                                {
+                                    gj.version = blk.children[0].letter.name;
+                                }
+                                else return Obj.Error(ObjType.Error, blk.children[0].letter, "version縺ｮ蠑墓焚縺ｯ蟆乗焚縺区紛謨ｰ縺縺代〒縺兔");
+                            }
+                            else return Obj.Error(ObjType.Error, val2.letter, "version縺ｮ蠑墓焚縺ｯ蟆乗焚縺区紛謨ｰ縺縺代〒縺兔");
+                        }
+                        else gj.version = "0";
+                    }
+                    else return Obj.Error(ObjType.Error, val2.letter, "繝・・繝悶Ν繧貞ｮ｣險縺励※縺上□縺輔＞縲・");
+                }
+                else
+                {
+                    gj.rename = word.name;
+                    gj.version = "0";
+                }
+                local.declareRA(gj.rename, gj);
+                if (val2.type == ObjType.CallBlock)
+                {
+                    if (local.comments.Count > 0)
+                    {
+                        return Obj.Error(ObjType.Error, val2.letter, "comment蜀・〒model繧貞ｮ｣險縺ｧ縺阪∪縺帙ｓ縲・");
+                    }
+                    gj.letter2 = (val2.children[1] as Block).letter2;
+                    gj.draw = val2 as CallBlock;
+                    var blk1 = val2.children[0] as Block;
+                    blk1.obj = new ObjBlock() { obj = gj, n = 0 };
+                    local.blocks[local.blocks.Count - 1].childblocks.Add(blk1);
+                    local.blocks.Add(blk1);
+                    for (var i = 0; i < local.blocks.Count; i++) blk1.blocks.Add(local.blocks[i]);
+                    blk1.exeA(local);
+                    var blk2 = val2.children[1] as Block;
+                    if (local.comments.Count > 0) blk2.comment = true;
+                    blk2.obj = new ObjBlock() { obj = gj, n = 1 };
+                    local.blocks[local.blocks.Count - 1].childblocks.Add(blk2);
+                    local.blocks.Add(blk2);
+                    for (var i = 0; i < local.blocks.Count; i++) blk2.blocks.Add(local.blocks[i]);
+                    blk2.exeA(local);
+                    local.blocks.RemoveAt(local.blocks.Count - 1);
+                    local.blocks.RemoveAt(local.blocks.Count - 1);
+                    n++;
+                    return gj;
+                }
+                else return Obj.Error(ObjType.Error, val2.letter, "model縺ｮ蜀・ｮｹ繧畜}縺ｧ螳｣險縺励※縺上□縺輔＞縲・");
+            }
+            else if (val2.type == ObjType.CallBlock)
+            {
+                var blk1 = val2.children[0] as Block;
+                if (local.comments.Count > 0) blk1.comment = true;
+                blk1.obj = new ObjBlock() { obj = this, n = 0 };
+                local.blocks[local.blocks.Count - 1].childblocks.Add(blk1);
+                local.blocks.Add(blk1);
+                for (var i = 0; i < local.blocks.Count; i++) blk1.blocks.Add(local.blocks[i]);
+                blk1.exeA(local);
+                var blk2 = val2.children[1] as Block;
+                if (local.comments.Count > 0) blk2.comment = true;
+                blk2.obj = new ObjBlock() { obj = this, n = 1 };
+                local.blocks[local.blocks.Count - 1].childblocks.Add(blk2);
+                local.blocks.Add(blk2);
+                for (var i = 0; i < local.blocks.Count; i++) blk2.blocks.Add(local.blocks[i]);
+                blk2.exeA(local);
+                local.blocks.RemoveAt(local.blocks.Count - 1);
+                local.blocks.RemoveAt(local.blocks.Count - 1);
+                n++;
+                return new VoiVal();
+            }
+            return Obj.Error(ObjType.NG, val2.letter, "model蜷阪ｒ螳｣險縺励※縺上□縺輔＞縲・");
+        }
+        public override string Info()
+        {
+            return "model";
+        }
+    }
+    partial class ModelObj
+    {
+        public override Obj exeA(Local local)
+        {
+            return this;
+        }
+        public override string Info()
+        {
+            var text = "mod :" + letter.name;
+            return text;
+        }
+    }
+    partial class ModelVal
+    {
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            if (val2.type == ObjType.Dot)
+            {
+                n++;
+                val2 = primary.children[n];
+                if (val2.type == ObjType.Word)
+                {
+                    var word = val2 as Word;
+                    n++;
+                    if (word.name == "update")
+                    {
+                        val2 = primary.children[n];
+                        if (val2.type == ObjType.Bracket)
+                        {
+                            var val = val2.exeA(local).GetterA(local);
+                            if (val.type == ObjType.Wait || val.type == ObjType.Error || val.type == ObjType.NG) return val;
+                            var block = val as Block;
+                            n++;
+                            if (block.rets.Count != 1) return Obj.Error(ObjType.Error, val2.letter, "update縺ｮ蠑墓焚縺ｯ1縺ｧ縺兔");
+                            return this;
+                        }
+                        else if (val2.type == ObjType.Stock)
+                        {
+                            return this;
+                        }
+                        else return Obj.Error(ObjType.Error, val2.letter, "update縺ｮ蠑墓焚縺ｯDataStock繧貞叙繧翫∪縺兔");
+                    }
+                    else if (vmap.ContainsKey(word.name)) return vmap[word.name];
+                    else return Obj.Error(ObjType.Error, word.letter, "縺昴・蜊倩ｪ槭・螟画焚縺ｨ縺励※螳｣險縺輔ｌ縺ｦ縺・∪縺帙ｓ");
+                }
+                else return Obj.Error(ObjType.Error, val2.letter, ".縺ｮ蠕後・蜊倩ｪ槭ｒ螳｣險縺励※縺上□縺輔＞縲・");
+            }
+            return Obj.Error(ObjType.NG, val2.let, ".縺梧擂縺ｾ縺兔");
+        }
+        public override string Info()
+        {
+            return "mval:" + cls.letter.name;
+        }
+    }
+    partial class Stock
+    {
+    }
+    partial class Gene
+    {
+        public override Obj exepA(ref int n, Local local, Primary primary)
+        {
+            return this;
+        }
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            if (val2.type == ObjType.Word)
+            {
+                var word = val2 as Word;
+                n++;
+                val2 = primary.children[n];
+                var gj = local.getA(word.name) as GeneObj;
+                gj.letter = word.letter;
+                if (val2.type == ObjType.Right)
+                {
+                    n++;
+                    val2 = primary.children[n];
+                    if (val2.type == ObjType.Word)
+                    {
+                        n++;
+                        val2 = primary.children[n];
+                        gj.rename = (val2 as Word).name;
+                        if (val2.type == ObjType.Block)
+                        {
+                            n++;
+                            val2 = primary.children[n];
+                            var blk = val2 as Block;
+                            if (blk.children.Count == 1)
+                            {
+                                if (blk.children[0].type == ObjType.FloatVal)
+                                {
+                                    gj.version = blk.children[0].letter.name;
+                                }
+                                else if (blk.children[0].type == ObjType.Number)
+                                {
+                                    gj.version = blk.children[0].letter.name;
+                                }
+                                else return Obj.Error(ObjType.Error, blk.children[0].letter, "version縺ｮ蠑墓焚縺ｯ蟆乗焚縺区紛謨ｰ縺縺代〒縺兔");
+                            }
+                            else return Obj.Error(ObjType.Error, val2.letter, "version縺ｮ蠑墓焚縺ｯ蟆乗焚縺区紛謨ｰ縺縺代〒縺兔");
+                        }
+                        else gj.version = "0";
+                    }
+                    else return Obj.Error(ObjType.Error, val2.letter, "繝・・繝悶Ν繧貞ｮ｣險縺励※縺上□縺輔＞縲・");
+                }
+                else
+                {
+                    gj.rename = word.name;
+                    gj.version = "0";
+                }
+                local.declareRA(gj.rename, gj);
+                if (val2.type == ObjType.CallBlock)
+                {
+                    gj.letter2 = (val2.children[1] as Block).letter2;
+                    foreach (var blk in local.blocks) gj.blocks.Add(blk);
+                    gj.call = val2 as CallBlock;
+                    var blk1 = val2.children[0] as Block;
+                    if (local.comments.Count > 0) blk1.comment = true;
+                    blk1.obj = new ObjBlock() { obj = gj, n = 0 };
+                    for (var i = 0; i < local.blocks.Count; i++) blk1.blocks.Add(local.blocks[i]);
+                    local.blocks[local.blocks.Count - 1].childblocks.Add(blk1);
+                    local.blocks.Add(blk1);
+                    blk1.exeA(local);
+                    var blk2 = val2.children[1] as Block;
+                    if (local.comments.Count > 0) blk2.comment = true;
+                    blk2.obj = new ObjBlock() { obj = gj, n = 1 };
+                    for (var i = 0; i < local.blocks.Count; i++) blk2.blocks.Add(local.blocks[i]);
+                    local.blocks[local.blocks.Count - 1].childblocks.Add(blk2);
+                    local.blocks.Add(blk2);
+                    blk2.exeA(local);
+                    local.blocks.RemoveAt(local.blocks.Count - 1);
+                    local.blocks.RemoveAt(local.blocks.Count - 1);
+                    n++;
+                head:
+                    if (val2.type == ObjType.Left)
+                    {
+                        n++;
+                        val2 = primary.children[n];
+                        if (val2.type == ObjType.CallBlock)
+                        {
+                            var blk3 = val2.children[0] as Block;
+                            if (local.comments.Count > 0) blk3.comment = true;
+                            blk3.obj = new ObjBlock() { obj = gj, n = 2 };
+                            for (var i = 0; i < local.blocks.Count; i++) blk3.blocks.Add(local.blocks[i]);
+                            local.blocks[local.blocks.Count - 1].childblocks.Add(blk3);
+                            local.blocks.Add(blk3);
+                            blk3.exeA(local);
+                            var blk4 = val2.children[1] as Block;
+                            if (local.comments.Count > 0) blk4.comment = true;
+                            blk4.obj = new ObjBlock() { obj = gj, n = 3 };
+                            for (var i = 0; i < local.blocks.Count; i++) blk4.blocks.Add(local.blocks[i]);
+                            local.blocks[local.blocks.Count - 1].childblocks.Add(blk4);
+                            local.blocks.Add(blk4);
+                            blk4.exeA(local);
+                            local.blocks.RemoveAt(local.blocks.Count - 1);
+                            local.blocks.RemoveAt(local.blocks.Count - 1);
+                            gj.left = val2 as CallBlock;
+                            n++;
+                            goto head;
+                        }
+                        else return Obj.Error(ObjType.Error, val2.letter, "騾ｲ蛹悶・繝ｭ繧ｰ繝ｩ繝溘Φ繧ｰ縺ｮ讖溯・謖・ｮ壹↓縺ｯ{|}縺悟ｿ・ｦ√〒縺兔");
+                    }
+                    else if (val2.type == ObjType.Right)
+                    {
+                        n++;
+                        val2 = primary.children[n];
+                        if (val2.type == ObjType.CallBlock)
+                        {
+                            var blk3 = val2.children[0] as Block;
+                            if (local.comments.Count > 0) blk3.comment = true;
+                            blk3.obj = new ObjBlock() { obj = gj, n = 2 };
+                            for (var i = 0; i < local.blocks.Count; i++) blk3.blocks.Add(local.blocks[i]);
+                            local.blocks[local.blocks.Count - 1].childblocks.Add(blk3);
+                            local.blocks.Add(blk3);
+                            blk3.exeA(local);
+                            var blk4 = val2.children[1] as Block;
+                            if (local.comments.Count > 0) blk4.comment = true;
+                            blk4.obj = new ObjBlock() { obj = gj, n = 3 };
+                            for (var i = 0; i < local.blocks.Count; i++) blk4.blocks.Add(local.blocks[i]);
+                            local.blocks[local.blocks.Count - 1].childblocks.Add(blk4);
+                            local.blocks.Add(blk4);
+                            blk4.exeA(local);
+                            local.blocks.RemoveAt(local.blocks.Count - 1);
+                            local.blocks.RemoveAt(local.blocks.Count - 1);
+                            gj.right = val2 as CallBlock;
+                            n++;
+                            goto head;
+                        }
+                        else return Obj.Error(ObjType.Error, val2.letter, "騾ｲ蛹悶・繝ｭ繧ｰ繝ｩ繝溘Φ繧ｰ縺ｮ讖溯・謖・ｮ壹↓縺ｯ{|}縺悟ｿ・ｦ√〒縺兔");
+                    }
+                    return gj;
+                }
+                else return Obj.Error(ObjType.Error, val2.letter, "{|}繧貞ｮ｣險縺励※縺上□縺輔＞縲・");
+            }
+            else if (val2.type == ObjType.CallBlock)
+            {
+                var gj = local.gene.vmap[""] as GeneObj;
+                gj.letter = val2.letter;
+                gj.call = val2 as CallBlock;
+                foreach (var blk in local.blocks) gj.blocks.Add(blk);
+                var blk1 = val2.children[0] as Block;
+                if (local.comments.Count > 0) blk1.comment = true;
+                blk1.obj = new ObjBlock() { obj = gj, n = 0 };
+                for (var i = 0; i < local.blocks.Count; i++) blk1.blocks.Add(local.blocks[i]);
+                local.blocks[local.blocks.Count - 1].childblocks.Add(blk1);
+                local.blocks.Add(blk1);
+                blk1.exeA(local);
+                var blk2 = val2.children[1] as Block;
+                if (local.comments.Count > 0) blk2.comment = true;
+                blk2.obj = new ObjBlock() { obj = gj, n = 1 };
+                for (var i = 0; i < local.blocks.Count; i++) blk2.blocks.Add(local.blocks[i]);
+                local.blocks[local.blocks.Count - 1].childblocks.Add(blk2);
+                local.blocks.Add(blk2);
+                blk2.exeA(local);
+                local.blocks.RemoveAt(local.blocks.Count - 1);
+                local.blocks.RemoveAt(local.blocks.Count - 1);
+                n++;
+            head:
+                if (val2.type == ObjType.Left)
+                {
+                    n++;
+                    val2 = primary.children[n];
+                    if (val2.type == ObjType.CallBlock)
+                    {
+                        var blk3 = val2.children[0] as Block;
+                        if (local.comments.Count > 0) blk3.comment = true;
+                        blk3.obj = new ObjBlock() { obj = gj, n = 2 };
+                        for (var i = 0; i < local.blocks.Count; i++) blk3.blocks.Add(local.blocks[i]);
+                        local.blocks[local.blocks.Count - 1].childblocks.Add(blk3);
+                        local.blocks.Add(blk3);
+                        blk3.exeA(local);
+                        var blk4 = val2.children[1] as Block;
+                        if (local.comments.Count > 0) blk4.comment = true;
+                        blk4.obj = new ObjBlock() { obj = gj, n = 3 };
+                        for (var i = 0; i < local.blocks.Count; i++) blk4.blocks.Add(local.blocks[i]);
+                        local.blocks[local.blocks.Count - 1].childblocks.Add(blk4);
+                        local.blocks.Add(blk4);
+                        blk4.exeA(local);
+                        local.blocks.RemoveAt(local.blocks.Count - 1);
+                        local.blocks.RemoveAt(local.blocks.Count - 1);
+                        gj.left = val2 as CallBlock;
+                        n++;
+                        goto head;
+                    }
+                    else return Obj.Error(ObjType.Error, val2.letter, "騾ｲ蛹悶・繝ｭ繧ｰ繝ｩ繝溘Φ繧ｰ縺ｮ讖溯・謖・ｮ壹↓縺ｯ{|}縺悟ｿ・ｦ√〒縺兔");
+                }
+                else if (val2.type == ObjType.Right)
+                {
+                    n++;
+                    val2 = primary.children[n];
+                    if (val2.type == ObjType.CallBlock)
+                    {
+                        var blk3 = val2.children[0] as Block;
+                        if (local.comments.Count > 0) blk3.comment = true;
+                        blk3.obj = new ObjBlock() { obj = gj, n = 2 };
+                        for (var i = 0; i < local.blocks.Count; i++) blk3.blocks.Add(local.blocks[i]);
+                        local.blocks[local.blocks.Count - 1].childblocks.Add(blk3);
+                        local.blocks.Add(blk3);
+                        blk3.exeA(local);
+                        var blk4 = val2.children[1] as Block;
+                        if (local.comments.Count > 0) blk4.comment = true;
+                        blk4.obj = new ObjBlock() { obj = gj, n = 3 };
+                        for (var i = 0; i < local.blocks.Count; i++) blk4.blocks.Add(local.blocks[i]);
+                        local.blocks[local.blocks.Count - 1].childblocks.Add(blk4);
+                        local.blocks.Add(blk4);
+                        blk4.exeA(local);
+                        local.blocks.RemoveAt(local.blocks.Count - 1);
+                        local.blocks.RemoveAt(local.blocks.Count - 1);
+                        gj.right = val2 as CallBlock;
+                        n++;
+                        goto head;
+                    }
+                    else return Obj.Error(ObjType.Error, val2.letter, "騾ｲ蛹悶・繝ｭ繧ｰ繝ｩ繝溘Φ繧ｰ縺ｮ讖溯・謖・ｮ壹↓縺ｯ{|}縺悟ｿ・ｦ√〒縺兔");
+                }
+                return gj;
+            }
+            else if (val2.type == ObjType.Dot)
+            {
+                n++;
+                val2 = primary.children[n];
+                if (val2.type == ObjType.Word)
+                {
+                    var word = val2 as Word;
+                    n++;
+                    if (local.gene.vmap.ContainsKey(word.name))
+                    {
+                        return local.gene.vmap[word.name];
+                    }
+                    if (local.gene.vmap.ContainsKey(""))
+                    {
+                        var gj = local.gene.vmap[""] as GeneObj;
+                        return gj.DotA(word.name);
+                    }
+                    else return Obj.Error(ObjType.Error, val2.letter, "辟｡蜷宏ene繧ｯ繝ｩ繧ｹ縺ｯ螳｣險縺輔ｌ縺ｦ縺・∪縺帙ｓ");
+                }
+                else return Obj.Error(ObjType.Error, val2.letter, ".縺ｮ蠕後↓縺ｯ蜷榊燕縺悟ｿ・ｦ√〒縺兔");
+            }
+            return Obj.Error(ObjType.NG, val2.letter, "gene縺ｮ蠕後↓驕ｩ蛻・↑蜊倩ｪ槭′譚･縺ｦ縺・∪縺帙ｓ");
+        }
+    }
+    partial class GeneObj
+    {
+        public Obj DotA(String name)
+        {
+            if (vmap.ContainsKey(name)) return vmap[name];
+            return gv.vmap[name];
+        }
+        public override Obj exeA(Local local)
+        {
+            return this;
+        }
+        public override string Info()
+        {
+            var text = "gene:" + letter.name;
+            return text;
+        }
+    }
+    partial class GeneChild
+    {
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            List<Obj> rets = new List<Obj>();
+            if (val2.type == ObjType.Bracket)
+            {
+                if (val2.children.Count == 0)
+                {
+                    n++;
+                    return Value.New(gj, local, letter);
+                }
+                else return Obj.Error(ObjType.Error, val2.letter, "Child縺ｮ蠑墓焚縺ｯ0縺ｧ縺吶・");
+            }
+            return Obj.Error(ObjType.NG, val2.letter, "髢｢謨ｰ縺ｮ蠕後↓縺ｯ()縺悟ｿ・ｦ√〒縺吶・");
+        }
+    }
+    partial class GeneMutate
+    {
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            if (val2.type == ObjType.Bracket)
+            {
+                if (val2.children.Count == 0)
+                {
+                    n++;
+                    return Value.New(gj, local, letter);
+                }
+                else return Obj.Error(ObjType.Error, val2.letter, "Mutate縺ｮ蠑墓焚縺ｯ0縺ｧ縺吶・");
+            }
+            return Obj.Error(ObjType.NG, val2.letter, "髢｢謨ｰ縺ｮ蠕後↓縺ｯ()縺悟ｿ・ｦ√〒縺吶・");
+        }
+    }
+    partial class GeneNew
+    {
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            if (val2.type == ObjType.Bracket)
+            {
+                if (val2.children.Count == 0)
+                {
+                    n++;
+                    return Value.New(gj, local, letter);
+                }
+                else return Obj.Error(ObjType.Error, val2.letter, "New縺ｮ蠑墓焚縺ｯ0縺ｧ縺吶・");
+            }
+            return Obj.Error(ObjType.NG, val2.letter, "髢｢謨ｰ縺ｮ蠕後↓縺ｯ()縺悟ｿ・ｦ√〒縺吶・");
+        }
+    }
+    partial class GeneCross
+    {
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            if (val2.type == ObjType.Bracket)
+            {
+                if (val2.children.Count == 2)
+                {
+                    var val = val2.Clone().exeA(local).GetterA(local);
+                    if (val.type == ObjType.Wait || val.type == ObjType.Error || val.type == ObjType.NG) return val;
+                    n++;
+                    return Value.New(gj, local, letter);
+                }
+                else return Obj.Error(ObjType.Error, val2.letter, "Cross縺ｮ蠑墓焚縺ｯ2縺ｧ縺吶・");
+            }
+            return Obj.Error(ObjType.NG, val2.letter, "髢｢謨ｰ縺ｮ蠕後↓縺ｯ()縺悟ｿ・ｦ√〒縺吶・");
+        }
+    }
+    partial class GeneVal
+    {
+        public override string Info()
+        {
+            return "gval:" + cls.letter.name;
+        }
+    }
+    partial class GeneStore
+    {
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            if (val2.type == ObjType.Bracket) {
+                if (val2.children.Count == 0)
+                {
+                    return Value.New(gj, local, letter);
+                }
+                else return Obj.Error(ObjType.Error, val2.letter, "Store縺ｮ蠑墓焚縺ｯ0縺ｧ縺吶・");
+            }
+            return Obj.Error(ObjType.NG, val2.letter, "髢｢謨ｰ縺ｮ蠕後↓縺ｯ()縺悟ｿ・ｦ√〒縺吶・");
+        }
+    }
+    partial class GeneSelect
+    {
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            if (val2.type == ObjType.Bracket)
+            {
+                var val = val2.exeA(local);
+                if (val.type == ObjType.Wait || val.type == ObjType.Error || val.type == ObjType.NG) return val;
+                if (val2.children.Count == 0 || val2.children.Count == 1)
+                {
+                    n++;
+                    return new Block(ObjType.Block);
+                }
+                else return Obj.Error(ObjType.Error, val2.letter, "Select縺ｮ蠑墓焚縺後≠縺｣縺ｦ縺・∪縺帙ｓ");
+            }
+            return Obj.Error(ObjType.NG, val2.letter, "髢｢謨ｰ縺ｮ蠕後↓縺ｯ()縺悟ｿ・ｦ√〒縺吶・");
+        }
+    }
+    partial class GeneSort
+    {
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            if (val2.type == ObjType.Bracket)
+            {
+                var val = val2.exeA(local);
+                if (val.type == ObjType.Wait || val.type == ObjType.Error || val.type == ObjType.NG) return val;
+                if (val2.children.Count == 0 || val2.children.Count == 1)
+                {
+                    n++;
+                    return new Block(ObjType.Block);
+                }
+                else return Obj.Error(ObjType.Error, val2.letter, "Sort縺ｮ蠑墓焚縺後≠縺｣縺ｦ縺・∪縺帙ｓ");
+            }
+            return Obj.Error(ObjType.NG, val2.letter, "髢｢謨ｰ縺ｮ蠕後↓縺ｯ()縺悟ｿ・ｦ√〒縺吶・");
+        }
+    }
+    partial class GeneLabel
+    {
+        public override Obj exepA(ref int n, Local local, Primary primary)
+        {
+            return this;
+        }
+    }
+    partial class GeneLabelValue
+    {
+        public override Obj PrimaryA(ref int n, Local local, Primary primary, Obj val2)
+        {
+            if (val2.type == ObjType.Dot)
+            {
+                n++;
+                val2 = primary.children[n];
+                if (val2.type == ObjType.Word)
+                {
+                    var word = val2 as Word;
+                    n++;
+                    if (word.name == "length")
+                    {
+                        return new Number(id.labels.Count) { cls = local.Int };
+                    }
+                    else return Obj.Error(ObjType.Error, val2.letter, "縺薙・GeneLabel縺ｫ縺ｯ" + word.name + "縺ｯ螳｣險縺輔ｌ縺ｦ縺・∪縺帙ｓ");
+                }
+                else return Obj.Error(ObjType.Error, val2.letter, ".縺ｮ蠕後・蜷榊燕縺ｧ縺ｪ縺・→縺・￠縺ｾ縺帙ｓ");
+            }
+            return Obj.Error(ObjType.NG, val2.letter, ".縺悟ｿ・ｦ√〒縺吶・");
+        }
+    }
+    partial class NewBlock
+    {
+    }
+    partial class CrossBlock
+    {
+    }
+    partial class MigrateBlock
+    {
+    }
+}
+縺薙ｌ繧ょ酔縺倥ｈ縺・↑蜷榊燕縺ｮ.h繝輔ぃ繧､繝ｫ縺ｫ螳溯｣・＠縺ｦ縺上□縺輔＞縲・}
