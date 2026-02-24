@@ -331,7 +331,7 @@ void RootResetId(NewElement* elem, int* n) {
 	}
 	elem->childend->id = (uint64_t)++(*n) * 65536ULL * 65536ULL * 65536ULL;
 }
-void ResetId(NewLocal* local) {
+void AllResetId(NewLocal* local) {
 	int n = 0;
 	local->resetid = false;
 	RootResetId(local, &n);
@@ -575,10 +575,6 @@ void NewNextElement(ThreadGC* thgc, NewLocal* local, NewElement* before, NewElem
 			RootBeforeOffscreen2(thgc, local, elem, screen);
 		}
 	}
-}
-void NewNextMoveElement(ThreadGC* thgc, NewLocal* local, NewElement* before, NewElement* elem) {
-	NewRemoveElement(thgc, local, elem);
-	NewNextElement(thgc, local, before, elem);
 }
 void NewRemoveElement(ThreadGC* thgc, NewLocal* local, NewElement* elem) {
 	Offscreen* screen = FindOffscreen(elem);

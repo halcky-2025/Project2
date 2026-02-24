@@ -157,6 +157,7 @@
     <ClInclude Include="imas.h" />
     <ClInclude Include="json.hpp" />
     <ClInclude Include="newelem.h" />
+    <ClInclude Include="objz.h" />
     <ClInclude Include="opt.h" />
     <ClInclude Include="platform_io.h" />
     <ClInclude Include="shader.h" />

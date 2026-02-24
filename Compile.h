@@ -319,10 +319,42 @@ List* Compile(ThreadGC* thgc, String* str, FontId font) {
 // パーサー構造体定義
 // ============================================================
 
+// 前方宣言
+struct Obj;
+struct Block;
+struct Primary;
+struct Master;
+
+// 仮想関数テーブル (C#のvirtual/overrideに対応)
+struct ObjVT {
+	Obj* (*exeZ)(ThreadGC*, Obj*, Master*);
+	Obj* (*exepZ)(ThreadGC*, Obj*, int*, Master*, Primary*);
+	Obj* (*GetterZ)(ThreadGC*, Obj*, Master*);
+	Obj* (*SelfZ)(ThreadGC*, Obj*, Master*);
+	Obj* (*opeZ)(ThreadGC*, Obj*, String*, Master*, Obj*);
+	Obj* (*PrimaryZ)(ThreadGC*, Obj*, int*, Master*, Primary*, Obj*);
+	Obj* (*exeA)(ThreadGC*, Obj*, Master*);
+	Obj* (*exepA)(ThreadGC*, Obj*, int*, Master*, Primary*);
+	Obj* (*GetterA)(ThreadGC*, Obj*, Master*);
+	Obj* (*SelfA)(ThreadGC*, Obj*, Master*);
+	Obj* (*opeA)(ThreadGC*, Obj*, String*, Master*, Obj*);
+	Obj* (*PrimaryA)(ThreadGC*, Obj*, int*, Master*, Primary*, Obj*);
+	Obj* (*exeB)(ThreadGC*, Obj*, Master*);
+	Obj* (*exepB)(ThreadGC*, Obj*, int*, Master*, Primary*);
+	Obj* (*GetterB)(ThreadGC*, Obj*, Master*);
+	Obj* (*SelfB)(ThreadGC*, Obj*, Master*);
+	Obj* (*opeB)(ThreadGC*, Obj*, String*, Master*, Obj*);
+	Obj* (*PrimaryB)(ThreadGC*, Obj*, int*, Master*, Primary*, Obj*);
+};
+
+// Primary用VTableの前方宣言 (objvt.hで定義)
+extern ObjVT vt_Primary;
+
 struct Obj {
 	LetterType objtype;
 	ATSSpan* letter;
 	List* children;
+	ObjVT* vt;
 	String* rename;
 	String* version;
 };
@@ -331,6 +363,7 @@ struct Block {
 	LetterType objtype;
 	ATSSpan* letter;
 	List* children;
+	ObjVT* vt;
 	Map* branchmap;
 	Map* labelmap;
 	Map* labelmapn;
@@ -344,6 +377,7 @@ struct TagBlock {
 	LetterType objtype;
 	ATSSpan* letter;
 	List* children;
+	ObjVT* vt;
 	Map* branchmap;
 	Map* labelmap;
 	Map* labelmapn;
@@ -358,6 +392,7 @@ struct Primary {
 	LetterType objtype;
 	ATSSpan* letter;
 	List* children;
+	ObjVT* vt;
 	List* singleops;
 };
 
@@ -546,6 +581,7 @@ Obj* make_cobj(ThreadGC* thgc, int ctype, LetterType ot, ATSSpan* letter) {
 	o->objtype = ot;
 	o->letter = letter;
 	o->children = create_list(thgc, sizeof(Obj*), CType::_List);
+	o->vt = NULL;
 	o->rename = NULL;
 	o->version = NULL;
 	return o;
@@ -556,6 +592,7 @@ Block* make_cblock(ThreadGC* thgc, int ctype, LetterType ot) {
 	b->objtype = ot;
 	b->letter = NULL;
 	b->children = create_list(thgc, sizeof(Obj*), CType::_List);
+	b->vt = NULL;
 	b->branchmap = create_mapy(thgc, CType::_List);
 	b->labelmap = create_mapy(thgc, CType::_List);
 	b->labelmapn = create_mapy(thgc, CType::_List);
@@ -606,6 +643,7 @@ Obj* ParseBlock(ThreadGC* thgc, Master* local, LetterType end, int comments, boo
 		item->objtype = LetterType::OT_TagBlock;
 		item->letter = NULL;
 		item->children = create_list(thgc, sizeof(Obj*), CType::_List);
+		item->vt = NULL;
 		item->branchmap = create_mapy(thgc, CType::_List);
 		item->labelmap = create_mapy(thgc, CType::_List);
 		item->labelmapn = create_mapy(thgc, CType::_List);
@@ -902,6 +940,7 @@ Obj* ParsePrimary(ThreadGC* thgc, Master* local, int comments, LetterType type, 
 	item->objtype = LetterType::OT_None;
 	item->letter = local->last;
 	item->children = create_list(thgc, sizeof(Obj*), CType::_List);
+	item->vt = &vt_Primary;
 	item->singleops = create_list(thgc, sizeof(SingleOp*), CType::_List);
 
 	if (comments > 0) {
@@ -1222,3 +1261,10 @@ List* CompileJapanese(ThreadGC* thgc, String* str, FontId font) {
 }
 
 #include "objz.h"
+#include "objvt.h"
+#include "obj2a.h"
+#include "obj2a2.h"
+#include "obj2a3.h"
+#include "obj2b.h"
+#include "obj2b2.h"
+#include "obj2b3.h"

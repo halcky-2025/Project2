@@ -131,7 +131,18 @@
       "Bash(\"C:/Users/hayah/source/repos/Project2/android/app/jni/src/bgfx/shaderc.exe\" -f \"C:/Users/hayah/source/repos/Project2/Project2/shaders/vs_unite2.sc\" -o \"C:/Users/hayah/source/repos/Project2/Project2/vs_unite2.bin\" --type v --platform windows -p vs_5_0 -i \"C:/Users/hayah/source/repos/Project2/android/app/jni/src/bgfx/src\" --varyingdef \"C:/Users/hayah/source/repos/Project2/Project2/shaders/v_unite2.def.sc\")",
       "Bash(\"C:/Users/hayah/source/repos/Project2/android/app/jni/src/bgfx/shaderc.exe\" -f \"C:/Users/hayah/source/repos/Project2/Project2/shaders/vs_unite2.sc\" -o \"C:/Users/hayah/source/repos/Project2/Project2/vs_unite2.bin\" --type v --platform windows -p s_5_0 -i \"C:/Users/hayah/source/repos/Project2/android/app/jni/src/bgfx/src\" --varyingdef \"C:/Users/hayah/source/repos/Project2/Project2/shaders/v_unite2.def.sc\")",
       "Bash(\"C:/Users/hayah/source/repos/Project2/android/app/jni/src/bgfx/shaderc.exe\" -f \"C:/Users/hayah/source/repos/Project2/Project2/shaders/fs_unite2.sc\" -o \"C:/Users/hayah/source/repos/Project2/Project2/fs_unite2.bin\" --type f --platform windows -p s_5_0 -i \"C:/Users/hayah/source/repos/Project2/android/app/jni/src/bgfx/src\" --varyingdef \"C:/Users/hayah/source/repos/Project2/Project2/shaders/v_unite2.def.sc\")",
-      "Bash(where.exe:*)"
+      "Bash(where.exe:*)",
+      "Bash(py -c:*)",
+      "Bash(cygpath:*)",
+      "Bash(node --version:*)",
+      "Bash(perl:*)",
+      "Bash(node -e:*)",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\hayah\\\\source\\\\repos\\\\Project2\\\\Project2\\\\extract_cs.ps1\")",
+      "Bash(powershell -Command \"Select-String -Path ''C:\\\\Users\\\\hayah\\\\.claude\\\\projects\\\\C--Users-hayah-source-repos-Project2-Project2\\\\2091347a-33c5-40ea-badc-b18db40789a2.jsonl'' -Pattern ''partial class If'' -List | Select-Object -First 3 -Property LineNumber\")",
+      "Bash(powershell -Command:*)",
+      "Bash(powershell -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\hayah\\\\source\\\\repos\\\\Project2\\\\Project2\\\\extract_cs3.ps1\")",
+      "Bash(\"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Community\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe\" \"C:\\\\Users\\\\hayah\\\\source\\\\repos\\\\Project2\\\\Project2\\\\Project2.vcxproj\" /p:Configuration=Debug /p:Platform=x64 /nologo /verbosity:minimal)",
+      "Bash(MSYS2_ARG_CONV_EXCL=\"*\" \"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Community\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe\":*)"
     ]
   }
 }
