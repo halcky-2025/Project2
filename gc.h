@@ -187,11 +187,14 @@ Frame* MakeFrame(RootNode* root, void (*func)(Frame*), char* blockobj) {
     frame->promise.statefin = -1;
     return frame;
 }
+struct Obj;
 struct FuncType {
     char* blk;
     char* (*drawcall)(RootNode*, char*);
 	char* (*call)(RootNode*, char*);
     char* obj;
+    Obj* cls;
+    void* draws;
 };
 // final_suspendの実装（CoroutineQueueが完全型になってから）
 inline auto Generator::promise_type::final_suspend() noexcept {
@@ -259,7 +262,12 @@ enum CType {
     _CDolor, _PrimOp, _SingleOp, _Label,
     _Master, _Operator,
     _VariClass, _ArrType, _FuncType2, _Variable, _Function, _GenericFunction,
-    _ClassObj, _ModelObj, _GeneObj, _GenericObj, _ObjBlock, _GenericType
+    _ClassObj, _ModelObj, _GeneObj, _GenericObj, _ObjBlock, _GenericType,
+    _CVariable, _CBlock,
+    _SB, _LComp, _LVari, _LStrV, _LLab, _LIfValue, _LPhi, _LTypeDec, _LTypeVal,
+    _LFunc, _LGete, _LCast, _LCall, _LAlloca, _LStore, _LLoad, _LBr,
+    _LSwitchComp, _LBinOp, _LCmp, _LLocationMarker, _LRet,
+    _LDebugInfo, _LDebugVariable, _LStructField, _LStructTypeInfo, _LLLVM
 };
 // =============================================================================
 // クラス定義

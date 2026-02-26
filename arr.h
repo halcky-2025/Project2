@@ -13,6 +13,9 @@ String* createString(ThreadGC* thgc, char* tex, int size, int esize) {
 	memcpy(str->data, tex, size * esize);
 	return str;
 }
+String* createString(ThreadGC* thgc, const char* tex, int size, int esize) {
+	return createString(thgc, (char*)tex, size, esize);
+}
 String* createStringant(ThreadGC* thgc, char* tex, int size, int esize) {
     String* str = (String*)GC_alloc_ant(thgc, _String);
     if (str == NULL) return NULL;
@@ -922,4 +925,53 @@ int remove_mapyn(ThreadGC* thgc, Map* map, char* key) {
         kvj->n = j;
     }
     return 1;
+}
+
+// map_values_list: extract all values from map into a List
+List* map_values_list(ThreadGC* thgc, Map* map) {
+    List* result = create_list(thgc, sizeof(char*), CType::_List);
+    for (int i = 0; i < map->kvs->size; i++) {
+        KV* kv = *(KV**)get_list(map->kvs, i);
+        add_list(thgc, result, kv->value);
+    }
+    return result;
+}
+
+// str_equals: compare C string with String*
+bool str_equals(const char* cstr, String* str) {
+    if (!cstr || !str) return false;
+    int len = (int)strlen(cstr);
+    return StringEqual((char*)cstr, len, 1, str->data, str->size, str->esize);
+}
+
+// str_equals: compare two String*
+bool str_equals(String* a, String* b) {
+    if (!a || !b) return false;
+    return StringEqual(a->data, a->size, a->esize, b->data, b->size, b->esize);
+}
+
+// str_equals: compare String* with const char*
+bool str_equals(String* str, const char* cstr) {
+    if (!str || !cstr) return false;
+    int len = (int)strlen(cstr);
+    return StringEqual(str->data, str->size, str->esize, (char*)cstr, len, 1);
+}
+
+// get_list_val: dereference list element (returns char*)
+inline char* get_list_val(List* list, int index) {
+    return *(char**)get_list(list, index);
+}
+
+// str_to_cstr: convert String* to null-terminated const char*
+const char* str_to_cstr(ThreadGC* thgc, String* str) {
+    if (!str || str->size == 0) return "";
+    // ensure null-terminated copy
+    char* buf = (char*)GC_alloc_size(thgc, str->size + 1);
+    if (str->esize == 1) {
+        memcpy(buf, str->data, str->size);
+    } else {
+        for (int i = 0; i < str->size; i++) buf[i] = str->data[i * str->esize];
+    }
+    buf[str->size] = '\0';
+    return buf;
 }

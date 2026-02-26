@@ -325,6 +325,17 @@ struct Block;
 struct Primary;
 struct Master;
 
+// LLVM型の前方宣言 (llvm.hで定義)
+struct LVari;
+struct LLab;
+struct LFunc;
+struct LLLVM;
+struct LTypeDec;
+struct LStrV;
+struct LComp;
+struct LDebugVariable;
+struct LDebugInfo;
+
 // 仮想関数テーブル (C#のvirtual/overrideに対応)
 struct ObjVT {
 	Obj* (*exeZ)(ThreadGC*, Obj*, Master*);
@@ -345,6 +356,12 @@ struct ObjVT {
 	Obj* (*SelfB)(ThreadGC*, Obj*, Master*);
 	Obj* (*opeB)(ThreadGC*, Obj*, String*, Master*, Obj*);
 	Obj* (*PrimaryB)(ThreadGC*, Obj*, int*, Master*, Primary*, Obj*);
+	Obj* (*exeC)(ThreadGC*, Obj*, Master*);
+	Obj* (*exepC)(ThreadGC*, Obj*, int*, Master*, Primary*);
+	Obj* (*GetterC)(ThreadGC*, Obj*, Master*);
+	Obj* (*SelfC)(ThreadGC*, Obj*, Master*);
+	Obj* (*opeC)(ThreadGC*, Obj*, String*, Master*, Obj*);
+	Obj* (*PrimaryC)(ThreadGC*, Obj*, int*, Master*, Primary*, Obj*);
 };
 
 // Primary用VTableの前方宣言 (objvt.hで定義)
@@ -357,6 +374,36 @@ struct Obj {
 	ObjVT* vt;
 	String* rename;
 	String* version;
+	// C pass (LLVM IR code generation) fields
+	String* model;
+	LVari* forvari;
+	int n_c;
+	int order;
+	LVari* vari_c;
+	LVari* bas;
+	LLab* entry;
+	LLab* end_lab;
+	Map* ifv;
+	int identity;
+	Obj* vartype;
+	Obj* cls;
+	// Additional members used by obj2c code generation
+	Obj* value;
+	Block* draw;
+	int number_val;
+	List* extends_list;
+	Obj* ret;
+	List* draws;
+	String* drawcall;
+	String* call_c;
+	List* rets;
+	List* singleops;
+	String* model_str;
+	Map* vmapA;
+	List* calls_list;
+	LLab* entry_lab;
+	Obj* rettype;
+	Obj* value_obj;
 };
 
 struct Block {
@@ -371,6 +418,7 @@ struct Block {
 	Map* vmapA;
 	List* rets;
 	Obj* obj;
+	LVari* vari_c;
 };
 
 struct TagBlock {
@@ -414,6 +462,9 @@ struct SingleOp {
 
 struct Operator : Obj {
 };
+
+struct Generic;
+struct Stock;
 
 struct Master {
 	NewElement* top;
@@ -496,7 +547,7 @@ struct Master {
 	List* blocks;
 	List* blockslist;
 	List* comments;
-	Obj* gene;
+	Generic* gene;
 	Obj* Object;
 	Obj* Void;
 	Obj* Int;
@@ -506,14 +557,50 @@ struct Master {
 	Obj* FloatT;
 	Obj* MouseEventT;
 	Obj* KeyEventT;
+	// C pass (LLVM IR code generation) fields
+	LLLVM* llvm;
+	List* compsC;
+	List* labsC;
+	LVari* go_c;
+	LVari* i8p;
+	LVari* countv;
+	LVari* objptr3;
+	LVari* co_val;
+	LVari* blok;
+	LTypeDec* typedecC;
+	int countC;
+	int odr;
+	LFunc* funcdec;
+	LFunc* funccheck;
+	Map* sigmapA;
+	// Additional members for code generation pass
+	List* calls;
+	void (*KouhoSet2)();
+	List* kouhos;
+	List* labs;
+	ATSSpan* letter;
+	LTypeDec* typedec_c;
+	LFunc* funccheck_c;
+	LFunc* funcdec_c;
+	LVari* i8p_c;
+	LVari* objptr3_c;
+	LVari* co_val_c;
+	int count_c;
+	Obj* migrate;
+	Stock* db;
 };
 
 // ============================================================
 // Z解析用の型構造体
 // ============================================================
 
+// Var: a type variable (OT_Var), used for generic type resolution
+struct Var : Obj {
+};
+
 struct VariClass : Obj {
 	int n;
+	Obj* base;
 };
 
 struct ArrType : Obj {
@@ -526,7 +613,13 @@ struct FuncType2 : Obj {
 };
 
 struct Variable : Obj {
-	Obj* vartype;
+	LVari* strvari;
+	int clone_flag;
+};
+
+struct FloatVal : Obj {
+	float value;
+	Obj* cls;
 };
 
 struct Function : Obj {
@@ -543,18 +636,57 @@ struct GenericFunction : Obj {
 };
 
 struct ClassObj : Obj {
+	Obj* cls_c;
+};
+
+// SqlParamMap: map with separate keys (int list) and vals (Obj* list) for SQL parameter binding
+struct SqlParamMap {
+	List* keys;
+	List* vals;
+};
+
+// SqlString: SQL string with parameter bindings
+struct SqlString {
+	String* sql;
+	SqlParamMap* varis;
+};
+
+// Value: represents a resolved value with an LLVM variable
+struct Value : Obj {
+	LVari* vari;
 };
 
 struct ModelObj : Obj {
 	ATSSpan* letter2;
 	Block* draw;
+	int n_val;
+	String* call;
+	String* rename;
+	String* version;
+	String* drawcall;
+	List* ifv;
+	bool decstore;
+	bool decdelete;
+	bool decselect;
+	LVari* bas;
 };
+
+typedef Block CallBlock;
 
 struct GeneObj : Obj {
 	ATSSpan* letter2;
 	String* name;
 	Block* call;
 	List* blocks;
+	Map* vmap;
+	CallBlock* call_blk;
+	CallBlock* left;
+	CallBlock* right;
+	Obj* gv;
+};
+
+// Stock: data store type
+struct Stock : Obj {
 	Map* vmap;
 };
 
@@ -571,6 +703,47 @@ struct ObjBlock : Obj {
 	Obj* obj;
 	int n;
 };
+
+// Word is an Obj whose letter->text contains the word name
+typedef Obj Word;
+
+inline ObjBlock* make_objblock(ThreadGC* thgc, Obj* obj, int n) {
+	ObjBlock* ob = (ObjBlock*)GC_alloc(thgc, CType::_ObjBlock);
+	ob->objtype = LetterType::OT_None;
+	ob->obj = obj;
+	ob->n = n;
+	return ob;
+}
+
+// Number: integer value
+struct Number : Obj {
+	int value;
+};
+
+// Val: alias for Obj (used in function signatures)
+typedef Obj Val;
+
+// Gene subtypes - all have a gj (parent GeneObj*) reference
+struct GeneChild : Obj { GeneObj* gj; };
+struct GeneMutate : Obj { GeneObj* gj; };
+struct GeneNew : Obj { GeneObj* gj; };
+struct GeneCross : Obj { GeneObj* gj; };
+struct GeneVal : Obj {};
+struct GeneStore : Obj { GeneObj* gj; };
+struct GeneSelect : Obj { GeneObj* gj; };
+struct GeneSort : Obj { GeneObj* gj; };
+struct GeneLabel : Obj { List* labels; };
+struct GeneLabelValue : Obj { GeneLabel* id; };
+
+// CrossBlock/MigrateBlock: Block subtypes used in Gene
+struct CrossBlock : Block { GeneObj* gj; };
+typedef Block MigrateBlock;
+
+// CheckType: type checking mode enum
+enum CheckType { CheckType_Setter = 0, CheckType_Getter = 1 };
+
+// Gene: gene type (uses Generic which has vmap)
+typedef Generic Gene;
 
 // ============================================================
 // ヘルパー関数
@@ -606,6 +779,88 @@ Block* make_cblock(ThreadGC* thgc, int ctype, LetterType ot) {
 Obj* make_word_change(ThreadGC* thgc, ATSSpan* letter, Master* local) {
 	Obj* o = make_cobj(thgc, CType::_Word, LetterType::OT_Word, letter);
 	return o;
+}
+
+// make_block: create a Block with the given LetterType
+inline Block* make_block(ThreadGC* thgc, LetterType ot) {
+	return make_cblock(thgc, CType::_Block, ot);
+}
+
+// vmap helper functions
+inline bool vmap_containsA(Map* vmap, String* key) {
+	return get_mapy(vmap, key) != NULL;
+}
+
+inline bool vmap_containsA(List* vmap, String* key) {
+	for (int i = 0; i < vmap->size; i++) {
+		KV* kv = (KV*)get_list(vmap, i);
+		if (str_equals(kv->key, key)) return true;
+	}
+	return false;
+}
+
+inline Obj* vmap_getA(Map* vmap, String* key) {
+	return (Obj*)get_mapy(vmap, key);
+}
+
+inline Obj* vmap_getA(List* vmap, String* key) {
+	for (int i = 0; i < vmap->size; i++) {
+		KV* kv = (KV*)get_list(vmap, i);
+		if (str_equals(kv->key, key)) return (Obj*)kv->value;
+	}
+	return NULL;
+}
+
+// add_kouho: add a completion candidate to the kouho list
+inline void add_kouho(ThreadGC* thgc, List* kouhos, String* key, Obj* value) {
+	KV* kv = (KV*)GC_alloc(thgc, CType::_KV);
+	kv->key = key;
+	kv->value = (char*)value;
+	add_list(thgc, kouhos, (char*)kv);
+}
+
+// call_last: invoke the last function pointer in the calls list
+inline void call_last(List* calls) {
+	if (calls->size > 0) {
+		void (*fn)() = *(void (**)())get_list(calls, calls->size - 1);
+		if (fn) fn();
+	}
+}
+
+// migrate_AddModel: register a model for migration
+inline void migrate_AddModel(ThreadGC* thgc, Obj* migrate, String* name, Obj* model, Master* local) {
+	// Stub - migration model registration
+}
+
+// make_functype: create a FuncType with given return type
+inline FuncType* make_functype(ThreadGC* thgc, Obj* rettype) {
+	FuncType* ft = (FuncType*)GC_alloc(thgc, CType::_FuncType);
+	ft->cls = rettype;
+	ft->draws = NULL;
+	ft->blk = NULL;
+	ft->drawcall = NULL;
+	ft->call = NULL;
+	ft->obj = NULL;
+	return ft;
+}
+
+// TypeCheck_CheckCVB: type checking for functions
+inline Obj* TypeCheck_CheckCVB(ThreadGC* thgc, FuncType* ftype, Function* func, CheckType ctype, Master* local) {
+	// Stub - type check implementation
+	return (Obj*)func;
+}
+
+// Value_New: create a new gene value
+inline Obj* Value_New(ThreadGC* thgc, GeneObj* gj, Master* local, ATSSpan* letter) {
+	Obj* val = make_cobj(thgc, CType::_CObj, LetterType::OT_None, letter);
+	val->cls = (Obj*)gj;
+	return val;
+}
+
+// Sort_Block: sort a block array using a comparison function
+inline Block* Sort_Block(ThreadGC* thgc, Block* arr, Function* func, Master* local) {
+	// Stub - sort implementation
+	return arr;
 }
 
 // ============================================================
@@ -1268,3 +1523,11 @@ List* CompileJapanese(ThreadGC* thgc, String* str, FontId font) {
 #include "obj2b.h"
 #include "obj2b2.h"
 #include "obj2b3.h"
+#include "llvm.h"
+#include "obj1c.h"
+#include "cobj2c.h"
+#include "obj2c.h"
+#include "obj2c_part2.h"
+#include "obj2c_part3.h"
+#include "obj2c_part4.h"
+#include "obj2c_part5.h"
