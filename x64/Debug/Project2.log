@@ -1,39 +1,23 @@
 ﻿  main.cpp
-C:\Users\hayah\source\repos\Project2\Project2\main.cpp(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
-C:\Users\hayah\Downloads\libtorch-win-shared-with-deps-debug-2.6.0+cu126\libtorch\include\torch\csrc\api\include\torch\nn\options\fold.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
+C:\Users\hayah\source\repos\Project2\Project2\arr.h(596,12): warning C4477: 'printf' : 書式文字列 '%d' には、型 'int' の引数が必要ですが、可変個引数 1 は型 'char *' です
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\C2\include\libavutil\rational.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
+C:\Users\hayah\source\repos\Project2\Project2\arr.h(596,12): warning C4313: 'printf': 書式文字列内の '%d' が引数 1 ('char *' 型) と競合しています
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\threed.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
+C:\Users\hayah\source\repos\Project2\Project2\arr.h(599,12): warning C4477: 'printf' : 書式文字列 '%f' には、型 'double' の引数が必要ですが、可変個引数 1 は型 'char *' です
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\threed.h(811,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
+C:\Users\hayah\source\repos\Project2\Project2\arr.h(792,13): warning C4311: '型キャスト': ポインターを 'char *' から 'long' へ切り詰めます。
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\arr.h(593,12): warning C4477: 'printf' : 書式文字列 '%d' には、型 'int' の引数が必要ですが、可変個引数 1 は型 'char *' です
+C:\Users\hayah\source\repos\Project2\Project2\elem.h(73,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'MemObj' の左辺を無視します。
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\arr.h(593,12): warning C4313: 'printf': 書式文字列内の '%d' が引数 1 ('char *' 型) と競合しています
+C:\Users\hayah\source\repos\Project2\Project2\elem.h(79,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'MemFunc' の左辺を無視します。
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\arr.h(596,12): warning C4477: 'printf' : 書式文字列 '%f' には、型 'double' の引数が必要ですが、可変個引数 1 は型 'char *' です
-  (ソース ファイル 'main.cpp' をコンパイルしています)
-  
-C:\Users\hayah\source\repos\Project2\Project2\arr.h(789,13): warning C4311: '型キャスト': ポインターを 'char *' から 'long' へ切り詰めます。
-  (ソース ファイル 'main.cpp' をコンパイルしています)
-  
-C:\Users\hayah\source\repos\Project2\Project2\elem.h(69,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'MemObj' の左辺を無視します。
-  (ソース ファイル 'main.cpp' をコンパイルしています)
-  
-C:\Users\hayah\source\repos\Project2\Project2\elem.h(75,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'MemFunc' の左辺を無視します。
-  (ソース ファイル 'main.cpp' をコンパイルしています)
-  
-C:\Users\hayah\source\repos\Project2\Project2\elem.h(81,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'PointI' の左辺を無視します。
-  (ソース ファイル 'main.cpp' をコンパイルしています)
-  
-C:\Users\hayah\source\repos\Project2\Project2\newelem.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
+C:\Users\hayah\source\repos\Project2\Project2\elem.h(85,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'PointI' の左辺を無視します。
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
 C:\Users\hayah\source\repos\Project2\Project2\newelem.h(11,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'NewElement' の左辺を無視します。
@@ -42,49 +26,13 @@ C:\Users\hayah\source\repos\Project2\Project2\newelem.h(11,16): warning C4091: '
 C:\Users\hayah\source\repos\Project2\Project2\newelem.h(12,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'DrawCommand' の左辺を無視します。
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\newelem.h(861,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
-  (ソース ファイル 'main.cpp' をコンパイルしています)
-  
 C:\Users\hayah\source\repos\Project2\Project2\newelem.h(913,53): warning C4834: [[nodiscard]] 属性を持つ関数の戻り値を破棄しています
-  (ソース ファイル 'main.cpp' をコンパイルしています)
-  
-C:\Users\hayah\source\repos\Project2\Project2\Compile.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
-  (ソース ファイル 'main.cpp' をコンパイルしています)
-  
-C:\Users\hayah\source\repos\Project2\Project2\objz.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
-  (ソース ファイル 'main.cpp' をコンパイルしています)
-  
-C:\Users\hayah\source\repos\Project2\Project2\objvt.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
-  (ソース ファイル 'main.cpp' をコンパイルしています)
-  
-C:\Users\hayah\source\repos\Project2\Project2\obj2a.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
-  (ソース ファイル 'main.cpp' をコンパイルしています)
-  
-C:\Users\hayah\source\repos\Project2\Project2\obj2a2.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
-  (ソース ファイル 'main.cpp' をコンパイルしています)
-  
-C:\Users\hayah\source\repos\Project2\Project2\obj2a3.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
-  (ソース ファイル 'main.cpp' をコンパイルしています)
-  
-C:\Users\hayah\source\repos\Project2\Project2\obj2a3.h(640,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
-  (ソース ファイル 'main.cpp' をコンパイルしています)
-  
-C:\Users\hayah\source\repos\Project2\Project2\opt.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
 C:\Users\hayah\source\repos\Project2\Project2\shader.h(696,43): warning C5055: 演算子 '<=': 列挙型と浮動小数点型の間では非推奨です
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
 C:\Users\hayah\source\repos\Project2\Project2\shader.h(696,73): warning C5055: 演算子 '<=': 列挙型と浮動小数点型の間では非推奨です
-  (ソース ファイル 'main.cpp' をコンパイルしています)
-  
-C:\Users\hayah\source\repos\Project2\Project2\extorch.h(1,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
-  (ソース ファイル 'main.cpp' をコンパイルしています)
-  
-C:\Users\hayah\source\repos\Project2\Project2\extorch.h(795,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
-  (ソース ファイル 'main.cpp' をコンパイルしています)
-  
-C:\Users\hayah\source\repos\Project2\Project2\extorch.h(1486,1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
 C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\optional(82,17): warning C4267: '初期化中': 'size_t' から 'int' に変換しました。データが失われているかもしれません。
@@ -286,4 +234,5 @@ C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\
               TargetType=size_t
           ]
   
+     ライブラリ C:\Users\hayah\source\repos\Project2\x64\Debug\Project2.lib とオブジェクト C:\Users\hayah\source\repos\Project2\x64\Debug\Project2.exp を作成中
   Project2.vcxproj -> C:\Users\hayah\source\repos\Project2\x64\Debug\Project2.exe

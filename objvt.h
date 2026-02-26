@@ -24,6 +24,12 @@ Obj* _vt_GetterB_default(ThreadGC* thgc, Obj* self, Master* local) { return self
 Obj* _vt_SelfB_default(ThreadGC* thgc, Obj* self, Master* local) { return self; }
 Obj* _vt_opeB_default(ThreadGC* thgc, Obj* self, String* key, Master* local, Obj* val2) { return self; }
 Obj* _vt_PrimaryB_default(ThreadGC* thgc, Obj* self, int* n, Master* local, Primary* primary, Obj* val2) { (*n)++; return self; }
+Obj* _vt_exeC_default(ThreadGC* thgc, Obj* self, Master* local) { return self; }
+Obj* _vt_exepC_default(ThreadGC* thgc, Obj* self, int* n, Master* local, Primary* primary) { return self; }
+Obj* _vt_GetterC_default(ThreadGC* thgc, Obj* self, Master* local) { return self; }
+Obj* _vt_SelfC_default(ThreadGC* thgc, Obj* self, Master* local) { return self; }
+Obj* _vt_opeC_default(ThreadGC* thgc, Obj* self, String* key, Master* local, Obj* val2) { return self; }
+Obj* _vt_PrimaryC_default(ThreadGC* thgc, Obj* self, int* n, Master* local, Primary* primary, Obj* val2) { (*n)++; return self; }
 
 // ============================================================
 // デフォルトVTable
@@ -31,7 +37,8 @@ Obj* _vt_PrimaryB_default(ThreadGC* thgc, Obj* self, int* n, Master* local, Prim
 ObjVT vt_Obj_default = {
 	_vt_exeZ_default, _vt_exepZ_default, _vt_GetterZ_default, _vt_SelfZ_default, _vt_opeZ_default, _vt_PrimaryZ_default,
 	_vt_exeA_default, _vt_exepA_default, _vt_GetterA_default, _vt_SelfA_default, _vt_opeA_default, _vt_PrimaryA_default,
-	_vt_exeB_default, _vt_exepB_default, _vt_GetterB_default, _vt_SelfB_default, _vt_opeB_default, _vt_PrimaryB_default
+	_vt_exeB_default, _vt_exepB_default, _vt_GetterB_default, _vt_SelfB_default, _vt_opeB_default, _vt_PrimaryB_default,
+	_vt_exeC_default, _vt_exepC_default, _vt_GetterC_default, _vt_SelfC_default, _vt_opeC_default, _vt_PrimaryC_default
 };
 
 // ============================================================
@@ -234,6 +241,43 @@ Obj* vt_PrimaryB(ThreadGC* thgc, Obj* self, int* n, Master* local, Primary* prim
 	if (self == NULL) { (*n)++; return self; }
 	_vt_lazy_assign(self);
 	if (self->vt && self->vt->PrimaryB) return self->vt->PrimaryB(thgc, self, n, local, primary, val2);
+	(*n)++; return self;
+}
+
+Obj* vt_exeC(ThreadGC* thgc, Obj* self, Master* local) {
+	if (self == NULL) return self;
+	_vt_lazy_assign(self);
+	if (self->vt && self->vt->exeC) return self->vt->exeC(thgc, self, local);
+	return self;
+}
+Obj* vt_exepC(ThreadGC* thgc, Obj* self, int* n, Master* local, Primary* primary) {
+	if (self == NULL) return self;
+	_vt_lazy_assign(self);
+	if (self->vt && self->vt->exepC) return self->vt->exepC(thgc, self, n, local, primary);
+	return self;
+}
+Obj* vt_GetterC(ThreadGC* thgc, Obj* self, Master* local) {
+	if (self == NULL) return self;
+	_vt_lazy_assign(self);
+	if (self->vt && self->vt->GetterC) return self->vt->GetterC(thgc, self, local);
+	return self;
+}
+Obj* vt_SelfC(ThreadGC* thgc, Obj* self, Master* local) {
+	if (self == NULL) return self;
+	_vt_lazy_assign(self);
+	if (self->vt && self->vt->SelfC) return self->vt->SelfC(thgc, self, local);
+	return self;
+}
+Obj* vt_opeC(ThreadGC* thgc, Obj* self, String* key, Master* local, Obj* val2) {
+	if (self == NULL) return self;
+	_vt_lazy_assign(self);
+	if (self->vt && self->vt->opeC) return self->vt->opeC(thgc, self, key, local, val2);
+	return self;
+}
+Obj* vt_PrimaryC(ThreadGC* thgc, Obj* self, int* n, Master* local, Primary* primary, Obj* val2) {
+	if (self == NULL) { (*n)++; return self; }
+	_vt_lazy_assign(self);
+	if (self->vt && self->vt->PrimaryC) return self->vt->PrimaryC(thgc, self, n, local, primary, val2);
 	(*n)++; return self;
 }
 

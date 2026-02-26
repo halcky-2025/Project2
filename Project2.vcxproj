@@ -107,7 +107,7 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>C:\C2\include;C:\Users\hayah\Downloads\libtorch-win-shared-with-deps-debug-2.6.0+cu126\libtorch\include\torch\csrc\api\include;C:\Users\hayah\Downloads\libtorch-win-shared-with-deps-debug-2.6.0+cu126\libtorch\include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalOptions>/Zc:preprocessor /Zc:__cplusplus /bigobj %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/utf-8 /Zc:preprocessor /Zc:__cplusplus /bigobj %(AdditionalOptions)</AdditionalOptions>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
     </ClCompile>
     <Link>
@@ -156,7 +156,21 @@
     <ClInclude Include="gui.h" />
     <ClInclude Include="imas.h" />
     <ClInclude Include="json.hpp" />
+    <ClInclude Include="llvm.h" />
     <ClInclude Include="newelem.h" />
+    <ClInclude Include="obj1c.h" />
+    <ClInclude Include="obj2a.h" />
+    <ClInclude Include="obj2a2.h" />
+    <ClInclude Include="obj2a3.h" />
+    <ClInclude Include="obj2b.h" />
+    <ClInclude Include="obj2b2.h" />
+    <ClInclude Include="obj2b3.h" />
+    <ClInclude Include="obj2c.h" />
+    <ClInclude Include="obj2c_part2.h" />
+    <ClInclude Include="obj2c_part3.h" />
+    <ClInclude Include="obj2c_part4.h" />
+    <ClInclude Include="obj2c_part5.h" />
+    <ClInclude Include="objvt.h" />
     <ClInclude Include="objz.h" />
     <ClInclude Include="opt.h" />
     <ClInclude Include="platform_io.h" />

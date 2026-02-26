@@ -48,7 +48,11 @@ enum LetterType {
 	OT_Client, OT_Server, OT_Signal, OT_ServerClient, OT_Dolor, OT_Mountain,
 	OT_Model, OT_Gene, OT_Class, OT_TagBlock, OT_CallBlock, OT_Array,
 	OT_ClassObj, OT_Generic, OT_GenericObj,
-	OT_VariClass, OT_ArrType, OT_FuncType, OT_Variable, OT_Function, OT_GenericFunction, OT_ObjBlock
+	OT_VariClass, OT_ArrType, OT_FuncType, OT_Variable, OT_Function, OT_GenericFunction, OT_ObjBlock,
+	OT_Value, OT_ModelObj, OT_GeneObj, OT_VoiVal, OT_Constructor, OT_ArrayConstructor,
+	OT_AnimationFunction, OT_ArrayType, OT_Br, OT_Clones, OT_ConnectStock,
+	OT_Div, OT_ElemObj, OT_IfBlock, OT_Iterator, OT_ModelVal,
+	OT_ServerFunction, OT_Sheet, OT_SignalFunction, OT_SqlString, OT_Stock
 };
 class FontAtlas;
 #ifndef __MACTYPES__  // Avoid conflict with MacTypes.h Point on Apple platforms
