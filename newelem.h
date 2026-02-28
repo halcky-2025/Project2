@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <map>
 #include <string>
 #include <vector>
@@ -253,6 +253,7 @@ struct NewLocal : NewElement {
 	Map* temap;
 	Map* selects;
 	NewSelect select;
+	List* imageids;
 };
 struct RenderGroup;
 struct OffscreenEnd {
@@ -576,6 +577,32 @@ void NewNextElement(ThreadGC* thgc, NewLocal* local, NewElement* before, NewElem
 		}
 	}
 }
+void NewBeforeElement(ThreadGC* thgc, NewLocal* local, NewElement* before, NewElement* elem) {
+	Offscreen* bscreen = FindOffscreen(elem);
+	NewBefore(thgc, local, before, elem);
+	if (bscreen != NULL) {
+		bscreen->markLayout(local);
+		Offscreen* ascreen = FindOffscreen(elem);
+		if (ascreen != NULL) {
+			ascreen->markLayout(local);
+			Offscreen* screen = FindNextOffscreen(elem->next);
+			if (screen == NULL) screen = ascreen->child;
+			RootBeforeOffscreen(thgc, local, elem, screen);
+		}
+		else {
+			RootDeleteOffscreen(thgc, local, elem);
+		}
+	}
+	else {
+		Offscreen* ascreen = FindOffscreen(elem);
+		if (ascreen != NULL) {
+			ascreen->markLayout(local);
+			Offscreen* screen = FindNextOffscreen(elem->next);
+			if (screen == NULL) screen = ascreen->child;
+			RootBeforeOffscreen2(thgc, local, elem, screen);
+		}
+	}
+}
 void NewRemoveElement(ThreadGC* thgc, NewLocal* local, NewElement* elem) {
 	Offscreen* screen = FindOffscreen(elem);
 	if (screen != NULL) {
@@ -759,8 +786,7 @@ void NewElementAddLast(ThreadGC* thgc, NewLocal* local, NewElement* parent, NewE
 		initNewLine(thgc, line);
 		NewBefore(thgc, local, parent->childend, line);
 	}
-	NewBefore(thgc, local, parent->childend->before->childend, child);
-	FindOffscreen(parent)->markLayout(local);
+	NewBeforeElement(thgc, local, parent->childend->before->childend, child);
 }
 void NewLineAddLast(ThreadGC* thgc, NewLocal* local, NewElement* parent, NewLine* line) {
 	NewBefore(thgc, local, parent->childend, line);
@@ -867,18 +893,17 @@ void NewDrawCall(ThreadGC* thgc, NewElement* elem, NewGraphic* g, NewLocal* loca
 		g = new NewGraphic{g->layer, elem, elem, {0,0}, {elem->size2.x, elem->size2.y}, {0,0}, {0,0},
 			elem->offscreen->ping ? elem->offscreen->imPong : elem->offscreen->imPing,  &info->fbo,  &info->size, elem->offscreen->viewId = --viewId, elem->offscreen->group };
 		elem->offscreen->ping = !elem->offscreen->ping;
-		static bgfx::TextureHandle s_nulltex = BGFX_INVALID_HANDLE;
 		bgfx::TextureHandle* tex1, * tex2;
 		if (isValidImageId(elem->background->tex1)) {
 			auto info = mygetStandaloneTextureInfo(thgc, elem->background->tex1);
 			tex1 = &info->handle;
 		}
-		else tex1 = &s_nulltex;
+		else tex1 = &nulltex;
 		if (isValidImageId(elem->background->tex2)) {
 			auto info = mygetStandaloneTextureInfo(thgc, elem->background->tex2);
 			tex2 = &info->handle;
 		}
-		else tex2 = &s_nulltex;
+		else tex2 = &nulltex;
 		g->layer->pushBackground(elem->background, elem->pos2.x, elem->pos2.y, sizex, sizey, std::floor(elem->zIndex),
 			tex1, tex2, g->fb, g->fbsize, g->viewId, 1.0f);
 		std::vector<float>* colors = new std::vector<float>{
@@ -936,9 +961,13 @@ void initNewLocal(ThreadGC* thgc, NewLocal* local) {
 	local->offscreen->elem = local;
 	local->offscreen->imPing = queueOffscreenNew(thgc, 1, 1);
 	local->offscreen->imPong = queueOffscreenNew(thgc, 1, 1);
+	local->offscreen->next = local->offscreen->before = local->offscreen;
+	local->offscreen->child = (Offscreen*)GC_alloc(thgc, CType::_OffscreenEnd);
+	local->offscreen->child->next = local->offscreen->child->before = local->offscreen->child;
+	local->offscreen->child->parent = local->offscreen;
 	local->offscreened = true;
-	local->background = new Background();
-	local->background->tex1 = myloadTexture2D(thgc, "123.png");
+	local->background = (Background*)GC_alloc(thgc, CType::_Background);
+	local->background->tex1 = myloadTexture2D(thgc, "123.png", ImageUsage::Background);
 	local->background->fillcolor = 0xffffffff;
 	local->background->borderColor = 0x00000000;
 	local->background->borderWidth = 0.0f;
@@ -2313,3 +2342,4 @@ int LetterKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLo
 	}
 	return -1;
 }
+#include "othelem.h"

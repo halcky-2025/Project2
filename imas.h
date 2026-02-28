@@ -344,14 +344,14 @@ public:
             return result;
         }
 
-        bgfx::TextureHandle tex = fontAtlas_.getPageTexture(gi->pageIndex);
+        bgfx::TextureHandle& tex = fontAtlas_.getPageTexture(gi->pageIndex);
         if (!bgfx::isValid(tex)) {
             result.status = ResolveStatus::Evicted;
             return result;
         }
 
         result.status = ResolveStatus::Success;
-        result.resolved.texture = tex;
+        result.resolved.texture = &tex;
         result.resolved.u0 = gi->u0;
         result.resolved.v0 = gi->v0;
         result.resolved.u1 = gi->u1;
@@ -371,7 +371,7 @@ public:
             float u0, v0, u1, v1;
             if (gridAtlas_.getUV(*gridHandle, u0, v0, u1, v1)) {
                 result.status = ResolveStatus::Success;
-                result.resolved.texture = gridAtlas_.getTexture(*gridHandle);
+                result.resolved.texture = &gridAtlas_.getTexture(gridHandle->pageIndex);
                 result.resolved.u0 = u0;
                 result.resolved.v0 = v0;
                 result.resolved.u1 = u1;
@@ -386,7 +386,7 @@ public:
             float u0, v0, u1, v1;
             if (shelfAtlas_.getUV(*shelfHandle, u0, v0, u1, v1)) {
                 result.status = ResolveStatus::Success;
-                result.resolved.texture = shelfAtlas_.getTexture(*shelfHandle);
+                result.resolved.texture = &shelfAtlas_.getTexture(shelfHandle->pageIndex);
                 result.resolved.u0 = u0;
                 result.resolved.v0 = v0;
                 result.resolved.u1 = u1;
@@ -419,8 +419,26 @@ public:
         case ImageIdDomain::Offscreen:
         case ImageIdDomain::Memory:
         case ImageIdDomain::Generated:
-        case ImageIdDomain::File:
+        case ImageIdDomain::File: {
+            // Check imageLocations_ to determine actual placement
+            std::lock_guard lock(locationMutex_);
+            auto it = imageLocations_.find(id);
+            if (it != imageLocations_.end()) {
+                switch (it->second.type) {
+                case ImageLocation::Type::GridAtlas: {
+                    uint64_t contentId = getImageIdLocal(id);
+                    return resolveThumbnail(id);
+                }
+                case ImageLocation::Type::ShelfAtlas: {
+                    uint64_t contentId = getImageIdLocal(id);
+                    return resolveThumbnail(id);
+                }
+                default:
+                    break;
+                }
+            }
             return resolveStandalone(id);
+        }
 
         default:
             result.status = ResolveStatus::NotFound;
@@ -434,7 +452,7 @@ public:
         auto result = resolve(id);
         if (!result.isReady()) return false;
 
-        outTex = result.resolved.texture;
+        outTex = *result.resolved.texture;
         u0 = result.resolved.u0;
         v0 = result.resolved.v0;
         u1 = result.resolved.u1;
@@ -468,6 +486,14 @@ public:
         std::lock_guard lock(locationMutex_);
         auto& loc = imageLocations_[id];
         loc.type = ImageLocation::Type::None;
+        loc.isPending = true;
+    }
+
+    // Pending状態 + 配置タイプを事前登録（GPU uploadキューイング前）
+    void registerPendingWithType(ImageId id, ImageLocation::Type placementType) {
+        std::lock_guard lock(locationMutex_);
+        auto& loc = imageLocations_[id];
+        loc.type = placementType;
         loc.isPending = true;
     }
 
@@ -765,6 +791,37 @@ public:
 
     bgfx::TextureHandle* getShelfAtlasTexturePtr(uint16_t pageIndex) {
         return (bgfx::TextureHandle*)(&shelfAtlas_.getTexture(pageIndex));
+    }
+
+    // ImageId → 永続的なTextureHandleポインタを取得（配置タイプに応じて）
+    bgfx::TextureHandle* resolveTexturePtr(ImageId id) {
+        if (id == 0) return nullptr;
+
+        // imageLocations_ で配置タイプを確認
+        {
+            std::lock_guard lock(locationMutex_);
+            auto it = imageLocations_.find(id);
+            if (it != imageLocations_.end()) {
+                switch (it->second.type) {
+                case ImageLocation::Type::GridAtlas:
+                    return &gridAtlas_.getTexture(it->second.thumbnail.handle.pageIndex);
+                case ImageLocation::Type::ShelfAtlas:
+                    return &shelfAtlas_.getTexture(it->second.thumbnail.handle.pageIndex);
+                default:
+                    break;
+                }
+            }
+        }
+
+        // Standalone fallback
+        {
+            std::lock_guard lock(standaloneMutex_);
+            auto sit = standaloneTextures_.find(id);
+            if (sit != standaloneTextures_.end() && bgfx::isValid(sit->second.handle)) {
+                return &sit->second.handle;
+            }
+        }
+        return nullptr;
     }
 
     // Thumbnail 取得（ポインタ付き）
@@ -1305,7 +1362,7 @@ public:
     ResolvedTexture getPlaceholder() {
         const auto& white = fontAtlas_.getWhitePixel();
         ResolvedTexture p;
-        p.texture = fontAtlas_.getPageTexture(white.pageIndex);
+        p.texture = &fontAtlas_.getPageTexture(white.pageIndex);
         p.u0 = white.u0; p.v0 = white.v0;
         p.u1 = white.u1; p.v1 = white.v1;
         p.width = white.width;
@@ -1347,7 +1404,7 @@ private:
         it->second.lastUsedFrame = currentFrame_;
 
         result.status = ResolveStatus::Success;
-        result.resolved.texture = it->second.handle;
+        result.resolved.texture = &it->second.handle;
         result.resolved.u0 = 0; result.resolved.v0 = 0;
         result.resolved.u1 = 1; result.resolved.v1 = 1;
         result.resolved.width = it->second.size.x;
@@ -1368,7 +1425,7 @@ private:
         gridAtlas_.touch(loc.thumbnail.handle);
 
         result.status = ResolveStatus::Success;
-        result.resolved.texture = gridAtlas_.getTexture(loc.thumbnail.handle);
+        result.resolved.texture = &gridAtlas_.getTexture(loc.thumbnail.handle.pageIndex);
         result.resolved.u0 = u0; result.resolved.v0 = v0;
         result.resolved.u1 = u1; result.resolved.v1 = v1;
         result.resolved.width = loc.width;
@@ -1388,7 +1445,7 @@ private:
         shelfAtlas_.touch(loc.thumbnail.handle);
 
         result.status = ResolveStatus::Success;
-        result.resolved.texture = shelfAtlas_.getTexture(loc.thumbnail.handle);
+        result.resolved.texture = &shelfAtlas_.getTexture(loc.thumbnail.handle.pageIndex);
         result.resolved.u0 = u0; result.resolved.v0 = v0;
         result.resolved.u1 = u1; result.resolved.v1 = v1;
         result.resolved.width = loc.width;
@@ -1617,15 +1674,7 @@ struct ImageSource {
 //=============================================================================
 // ImageUsage - 配置ヒント
 //=============================================================================
-enum class ImageUsage : uint8_t {
-    Auto,           // サイズから自動判断
-    Icon,           // 小さな正方形 → Grid
-    Thumbnail,      // 通常サムネ → サイズ別 Grid or Shelf
-    VideoThumb,     // 動画サムネ → Shelf
-    Background,     // 背景画像 → Standalone (persistent)
-    UIImage,        // UI画像 → Standalone or FontAtlas
-    Dynamic,        // 動的更新 → Standalone
-};
+
 
 //=============================================================================
 // DecodedImage
@@ -1774,7 +1823,11 @@ public:
             cached.refCount = 1;
         }
 
-        // GPU にアップロード
+        // 配置タイプを事前登録（resolve()がGPUアップロード前でもルーティングできるように）
+        auto placementType = decidePlacement(decoded.width, decoded.height, usage);
+        master_.registerPendingWithType(imageId, placementType);
+
+        // GPU にアップロード（レンダースレッドにキューイング）
         if (!uploadToGpu(imageId)) {
             return 0;
         }
@@ -2028,10 +2081,9 @@ public:
     const PlacementPolicy& policy() const { return policy_; }
     PlacementPolicy& policy() { return policy_; }
 
-#if TARGET_OS_IOS || TARGET_OS_SIMULATOR
     //=========================================================================
-    // iOS: Process queued GPU uploads on main thread
-    // Must be called from main thread in bgfx single-thread mode
+    // Process queued GPU uploads on render thread
+    // Must be called from render thread (bgfx API calls require it)
     //=========================================================================
     void processGpuUploadsMainThread() {
         std::vector<ImageId> toProcess;
@@ -2048,7 +2100,6 @@ public:
             }
         }
     }
-#endif
 
 private:
     //=========================================================================
@@ -2212,20 +2263,13 @@ private:
     // GPU アップロード - ImageMaster に登録
     //=========================================================================
     bool uploadToGpu(ImageId imageId) {
-#if TARGET_OS_IOS || TARGET_OS_SIMULATOR
-        // iOS: Queue the upload for main thread processing
-        // bgfx single-thread mode requires all API calls on main thread
+        // Queue the upload for render thread processing
+        // bgfx API calls must happen on the render thread
         {
             std::lock_guard lock(gpuUploadQueueMutex_);
             gpuUploadQueue_.push_back(imageId);
         }
-        return true;  // Will be processed on main thread
-#else
-        std::lock_guard lock(cacheMutex_);
-        auto it = cache_.find(imageId);
-        if (it == cache_.end()) return false;
-        return uploadToGpuInternal(it->second);
-#endif
+        return true;  // Will be processed on render thread
     }
 
     bool uploadToGpuInternal(CachedImage& cached) {
@@ -2415,9 +2459,7 @@ private:
     std::mutex pendingCallbacksMutex_;
     std::unordered_map<ImageId, std::vector<std::function<void(ImageId, bool)>>> pendingCallbacks_;
 
-#if TARGET_OS_IOS || TARGET_OS_SIMULATOR
-    // iOS: Queue for deferred GPU uploads (must be processed on main thread)
+    // Queue for deferred GPU uploads (must be processed on render thread)
     std::mutex gpuUploadQueueMutex_;
     std::vector<ImageId> gpuUploadQueue_;
-#endif
 };

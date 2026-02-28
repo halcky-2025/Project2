@@ -173,6 +173,7 @@
     <ClInclude Include="objvt.h" />
     <ClInclude Include="objz.h" />
     <ClInclude Include="opt.h" />
+    <ClInclude Include="othelem.h" />
     <ClInclude Include="platform_io.h" />
     <ClInclude Include="shader.h" />
     <ClInclude Include="shader2.h" />

@@ -710,7 +710,7 @@ public:
         local = (NewLocal*)te->elem;
         if ((local->dirty & DirtyType::Rebuild) > 0) {
             int n = 0;
-            local->offscreen->child->next = local->offscreen->child->before;
+            local->offscreen->child->next = local->offscreen->child->before = local->offscreen->child;
             RebuildOffscreen(target, local->offscreen->child, local, &n);
         }
         if ((local->dirty & DirtyType::OffscreenLayout) > 0) {
@@ -913,10 +913,7 @@ public:
 
             for (size_t i = 0; i < render_items.size(); i++) {
                 std::vector<UnifiedDrawCommand> commands;
-                std::vector<bgfx::TextureHandle> textures;
-
                 commands.reserve(render_items.size());
-                textures.reserve(render_items.size());
 
                 float base_z = 0.0f;
                 for (size_t j = 0; j < render_items.size(); j++) {
@@ -928,13 +925,11 @@ public:
                     float px, py, pw, ph;
                     calculate_layout_pixels(j, render_items.size(), item.clip, px, py, pw, ph);
 
-                    textures.push_back(resolved.resolved.texture);
-
                     UnifiedDrawCommand cmd{};
                     cmd.type = DrawCommandType::Image;
                     cmd.viewId = 30;
                     cmd.zIndex = base_z + j * 0.001f;
-                    cmd.texture = &textures.back();
+                    cmd.texture = resolved.resolved.texture;
                     cmd.texture2 = &nulltex;
 
                     cmd.x = px;
@@ -1154,6 +1149,7 @@ public:
                 hoppy_->patternAtlas.buildTextures();
             }
             auto t1 = std::chrono::high_resolution_clock::now();
+            hoppy_->loader.processGpuUploadsMainThread();
             if (layers != NULL) {
                 hoppy_->master.beginFrame();
                 for (auto& layer : *layers) {
@@ -1171,10 +1167,7 @@ public:
                     // レイヤー順に描画（下から上へ）
                     for (size_t i = 0; i < render_items.size(); i++) {
                         std::vector<UnifiedDrawCommand> commands;
-                        std::vector<bgfx::TextureHandle> textures;  // テクスチャハンドルを保持
-
                         commands.reserve(render_items.size());
-                        textures.reserve(render_items.size());
 
                         float base_z = 0.0f;
                         for (size_t i = 0; i < render_items.size(); i++) {
@@ -1187,14 +1180,11 @@ public:
                             float px, py, pw, ph;
                             calculate_layout_pixels(i, render_items.size(), item.clip, px, py, pw, ph);
 
-                            // テクスチャを保存
-                            textures.push_back(resolved.resolved.texture);
-
                             UnifiedDrawCommand cmd{};
                             cmd.type = DrawCommandType::Image;
                             cmd.viewId = 0;
                             cmd.zIndex = base_z + i * 0.001f;
-                            cmd.texture = &textures.back();
+                            cmd.texture = resolved.resolved.texture;
                             cmd.texture2 = &nulltex;
 
                             // 位置とサイズ（ピクセル座標）
@@ -1247,8 +1237,8 @@ ExtendedRenderGroup& createGroup(ThreadGC* thgc) {
     return thgc->hoppy->master.createGroup(0);  // SurfaceId = 0
 }
 
-ImageId myloadTexture2D(ThreadGC* thgc, const char* path) {
-    return thgc->hoppy->loader.loadFromFile(path, ImageUsage::Background, false);
+ImageId myloadTexture2D(ThreadGC* thgc, const char* path, ImageUsage usage) {
+    return thgc->hoppy->loader.loadFromFile(path, usage, false);
 }
 ImageId queueOffscreenNew(ThreadGC* thgc, int width, int height) {
     return thgc->hoppy->master.reserveOffscreenTexture(width, height, false);
@@ -1258,6 +1248,12 @@ void queueOffscreenResize(ThreadGC* thgc, ImageId offscreenid, int width, int he
 }
 ResolvedTexture myresolveTexture(ImageMaster& master, ImageId imageId) {
     return master.resolveForDraw(imageId);
+}
+bgfx::TextureHandle* myResolveTexturePtr(ThreadGC* thgc, ImageId imageId) {
+    return thgc->hoppy->master.resolveTexturePtr(imageId);
+}
+ResolvedTexture myResolveForDraw(ThreadGC* thgc, ImageId imageId) {
+    return thgc->hoppy->master.resolveForDraw(imageId);
 }
 StandaloneTextureInfo* mygetStandaloneTextureInfo(ThreadGC* thgc, ImageId imageId) {
     return thgc->hoppy->master.getStandaloneTexture(imageId);

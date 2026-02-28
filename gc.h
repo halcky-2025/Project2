@@ -251,7 +251,7 @@ char* wait_handle(ThreadGC* thgc, char* raw) {
 }
 enum CType {
 	_Struct,
-	_List, _String, _Element, _FRect, _LetterC, _Detection, _LocalC, _Select, _State, _LineC, _VLineC, _LetterPart,
+	_List, _String, _Element, _FRect, _LetterC, _Detection, _LocalC, _Select, _State, _LineC, _VLineC, _ImageC, _Background,
     _MapData, _Map, _KV, _EndC, _CloneElemC, _HoppyWindow, _ColumnMeta, _Table, _Column, _TreeElement, _DivC, _SheetC,
     _MemTable, _MouseEvent, _KeyEvent, _MemFunc, _FuncType, _Offscreen, _OffscreenEnd,
     _ATSSpan, _StyleSpan, _RenderSpan,

@@ -136,12 +136,12 @@ struct FontId {
 };
 
 struct ResolvedTexture {
-	bgfx::TextureHandle texture = BGFX_INVALID_HANDLE;
+	bgfx::TextureHandle* texture = nullptr;
 	float u0 = 0, v0 = 0, u1 = 1, v1 = 1;
 	uint16_t width = 0;
 	uint16_t height = 0;
 
-	bool isValid() const { return bgfx::isValid(texture); }
+	bool isValid() const { return texture && bgfx::isValid(*texture); }
 };
 FontId getFont(const char* name, int size) {
 	FontId id(name, size);
@@ -218,6 +218,15 @@ enum class ImageOrigin : uint8_t {
 	Offscreen,
 	Generated,
 };
+enum class ImageUsage : uint8_t {
+	Auto,           // サイズから自動判断
+	Icon,           // 小さな正方形 → Grid
+	Thumbnail,      // 通常サムネ → サイズ別 Grid or Shelf
+	VideoThumb,     // 動画サムネ → Shelf
+	Background,     // 背景画像 → Standalone (persistent)
+	UIImage,        // UI画像 → Standalone or FontAtlas
+	Dynamic,        // 動的更新 → Standalone
+};
 struct StandaloneTextureInfo {
 	bgfx::TextureHandle handle = BGFX_INVALID_HANDLE;
 	bgfx::FrameBufferHandle fbo = BGFX_INVALID_HANDLE;
@@ -228,6 +237,7 @@ struct StandaloneTextureInfo {
 	bool isRenderTarget = false;
 	ImageOrigin origin = ImageOrigin::File;
 };
+bgfx::TextureHandle nulltex = BGFX_INVALID_HANDLE;
 struct LayerInfo;
 struct ExtendedRenderGroup;
 struct ImageMaster;
@@ -235,7 +245,9 @@ struct FontAtlas;
 StandaloneTextureInfo* mygetStandaloneTextureInfo(ThreadGC* thgc, ImageId imageId);
 ImageId queueOffscreenNew(ThreadGC* thgc, int width, int height);
 void queueOffscreenResize(ThreadGC* thgc, ImageId offscreenid, int width, int height);
-ImageId myloadTexture2D(ThreadGC* thgc, const char* path);
+ImageId myloadTexture2D(ThreadGC* thgc, const char* path, ImageUsage usage);
+bgfx::TextureHandle* myResolveTexturePtr(ThreadGC* thgc, ImageId imageId);
+ResolvedTexture myResolveForDraw(ThreadGC* thgc, ImageId imageId);
 ExtendedRenderGroup& createGroup(ThreadGC* thgc);
 void drawTextUTF8(LayerInfo* layer, FontAtlas& atlas, FontId font,
 	const char* text, int length, float x, float y,

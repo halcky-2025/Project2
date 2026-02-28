@@ -26,13 +26,13 @@ C:\Users\hayah\source\repos\Project2\Project2\newelem.h(11,16): warning C4091: '
 C:\Users\hayah\source\repos\Project2\Project2\newelem.h(12,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'DrawCommand' の左辺を無視します。
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\newelem.h(913,53): warning C4834: [[nodiscard]] 属性を持つ関数の戻り値を破棄しています
+C:\Users\hayah\source\repos\Project2\Project2\newelem.h(938,53): warning C4834: [[nodiscard]] 属性を持つ関数の戻り値を破棄しています
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\shader.h(696,43): warning C5055: 演算子 '<=': 列挙型と浮動小数点型の間では非推奨です
+C:\Users\hayah\source\repos\Project2\Project2\shader.h(695,43): warning C5055: 演算子 '<=': 列挙型と浮動小数点型の間では非推奨です
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\shader.h(696,73): warning C5055: 演算子 '<=': 列挙型と浮動小数点型の間では非推奨です
+C:\Users\hayah\source\repos\Project2\Project2\shader.h(695,73): warning C5055: 演算子 '<=': 列挙型と浮動小数点型の間では非推奨です
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
 C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\optional(82,17): warning C4267: '初期化中': 'size_t' から 'int' に変換しました。データが失われているかもしれません。
@@ -234,5 +234,4 @@ C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\
               TargetType=size_t
           ]
   
-     ライブラリ C:\Users\hayah\source\repos\Project2\x64\Debug\Project2.lib とオブジェクト C:\Users\hayah\source\repos\Project2\x64\Debug\Project2.exp を作成中
   Project2.vcxproj -> C:\Users\hayah\source\repos\Project2\x64\Debug\Project2.exe
