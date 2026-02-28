@@ -1,4 +1,4 @@
-#ifdef __APPLE__
+﻿#ifdef __APPLE__
 #include <TargetConditionals.h>
 #endif
 
@@ -1399,36 +1399,37 @@ void* GoThread(ThreadGC* thgc) {
 #else
 CustomModuleImpl* GoThread(ThreadGC* thgc) {
 #endif
-
-    GC_register_class(thgc, _String, "Str", sizeof(String), NULL, NULL);
-    GC_register_class(thgc, _List, "List", sizeof(List), ListCheck, NULL);
-    GC_register_class(thgc, _Element, "Elem", sizeof(NewElement), NULL, NULL);
-    GC_register_class(thgc, _FRect, "FRect", sizeof(SDL_FRect), NULL, NULL);
-    GC_register_class(thgc, _LetterC, "Letter", sizeof(NewLetter), NULL, NULL);
-    GC_register_class(thgc, _LineC, "Line", sizeof(NewLine), NULL, NULL);
+    GC_register_class(thgc, CType::_String, "Str", sizeof(String), NULL, NULL);
+    GC_register_class(thgc, CType::_List, "List", sizeof(List), ListCheck, NULL);
+    GC_register_class(thgc, CType::_Element, "Elem", sizeof(NewElement), NULL, NULL);
+    GC_register_class(thgc, CType::_FRect, "FRect", sizeof(SDL_FRect), NULL, NULL);
+    GC_register_class(thgc, CType::_LetterC, "Letter", sizeof(NewLetter), NULL, NULL);
+    GC_register_class(thgc, CType::_LineC, "Line", sizeof(NewLine), NULL, NULL);
     //GC_SetClass(thgc, _VLineC, "VirtualLine", sizeof(VLine), VLineCheck, NULL);
     //GC_SetClass(thgc, _Select, "Select", sizeof(Select), SelectCheck, NULL);
     //GC_SetClass(thgc, _State, "State", sizeof(State), StateCheck, NULL);
-    GC_register_class(thgc, _LocalC, "Local", sizeof(NewLocal), NULL, NULL);
+    GC_register_class(thgc, CType::_LocalC, "Local", sizeof(NewLocal), NULL, NULL);
+    GC_register_class(thgc, CType::_ImageC, "Image", sizeof(NewImage), NULL, NULL);
+    GC_register_class(thgc, CType::_Background, "Background", sizeof(Background), NULL, NULL);
     //GC_SetClass(thgc, _LetterPart, "LetterPart", sizeof(LetterPart), LetterPartCheck, NULL);
-    GC_register_class(thgc, _KV, "KeyValue", sizeof(KV), KVCheck, NULL);
-    GC_register_class(thgc, _MapData, "MapData", sizeof(MapData), MapDataCheck, NULL);
-    GC_register_class(thgc, _Map, "Map", sizeof(Map), MapCheck, NULL);
-    GC_register_class(thgc, _EndC, "End", sizeof(NewEndElement), NULL, NULL);
+    GC_register_class(thgc, CType::_KV, "KeyValue", sizeof(KV), KVCheck, NULL);
+    GC_register_class(thgc, CType::_MapData, "MapData", sizeof(MapData), MapDataCheck, NULL);
+    GC_register_class(thgc, CType::_Map, "Map", sizeof(Map), MapCheck, NULL);
+    GC_register_class(thgc, CType::_EndC, "End", sizeof(NewEndElement), NULL, NULL);
     //GC_SetClass(thgc, _CloneElemC, "CloneElem", sizeof(CloneElement), CloneElementCheck, NULL);
     //GC_SetClass(thgc, _HoppyWindow, "HoppyWindow", sizeof(HoppyWindow), HoppyWindowCheck, NULL);
-    GC_register_class(thgc, _ColumnMeta, "ColumnMeta", sizeof(ColumnMeta), NULL, NULL);
-    GC_register_class(thgc, _Table, "Table", sizeof(Table), NULL, NULL);
-    GC_register_class(thgc, _Column, "Column", sizeof(Column), NULL, NULL);
-    GC_register_class(thgc, _TreeElement, "TreeElement", sizeof(TreeElement), NULL, NULL);
+    GC_register_class(thgc, CType::_ColumnMeta, "ColumnMeta", sizeof(ColumnMeta), NULL, NULL);
+    GC_register_class(thgc, CType::_Table, "Table", sizeof(Table), NULL, NULL);
+    GC_register_class(thgc, CType::_Column, "Column", sizeof(Column), NULL, NULL);
+    GC_register_class(thgc, CType::_TreeElement, "TreeElement", sizeof(TreeElement), NULL, NULL);
     //GC_SetClass(thgc, _DivC, "Div", sizeof(Div), NULL, NULL);
     //GC_SetClass(thgc, _SheetC, "Sheet", sizeof(Sheet), NULL, NULL);
-    GC_register_class(thgc, _MemTable, "MemTable", sizeof(MemTable), NULL, NULL);
-    GC_register_class(thgc, _MemFunc, "MemFunc", sizeof(MemFunc), NULL, NULL);
-    GC_register_class(thgc, _FuncType, "FuncType", sizeof(FuncType), NULL, NULL);
+    GC_register_class(thgc, CType::_MemTable, "MemTable", sizeof(MemTable), NULL, NULL);
+    GC_register_class(thgc, CType::_MemFunc, "MemFunc", sizeof(MemFunc), NULL, NULL);
+    GC_register_class(thgc, CType::_FuncType, "FuncType", sizeof(FuncType), NULL, NULL);
     //GC_SetClass(thgc, _MouseEvent, "MouseEvent", sizeof(MouseEvent), NULL, NULL);
     //GC_SetClass(thgc, _KeyEvent, "KeyEvent", sizeof(KeyEvent), NULL, NULL);
-    GC_register_class(thgc, _Offscreen, "Offscreen", sizeof(Offscreen), NULL, NULL);
+    GC_register_class(thgc, CType::_Offscreen, "Offscreen", sizeof(Offscreen), NULL, NULL);
     GC_register_class(thgc, CType::_OffscreenEnd, "Offscreen", sizeof(OffscreenEnd), NULL, NULL);
     //HoppyWindow* hw = (HoppyWindow*)GC_malloc(thgc, _HoppyWindow);
     GC_register_class(thgc, CType::_ATSSpan, "ATSSpan", sizeof(ATSSpan), NULL, NULL);
@@ -1457,11 +1458,32 @@ CustomModuleImpl* GoThread(ThreadGC* thgc) {
     GC_register_class(thgc, CType::_Master, "Local", sizeof(Master), NULL, NULL);
     GC_register_class(thgc, CType::_Operator, "Operator", sizeof(Operator), NULL, NULL);
     //initHoppyWindow(thgc, hw);
-	NewLocal* local = (NewLocal*)GC_alloc(thgc, _LocalC);
+	NewLocal* local = (NewLocal*)GC_alloc(thgc, CType::_LocalC);
     initNewLocal(thgc, local);
     local->font = getFont("sans", 16);
-    NewLetter* let = (NewLetter*)GC_alloc(thgc, _LetterC);
-    initNewLetter(thgc, let, getFont("sans", 16), _Letter);
+    NewImage* im1 = (NewImage*)GC_alloc(thgc, CType::_ImageC);
+    initNewImage(thgc, im1);
+    im1->background = (Background*)GC_alloc(thgc, CType::_Background);
+    im1->background->tex1 = myloadTexture2D(thgc, "imgs/build.png", ImageUsage::Icon);
+    im1->background->type = DrawCommandType::RawImage;
+    im1->background->fillcolor = 0xFFFFFFFF;
+    im1->size.x = 32;
+    im1->size.y = 32;
+    NewElementAddLast(thgc, local, local, im1);
+    NewImage* im2 = (NewImage*)GC_alloc(thgc, CType::_ImageC);
+    initNewImage(thgc, im2);
+    im2->background = (Background*)GC_alloc(thgc, CType::_Background);
+    im2->background->tex1 = myloadTexture2D(thgc, "imgs/continue.png", ImageUsage::Icon);
+    im2->background->type = DrawCommandType::RawImage;
+    im2->background->fillcolor = 0xFFFFFFFF;
+    im2->size.x = 32;
+    im2->size.y = 32;
+    NewElementAddLast(thgc, local, local, im2);
+    NewLine* line = (NewLine*)GC_alloc(thgc, CType::_LineC);
+    initNewLine(thgc, line);
+    NewLineAddLast(thgc, local, local, line);
+    NewLetter* let = (NewLetter*)GC_alloc(thgc, CType::_LetterC);
+    initNewLetter(thgc, let, getFont("sans", 16), LetterType::_Letter);
 	let->text = createString(thgc, (char*)"Hello,world!", 12, 1);
     let->color = 0xFFFFFFFF;
     NewElementAddLast(thgc, local, (NewElement*)local, (NewElement*)let);

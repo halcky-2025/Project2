@@ -11,7 +11,6 @@ void LayerInfo::push(DrawCommand* cmd) {
     cmds.push_back(cmd);
 }
 
-bgfx::TextureHandle nulltex = BGFX_INVALID_HANDLE;
 // ============================================================
 // Fill
 // ============================================================
@@ -245,7 +244,7 @@ void LayerInfo::pushText(float x, float y, float width, float height,
     float blendMode)
 {
     UnifiedDrawCommand* cmd = new UnifiedDrawCommand();
-    cmd->type = DrawCommandType::Image;
+    cmd->type = DrawCommandType::RawImage;
     cmd->blendMode = blendMode;
     cmd->targetFBO = targetFBO;
     cmd->viewId = viewId;
