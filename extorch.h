@@ -1459,7 +1459,8 @@ CustomModuleImpl* GoThread(ThreadGC* thgc) {
     GC_register_class(thgc, CType::_Operator, "Operator", sizeof(Operator), NULL, NULL);
     //initHoppyWindow(thgc, hw);
 	NewLocal* local = (NewLocal*)GC_alloc(thgc, CType::_LocalC);
-    initNewLocal(thgc, local);
+    NativeWindow* mainWin = (!thgc->hoppy->windows.empty()) ? thgc->hoppy->windows[0] : nullptr;
+    initNewLocal(thgc, local, mainWin);
     local->font = getFont("sans", 16);
     NewImage* im1 = (NewImage*)GC_alloc(thgc, CType::_ImageC);
     initNewImage(thgc, im1);

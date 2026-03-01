@@ -7,68 +7,88 @@
 #include <string.h>
 
 // ============================================================
-// Section A: StringBuilder (SB) utility
+// Section A: StringBuilder（String* を内包）
 // ============================================================
-typedef struct {
-    char* data;
-    int size;
+struct SB {
+    String str;
     int capa;
-} SB;
+};
 
-SB* sb_create(ThreadGC* thgc) {
+SB* sb_create(ThreadGC* thgc, int esize = 1) {
     SB* sb = (SB*)GC_alloc(thgc, _SB);
     sb->capa = 256;
-    sb->size = 0;
-    sb->data = (char*)GC_alloc_size(thgc, sb->capa);
+    sb->str.size = 0;
+    sb->str.esize = esize;
+    sb->str.data = (char*)GC_alloc_size(thgc, sb->capa);
     return sb;
 }
+// extra は追加する文字数
 void sb_ensure(ThreadGC* thgc, SB* sb, int extra) {
-    if (sb->size + extra >= sb->capa) {
+    int needed = (sb->str.size + extra) * sb->str.esize;
+    if (needed >= sb->capa) {
         int newcapa = sb->capa * 2;
-        while (newcapa < sb->size + extra + 1) newcapa *= 2;
+        while (newcapa < needed + sb->str.esize) newcapa *= 2;
         char* newdata = (char*)GC_alloc_size(thgc, newcapa);
-        memcpy(newdata, sb->data, sb->size);
-        sb->data = newdata;
+        memcpy(newdata, sb->str.data, sb->str.size * sb->str.esize);
+        sb->str.data = newdata;
         sb->capa = newcapa;
     }
+}
+void sb_addc(ThreadGC* thgc, SB* sb, char c) {
+    sb_ensure(thgc, sb, 1);
+    int off = sb->str.size * sb->str.esize;
+    sb->str.data[off] = c;
+    if (sb->str.esize == 2) sb->str.data[off + 1] = 0;
+    sb->str.size++;
 }
 void sb_adds(ThreadGC* thgc, SB* sb, const char* s) {
     int len = (int)strlen(s);
     sb_ensure(thgc, sb, len);
-    memcpy(sb->data + sb->size, s, len);
-    sb->size += len;
+    int off = sb->str.size * sb->str.esize;
+    if (sb->str.esize == 1) {
+        memcpy(sb->str.data + off, s, len);
+    } else {
+        for (int i = 0; i < len; i++) {
+            sb->str.data[off + i * 2] = s[i];
+            sb->str.data[off + i * 2 + 1] = 0;
+        }
+    }
+    sb->str.size += len;
 }
-void sb_addn(ThreadGC* thgc, SB* sb, const char* s, int len) {
-    sb_ensure(thgc, sb, len);
-    memcpy(sb->data + sb->size, s, len);
-    sb->size += len;
-}
-void sb_addc(ThreadGC* thgc, SB* sb, char c) {
-    sb_ensure(thgc, sb, 1);
-    sb->data[sb->size++] = c;
+// chars 文字分コピー（esize変換あり）
+void sb_addn(ThreadGC* thgc, SB* sb, const char* s, int chars, int src_esize) {
+    sb_ensure(thgc, sb, chars);
+    int off = sb->str.size * sb->str.esize;
+    if (src_esize == sb->str.esize) {
+        memcpy(sb->str.data + off, s, chars * sb->str.esize);
+    } else if (src_esize == 1 && sb->str.esize == 2) {
+        for (int i = 0; i < chars; i++) {
+            sb->str.data[off + i * 2] = s[i];
+            sb->str.data[off + i * 2 + 1] = 0;
+        }
+    } else if (src_esize == 2 && sb->str.esize == 1) {
+        for (int i = 0; i < chars; i++) {
+            sb->str.data[off + i] = s[i * 2];
+        }
+    }
+    sb->str.size += chars;
 }
 void sb_addi(ThreadGC* thgc, SB* sb, int n) {
     char buf[32];
     int len = snprintf(buf, sizeof(buf), "%d", n);
-    sb_addn(thgc, sb, buf, len);
+    sb_adds(thgc, sb, buf);
 }
 void sb_add_str(ThreadGC* thgc, SB* sb, String* s) {
     if (!s) return;
-    if (s->esize == 1) {
-        sb_addn(thgc, sb, s->data, s->size);
-    } else {
-        // UTF-16LE -> ASCII (simplified for LLVM IR identifiers)
-        for (int i = 0; i < s->size; i++) {
-            sb_addc(thgc, sb, s->data[i * 2]);
-        }
-    }
+    sb_addn(thgc, sb, s->data, s->size, s->esize);
 }
 void sb_add_sb(ThreadGC* thgc, SB* sb, SB* other) {
-    if (!other || other->size == 0) return;
-    sb_addn(thgc, sb, other->data, other->size);
+    if (!other || other->str.size == 0) return;
+    sb_add_str(thgc, sb, &other->str);
 }
 void sb_write(SB* sb, FILE* f) {
-    if (sb->size > 0) fwrite(sb->data, 1, sb->size, f);
+    int bytes = sb->str.size * sb->str.esize;
+    if (bytes > 0) fwrite(sb->str.data, 1, bytes, f);
 }
 
 // ============================================================
@@ -832,7 +852,7 @@ void output_lstrv_dec(ThreadGC* thgc, LStrV* v, SB* sb) {
     // type without trailing *
     String* t = v->type;
     if (t->size > 0 && t->data[t->size - 1] == '*') {
-        sb_addn(thgc, sb, t->data, t->size - 1);
+        sb_addn(thgc, sb, t->data, t->size - 1, t->esize);
     } else {
         sb_add_str(thgc, sb, t);
     }
@@ -976,7 +996,7 @@ void output_lalloca(ThreadGC* thgc, LAlloca* a, SB* sb) {
     // type without trailing *
     String* t = a->a->type;
     if (t->size > 0 && t->data[(t->size - 1) * t->esize] == '*') {
-        sb_addn(thgc, sb, t->data, (t->size - 1) * t->esize);
+        sb_addn(thgc, sb, t->data, t->size - 1, t->esize);
     } else {
         sb_add_str(thgc, sb, t);
     }

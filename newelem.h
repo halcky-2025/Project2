@@ -147,7 +147,38 @@ struct Background {
 };
 struct Offscreen;
 struct NewLocal;
-struct HoppyWindow;
+struct SDL_Window;          // 前方宣言
+
+enum PopupAnchor { Anchor_None, Anchor_Element, Anchor_ParentWindow, Anchor_Screen };
+
+enum NativeWindowType {
+	WindowType_Main,        // メインウィンドウ（bgfx init済み、FBO不要）
+	WindowType_Popup,       // SDL_CreatePopupWindow（親の子、ドロップダウン等）
+	WindowType_AlwaysOnTop, // SDL_CreateWindow + SDL_WINDOW_ALWAYS_ON_TOP（アラート等）
+	WindowType_Modal,       // SDL_CreateWindow + SDL_WINDOW_MODAL（親操作ブロック）
+};
+
+struct NativeWindow {
+    SDL_Window* sdlWindow = nullptr;
+    NativeWindow* parent = nullptr;
+    void* nwh = nullptr;
+    bgfx::FrameBufferHandle fbo = BGFX_INVALID_HANDLE;  // メインは INVALID、それ以外はスワップチェーンFBO
+    uint8_t viewId = 0;
+    PointI size = { 0, 0 };
+    NewElement* local = nullptr;
+
+    NativeWindowType type = WindowType_Main;
+
+    // 位置指定
+    PopupAnchor anchor = Anchor_None;
+    int anchorX = 0, anchorY = 0;
+    NewElement* anchorElement = nullptr;
+
+    bool needsFboInit = false;
+    bool needsFboReset = false;   // リサイズ時のFBO再作成フラグ
+    bool visible = true;
+};
+
 struct PointF {
 	float x;
 	float y;
@@ -159,7 +190,7 @@ struct MouseEvent {
 	Point basepos;
 	int action;
 	enum MouseCall call;
-	HoppyWindow* window;
+	NativeWindow* window;
 	bool click = false;
 	ExtendedRenderGroup* group;
 };
@@ -244,10 +275,11 @@ struct NewSelect {
 	NewElement* start, * end;
 	int s, e;
 	int count;
+	NativeWindow* window = nullptr; // fromが属するウィンドウ
 };
 struct NewLocal : NewElement {
 	bool resetid;
-	HoppyWindow* window;
+	NativeWindow* window;
 	DirtyType dirty;
 	List* screens;
 	Map* temap;
@@ -269,6 +301,7 @@ struct Offscreen : OffscreenEnd {
 	bool layout = true;
 	bool paint = true;
 	NewElement* elem;
+	NativeWindow* window = nullptr;  // 所属するウィンドウ
 	void markLayout(NewLocal* local) { layout = true; paint = true; local->dirty = (DirtyType)(local->dirty | DirtyType::Partial); }
 	void markPaint(NewLocal* local) { paint = true; local->dirty = (DirtyType)(local->dirty | DirtyType::Partial); }
 	int viewId = 0;
@@ -522,6 +555,7 @@ void RootBeforeOffscreen2(ThreadGC* thgc, NewLocal* local, NewElement* elem, Off
 		elem->offscreen->group = &createGroup(thgc);
 		elem->offscreen->elem = elem;
 		elem->offscreen->dirty = true;
+		elem->offscreen->window = offscreen->parent ? offscreen->parent->window : offscreen->window;
 		elem->offscreen->child = (Offscreen*)GC_alloc(thgc, CType::_OffscreenEnd);
 		elem->offscreen->child->next = elem->offscreen->child->before = elem->offscreen->child;
 		BeforeOffscreen(local, offscreen, elem->offscreen);
@@ -628,6 +662,7 @@ void changeXtype(ThreadGC* thgc, NewLocal* local, NewElement* elem, SizeType xty
 				elem->offscreen->group = &createGroup(thgc);
 				elem->offscreen->elem = elem;
 				elem->offscreen->dirty = true;
+				elem->offscreen->window = off->window;
 				elem->offscreen->child = (Offscreen*)GC_alloc(thgc, CType::_OffscreenEnd);
 				elem->offscreen->child->next = elem->offscreen->child->before = elem->offscreen->child;
 				elem->offscreen->child->parent = elem->offscreen;
@@ -663,6 +698,7 @@ void changeYType(ThreadGC* thgc, NewLocal* local, NewElement* elem, SizeType yty
 				elem->offscreen->group = &createGroup(thgc);
 				elem->offscreen->elem = elem;
 				elem->offscreen->dirty = true;
+				elem->offscreen->window = off->window;
 				elem->offscreen->child = (Offscreen*)GC_alloc(thgc, CType::_OffscreenEnd);
 				elem->offscreen->child->next = elem->offscreen->child->before = elem->offscreen->child;
 				elem->offscreen->child->parent = elem->offscreen;
@@ -698,6 +734,7 @@ void changeOffscreen(ThreadGC* thgc, NewLocal* local, NewElement* elem, bool off
 				elem->offscreen->group = &createGroup(thgc);
 				elem->offscreen->elem = elem;
 				elem->offscreen->dirty = true;
+				elem->offscreen->window = off->window;
 				elem->offscreen->child = (Offscreen*)GC_alloc(thgc, CType::_OffscreenEnd);
 				elem->offscreen->child->next = elem->offscreen->child->before = elem->offscreen->child;
 				elem->offscreen->child->parent = elem->offscreen;
@@ -930,7 +967,7 @@ void NewDrawCall(ThreadGC* thgc, NewElement* elem, NewGraphic* g, NewLocal* loca
 		child = child->next;
 	}
 }
-void initNewLocal(ThreadGC* thgc, NewLocal* local) {
+void initNewLocal(ThreadGC* thgc, NewLocal* local, NativeWindow* mainWindow = nullptr) {
 	local->next = local->before = (NewElement*)local;
 	local->parent = NULL;
 	NewEndElement* end = (NewEndElement*)GC_alloc(thgc, CType::_EndC);
@@ -959,6 +996,7 @@ void initNewLocal(ThreadGC* thgc, NewLocal* local) {
 	local->offscreen->group = &createGroup(thgc);
 	local->offscreen->markLayout(local);
 	local->offscreen->elem = local;
+	local->offscreen->window = mainWindow;
 	local->offscreen->imPing = queueOffscreenNew(thgc, 1, 1);
 	local->offscreen->imPong = queueOffscreenNew(thgc, 1, 1);
 	local->offscreen->next = local->offscreen->before = local->offscreen;
@@ -1125,11 +1163,14 @@ void SelectDraw(ThreadGC* thgc, NewLocal* local, NewGraphic* g, RenderCommandQue
 		local->select.s = local->select.n;
 		local->select.e = local->select.m;
 	}
+	// endが別ウィンドウならend自体のwindowを事前チェック
+	Offscreen* endOff = FindOffscreen(local->select.end);
+	bool endInWindow = !endOff || endOff->window == local->select.window;
 	NewElement* start = local->select.start;
 	int s = local->select.s;
 	for (;;) {
 		if (start == local->select.end) {
-			start->DrawSelection(thgc, local, start, s, local->select.e, g, q);
+			if (endInWindow) start->DrawSelection(thgc, local, start, s, local->select.e, g, q);
 			break;
 		}
 		start->DrawSelection(thgc, local, start, s, start->len(start), g, q);
@@ -1279,6 +1320,7 @@ void NewMoveElement(ThreadGC* thgc, NewLocal* local, NewElement* before, NewElem
 	
 }
 void SelectKey(ThreadGC* thgc, NewLocal* local, KeyEvent* e) {
+	if (local->select.from == NULL) return;
 	if (local->select.m == local->select.from->len(local->select.from)) {
 		local->select.from = local->select.from->next;
 		local->select.fromid = local->select.from->id;
@@ -1315,19 +1357,22 @@ void SelectKey(ThreadGC* thgc, NewLocal* local, KeyEvent* e) {
 		local->select.s = local->select.n;
 		local->select.e = local->select.m;
 	}
+	// endが別ウィンドウならend自体のwindowを事前チェック
+	Offscreen* endOff = FindOffscreen(local->select.end);
+	bool endInWindow = !endOff || endOff->window == local->select.window;
 	NewElement* start = local->select.start;
 	std::vector<NewElement*> vec;
 	for (; start != NULL; start = start->parent) vec.push_back(start);
 	for (auto it = vec.rbegin(); it != vec.rend(); ++it) {
-		NewElement* e = *it;
-		if (e->GoKeyDown != NULL) {
-			MemObj* mo = (MemObj*)GC_clone(thgc, (char*)e->GoKeyDown->obj);
+		NewElement* el = *it;
+		if (el->GoKeyDown != NULL) {
+			MemObj* mo = (MemObj*)GC_clone(thgc, (char*)el->GoKeyDown->obj);
 			MemTable* res = (MemTable*)GC_alloc(thgc, _MemTable);
 			res->table = (Map*)create_mapy(thgc, _List);
-			MemInsert(thgc, res, _KeyEvent, (ModelVal*)e);
+			MemInsert(thgc, res, _KeyEvent, (ModelVal*)el);
 			mo->req = NULL; mo->res = res;
 			auto rn = GC_add_root_node(thgc);
-			auto h = std::coroutine_handle<Generator::promise_type>::from_address(static_cast<void*>(MakeFrame(rn, e->GoKeyDown->func, (char*)mo)));
+			auto h = std::coroutine_handle<Generator::promise_type>::from_address(static_cast<void*>(MakeFrame(rn, el->GoKeyDown->func, (char*)mo)));
 			h.promise().state = -2;
 			thgc->queue->push(h);
 		}
@@ -1336,7 +1381,7 @@ void SelectKey(ThreadGC* thgc, NewLocal* local, KeyEvent* e) {
 	int s = local->select.s;
 	for (;;) {
 		if (start == local->select.end) {
-			start->Key(thgc, start, s, local->select.e, e, local);
+			if (endInWindow) start->Key(thgc, start, s, local->select.e, e, local);
 			break;
 		}
 		NewElement* next = start->next;
@@ -1864,6 +1909,8 @@ int LetterMouse(ThreadGC* thgc, NewElement* self, MouseEvent* e, NewLocal* local
 					local->select.from = local->select.to = self;
 					local->select.fromid = local->select.toid = self->id;
 					local->select.m = local->select.n = rs->start + n;
+					Offscreen* seloff = FindOffscreen(self);
+					local->select.window = seloff ? seloff->window : nullptr;
 				}
 				else if (e->action == SDL_EVENT_MOUSE_BUTTON_UP || e->click) {
 					local->select.to = self;
@@ -2342,4 +2389,9 @@ int LetterKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLo
 	}
 	return -1;
 }
+// othelem.h で使うポップアップ関数の前方宣言
+NativeWindow* myCreatePopupWindow(ThreadGC* thgc, NativeWindowType type, PopupAnchor anchor,
+                                   int x, int y, int w, int h, NewElement* anchorElem);
+void myResizePopupWindow(ThreadGC* thgc, NativeWindow* popup, int newW, int newH);
+void myDestroyPopupWindow(ThreadGC* thgc, NativeWindow* popup);
 #include "othelem.h"

@@ -517,8 +517,9 @@ static inline String* build_model_vstr(ThreadGC* thgc, ModelObj* modelobj, Maste
 			}
 		}
 	}
-	sb->data[sb->size] = '\0';
-	return createString(thgc, sb->data, sb->size, 1);
+	sb->str.data[sb->str.size * sb->str.esize] = '\0';
+	if (sb->str.esize == 2) sb->str.data[sb->str.size * sb->str.esize + 1] = '\0';
+	return &sb->str;
 }
 
 // ============================================================

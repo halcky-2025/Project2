@@ -33,7 +33,7 @@ enum SizeType {
     Auto, Break, Page, Range, Scroll
 };
 enum LetterType {
-	_None, _ElemEnd, _Main, _End, _Kaigyou, _Line, _VLine, _Letter, _CloneElem,
+	_None, _ElemEnd, _Main, _Popup, _End, _Kaigyou, _Line, _VLine, _Letter, _CloneElem, _Image,
 	_Name, _Number, _BracketL, _BracketR, _BlockL, _BlockR, _BraceL, _BraceR, _Semicolon, _Comma, _Plus, _Minus, _Mul, _Div, _Mod,
 	_Space, _Equal,
 	_Str, _Decimal, _Sharp, _Dot, _Bou, _Not, _LessThan, _MoreThan,
@@ -52,7 +52,8 @@ enum LetterType {
 	OT_Value, OT_ModelObj, OT_GeneObj, OT_VoiVal, OT_Constructor, OT_ArrayConstructor,
 	OT_AnimationFunction, OT_ArrayType, OT_Br, OT_Clones, OT_ConnectStock,
 	OT_Div, OT_ElemObj, OT_IfBlock, OT_Iterator, OT_ModelVal,
-	OT_ServerFunction, OT_Sheet, OT_SignalFunction, OT_SqlString, OT_Stock
+	OT_ServerFunction, OT_Sheet, OT_SignalFunction, OT_SqlString, OT_Stock,
+	_Drop, _Down
 };
 class FontAtlas;
 #ifndef __MACTYPES__  // Avoid conflict with MacTypes.h Point on Apple platforms
@@ -275,6 +276,12 @@ void drawRightScrollBar(LayerInfo* layer,
 	float zIndex,
 	bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId);
 #include "newelem.h"
+
+// ポップアップウィンドウ管理ラッパー（GoThread → RenderThread キュー経由）
+NativeWindow* myCreatePopupWindow(ThreadGC* thgc, NativeWindowType type, PopupAnchor anchor,
+                                   int x, int y, int w, int h, NewElement* anchorElem);
+void myResizePopupWindow(ThreadGC* thgc, NativeWindow* popup, int newW, int newH);
+void myDestroyPopupWindow(ThreadGC* thgc, NativeWindow* popup);
 
 typedef struct TreeElement {
 	String* id;
