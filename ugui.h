@@ -638,6 +638,44 @@ struct BatchCache {
     uint32_t numIndices = 0;
     bool valid = false;
 };
+// NativeWindow は newelem.h で定義済み
+
+// === メインスレッドへの SDL 委任用イベント（RenderThread → MainThread） ===
+inline Uint32 SDL_EVENT_SDL_REQUEST = 0;
+
+// SDL委任リクエスト（RenderThread → MainThread、SDL操作のみ）
+struct SDLRequest {
+    enum Type { CreateWindow, ResizeWindow, DestroyWindow };
+    Type type;
+    // CreateWindow 用
+    NativeWindowType winType;
+    SDL_Window* parentSDLWindow = nullptr;
+    int x, y, w, h;
+    // ResizeWindow 用
+    NativeWindow* target = nullptr;
+    int newW, newH;
+    // 結果
+    SDL_Window* resultSDLWindow = nullptr;
+    void* resultNwh = nullptr;
+    bool success = false;
+    std::promise<void> done;
+};
+
+// === ポップアップコマンド（GoThread → RenderThread、描画と同じキューで順序保証） ===
+enum class PopupCmdType { Create, Resize, Destroy };
+
+struct PopupCmd {
+    PopupCmdType type;
+    // Create 用
+    NativeWindowType winType = WindowType_Popup;
+    PopupAnchor anchor = Anchor_None;
+    int x = 0, y = 0, w = 0, h = 0;
+    NewElement* anchorElem = nullptr;
+    // Resize 用
+    NativeWindow* target = nullptr;
+    int newW = 0, newH = 0;
+};
+
 class HopStar {
 public:
     std::vector<ThreadGC*> thgcs;
@@ -652,6 +690,158 @@ public:
     PatternAtlasBuilder patternAtlas;
     ImageMaster master = ImageMaster{};
 	ImageLoader loader = ImageLoader(master);
+
+    // === ウィンドウ管理 ===
+    std::vector<NativeWindow*> windows;  // windows[0] = メイン
+    uint8_t nextViewId = 31;             // メインが30を使用、ポップアップは31から
+
+    // ポップアップコマンドキュー（GoThread → RenderThread）
+    std::mutex popupCmdMutex;
+    std::vector<PopupCmd> popupCmdQueue;
+
+    // --- SDL操作をメインスレッドに委任して同期待ち ---
+    void requestSDL(SDLRequest& req) {
+        std::future<void> f = req.done.get_future();
+        SDL_Event ev = {};
+        ev.type = SDL_EVENT_SDL_REQUEST;
+        ev.user.data1 = &req;
+        SDL_PushEvent(&ev);
+        f.get();  // メインスレッドが処理するまでブロック（~1ms）
+    }
+
+    // --- RenderThread から呼ばれるポップアップ生成（SDL部分はメインに委任） ---
+    NativeWindow* createPopupWindow(NativeWindow* parent, NativeWindowType type,
+                                     PopupAnchor anchor,
+                                     int x, int y, int w, int h,
+                                     NewElement* anchorElem) {
+        NativeWindow* nw = new NativeWindow{};
+        nw->type = type;
+        nw->parent = parent;
+        nw->anchor = anchor;
+        nw->anchorX = x; nw->anchorY = y;
+        nw->size = { w, h };
+        nw->anchorElement = anchorElem;
+
+        // SDL座標を計算
+        int relX = x, relY = y;
+        if (anchor == Anchor_Element && anchorElem) {
+            relX = (int)(anchorElem->pos2.x + anchorElem->pos.x) + x;
+            relY = (int)(anchorElem->pos2.y + anchorElem->pos.y + anchorElem->size.y) + y;
+        }
+
+        // SDL ウィンドウ作成をメインスレッドに委任
+        SDLRequest req{};
+        req.type = SDLRequest::CreateWindow;
+        req.winType = type;
+        req.parentSDLWindow = parent ? parent->sdlWindow : nullptr;
+        req.x = relX; req.y = relY; req.w = w; req.h = h;
+        requestSDL(req);
+
+        if (!req.success) {
+            SDL_Log("createPopupWindow failed");
+            delete nw;
+            return nullptr;
+        }
+
+        nw->sdlWindow = req.resultSDLWindow;
+        nw->nwh = req.resultNwh;
+
+        // FBO作成（ここはRenderThread上なので直接OK）
+        nw->fbo = bgfx::createFrameBuffer(nw->nwh, (uint16_t)w, (uint16_t)h);
+        nw->viewId = nextViewId++;
+
+        windows.push_back(nw);
+        return nw;
+    }
+
+    // --- RenderThread から呼ばれるポップアップ破棄 ---
+    void destroyPopupWindow(NativeWindow* popup) {
+        if (!popup) return;
+        // ウィンドウリストから削除
+        for (auto it = windows.begin(); it != windows.end(); ++it) {
+            if (*it == popup) {
+                windows.erase(it);
+                break;
+            }
+        }
+        // bgfx FBO 解放（RenderThread 上なので直接OK）
+        if (bgfx::isValid(popup->fbo)) {
+            bgfx::destroy(popup->fbo);
+            popup->fbo = BGFX_INVALID_HANDLE;
+        }
+        // SDL ウィンドウ破棄をメインスレッドに委任
+        if (popup->sdlWindow) {
+            SDLRequest req{};
+            req.type = SDLRequest::DestroyWindow;
+            req.target = popup;
+            requestSDL(req);
+            popup->sdlWindow = nullptr;
+        }
+        delete popup;
+    }
+
+    void resolvePopupPosition(NativeWindow* popup) {
+        if (!popup || !popup->sdlWindow) return;
+        switch (popup->anchor) {
+        case Anchor_Element: {
+            auto* e = popup->anchorElement;
+            if (!e) break;
+            int relX = (int)(e->pos2.x + e->pos.x) + popup->anchorX;
+            int relY = (int)(e->pos2.y + e->pos.y + e->size.y) + popup->anchorY;
+            SDL_SetWindowPosition(popup->sdlWindow, relX, relY);
+            break;
+        }
+        case Anchor_ParentWindow:
+            SDL_SetWindowPosition(popup->sdlWindow, popup->anchorX, popup->anchorY);
+            break;
+        case Anchor_Screen: {
+            if (popup->parent && popup->parent->sdlWindow) {
+                int px, py;
+                SDL_GetWindowPosition(popup->parent->sdlWindow, &px, &py);
+                SDL_SetWindowPosition(popup->sdlWindow, popup->anchorX - px, popup->anchorY - py);
+            } else {
+                SDL_SetWindowPosition(popup->sdlWindow, popup->anchorX, popup->anchorY);
+            }
+            break;
+        }
+        default:
+            break;
+        }
+    }
+
+    // --- RenderThread から呼ばれるリサイズ処理（SDL部分はメインに委任） ---
+    bool resizePopupWindow(NativeWindow* nw, int newW, int newH) {
+        if (!nw || !nw->sdlWindow) return false;
+
+        // SDL ウィンドウリサイズをメインスレッドに委任
+        SDLRequest req{};
+        req.type = SDLRequest::ResizeWindow;
+        req.target = nw;
+        req.newW = newW; req.newH = newH;
+        requestSDL(req);
+
+        if (!req.success) return false;
+
+        // 内部サイズを更新
+        nw->size = { newW, newH };
+
+        // FBO を再作成（RenderThread 上なので直接OK）
+        if (bgfx::isValid(nw->fbo)) {
+            bgfx::destroy(nw->fbo);
+        }
+        nw->fbo = bgfx::createFrameBuffer(nw->nwh, (uint16_t)newW, (uint16_t)newH);
+        return bgfx::isValid(nw->fbo);
+    }
+
+    NativeWindow* findWindowBySDLId(SDL_WindowID id) {
+        for (auto* nw : windows) {
+            if (nw->sdlWindow && SDL_GetWindowID(nw->sdlWindow) == id) {
+                return nw;
+            }
+        }
+        return nullptr;
+    }
+
     HopStar() {
 	}
     void initFonts() {
@@ -742,15 +932,19 @@ public:
                     screen->elem->Draw(target, (NewElement*)screen->elem, graphic, local, q);
                 }
             }
-            if (local->select.from != NULL) {
+            if (local->select.from != NULL && local->select.window != nullptr) {
+                NativeWindow* selWin = local->select.window;
                 NewGraphic* graphic = new NewGraphic();
-                graphic->pos.x = 0; graphic->pos.y = 0; graphic->size.x = 800; graphic->size.y = 600;
-                graphic->start.x = 0; graphic->start.y = 0; graphic->end.x = 800; graphic->end.y = 600;
-                graphic->fb = &nullfb; graphic->viewId = 30; graphic->layer = &layer;
+                graphic->pos.x = 0; graphic->pos.y = 0;
+                graphic->size.x = (float)selWin->size.x; graphic->size.y = (float)selWin->size.y;
+                graphic->start.x = 0; graphic->start.y = 0;
+                graphic->end.x = (float)selWin->size.x; graphic->end.y = (float)selWin->size.y;
+                graphic->fb = &selWin->fbo; graphic->viewId = selWin->viewId; graphic->layer = &layer;
                 SelectDraw(target, local, graphic, q);
             }
             q->publish();
             render++;
+
             cv_.notify_one();
             invalidate = 1;
         }
@@ -778,6 +972,25 @@ Generator KeyButton(HopStar* hoppy, KeyEvent* kv) {
 	SelectKey(hoppy->target, local, kv);
     hoppy->update = true;
     hoppy->invalidate = 1;
+    co_return (char*)0;
+}
+// ポップアップ用マウスイベント
+Generator PopupMouseButton(HopStar* hoppy, NativeWindow* nw, MouseEvent* mv) {
+    if (nw && nw->local) {
+        TreeElement* tree = (TreeElement*)get_mapy(hoppy->target->map, createString(hoppy->target, (char*)"main", 4, 1));
+        ((NewElement*)nw->local)->Mouse(hoppy->target, nw->local, mv, (NewLocal*)tree->elem);
+        hoppy->invalidate = 1;
+    }
+    co_return (char*)0;
+}
+// ポップアップ用キーイベント
+Generator PopupKeyButton(HopStar* hoppy, NativeWindow* nw, KeyEvent* kv) {
+    if (nw && nw->local) {
+        TreeElement* tree = (TreeElement*)get_mapy(hoppy->target->map, createString(hoppy->target, (char*)"main", 4, 1));
+        SelectKey(hoppy->target, (NewLocal*)tree->elem, kv);
+        hoppy->update = true;
+        hoppy->invalidate = 1;
+    }
     co_return (char*)0;
 }
 std::promise<void> initDone;
@@ -1143,6 +1356,59 @@ public:
                 queue = hoppy_->target->commandQueue;
                 gotNew = hoppy_->target->commandQueue->acquire(&layers, frameId, token);
             }
+            // === ポップアップコマンドを処理（描画前に順序保証） ===
+            {
+                std::vector<PopupCmd> cmds;
+                {
+                    std::lock_guard<std::mutex> lock(hoppy_->popupCmdMutex);
+                    cmds.swap(hoppy_->popupCmdQueue);
+                }
+                for (auto& cmd : cmds) {
+                    switch (cmd.type) {
+                    case PopupCmdType::Create: {
+                        // GoThread が確保済みの NativeWindow に SDL/FBO を埋める
+                        NativeWindow* nw = cmd.target;
+                        NativeWindow* parent = nullptr;
+                        if (!hoppy_->windows.empty()) parent = hoppy_->windows[0];
+                        nw->parent = parent;
+
+                        // SDL座標を計算
+                        int relX = cmd.x, relY = cmd.y;
+                        if (cmd.anchor == Anchor_Element && cmd.anchorElem) {
+                            relX = (int)(cmd.anchorElem->pos2.x + cmd.anchorElem->pos.x) + cmd.x;
+                            relY = (int)(cmd.anchorElem->pos2.y + cmd.anchorElem->pos.y + cmd.anchorElem->size.y) + cmd.y;
+                        }
+
+                        // SDL ウィンドウ作成をメインスレッドに委任
+                        SDLRequest req{};
+                        req.type = SDLRequest::CreateWindow;
+                        req.winType = cmd.winType;
+                        req.parentSDLWindow = parent ? parent->sdlWindow : nullptr;
+                        req.x = relX; req.y = relY; req.w = cmd.w; req.h = cmd.h;
+                        hoppy_->requestSDL(req);
+
+                        if (req.success) {
+                            nw->sdlWindow = req.resultSDLWindow;
+                            nw->nwh = req.resultNwh;
+                            // FBO作成（RenderThread上なので直接OK）
+                            nw->fbo = bgfx::createFrameBuffer(nw->nwh, (uint16_t)cmd.w, (uint16_t)cmd.h);
+                            nw->viewId = hoppy_->nextViewId++;
+                            hoppy_->windows.push_back(nw);
+                        } else {
+                            SDL_Log("createPopupWindow failed via RenderThread");
+                        }
+                        break;
+                    }
+                    case PopupCmdType::Resize:
+                        if (cmd.target) hoppy_->resizePopupWindow(cmd.target, cmd.newW, cmd.newH);
+                        break;
+                    case PopupCmdType::Destroy:
+                        if (cmd.target) hoppy_->destroyPopupWindow(cmd.target);
+                        break;
+                    }
+                }
+            }
+
             {
                 std::lock_guard<std::mutex> lock3(hoppy_->patternAtlas.m);
                 hoppy_->patternAtlas.reset();
@@ -1216,6 +1482,21 @@ public:
                         }
                     }
                 }
+                // ポップアップウィンドウの View 設定（描画データはメインqueueに統一）
+                for (auto* nw : hoppy_->windows) {
+                    if (nw->type == WindowType_Main) continue;
+                    if (!nw->visible) continue;
+                    if (!bgfx::isValid(nw->fbo)) continue;
+
+                    bgfx::setViewFrameBuffer(nw->viewId, nw->fbo);
+                    bgfx::setViewClear(nw->viewId, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, 0xFFFFFFFF, 1.0f, 0);
+                    bgfx::setViewRect(nw->viewId, 0, 0, (uint16_t)nw->size.x, (uint16_t)nw->size.y);
+                    float popupProj[16];
+                    bx::mtxOrtho(popupProj, 0.0f, (float)nw->size.x, (float)nw->size.y, 0.0f, 0.0f, 100.0f, 0.0f,
+                                 bgfx::getCaps()->homogeneousDepth);
+                    bgfx::setViewTransform(nw->viewId, NULL, popupProj);
+                }
+
                 frameN = bgfx::frame();
                 // bgfx::renderFrame() は init前の1回だけ。毎フレームは呼ばない
             }
@@ -1257,4 +1538,55 @@ ResolvedTexture myResolveForDraw(ThreadGC* thgc, ImageId imageId) {
 }
 StandaloneTextureInfo* mygetStandaloneTextureInfo(ThreadGC* thgc, ImageId imageId) {
     return thgc->hoppy->master.getStandaloneTexture(imageId);
+}
+// === ポップアップウィンドウ管理ラッパー（GoThread → RenderThread キュー経由） ===
+
+// ポップアップ生成: NativeWindow* を即座に返す（SDL/FBO は RenderThread が後で埋める）
+NativeWindow* myCreatePopupWindow(ThreadGC* thgc, NativeWindowType type, PopupAnchor anchor,
+                                   int x, int y, int w, int h, NewElement* anchorElem) {
+    // GoThread側でNativeWindowを先に確保（ポインタを即座に返せる）
+    NativeWindow* nw = new NativeWindow{};
+    nw->type = type;
+    nw->anchor = anchor;
+    nw->anchorX = x; nw->anchorY = y;
+    nw->size = { w, h };
+    nw->anchorElement = anchorElem;
+
+    PopupCmd cmd{};
+    cmd.type = PopupCmdType::Create;
+    cmd.winType = type;
+    cmd.anchor = anchor;
+    cmd.x = x; cmd.y = y; cmd.w = w; cmd.h = h;
+    cmd.anchorElem = anchorElem;
+    cmd.target = nw;  // 先に確保したNativeWindowを渡す
+    {
+        std::lock_guard<std::mutex> lock(thgc->hoppy->popupCmdMutex);
+        thgc->hoppy->popupCmdQueue.push_back(cmd);
+    }
+    return nw;  // 即座に返す。描画命令より先にRenderThreadが初期化する
+}
+
+// ポップアップリサイズ（キューに積むだけ、ブロックしない）
+void myResizePopupWindow(ThreadGC* thgc, NativeWindow* popup, int newW, int newH) {
+    if (!popup) return;
+    PopupCmd cmd{};
+    cmd.type = PopupCmdType::Resize;
+    cmd.target = popup;
+    cmd.newW = newW; cmd.newH = newH;
+    {
+        std::lock_guard<std::mutex> lock(thgc->hoppy->popupCmdMutex);
+        thgc->hoppy->popupCmdQueue.push_back(cmd);
+    }
+}
+
+// ポップアップ破棄（キューに積むだけ、ブロックしない）
+void myDestroyPopupWindow(ThreadGC* thgc, NativeWindow* popup) {
+    if (!popup) return;
+    PopupCmd cmd{};
+    cmd.type = PopupCmdType::Destroy;
+    cmd.target = popup;
+    {
+        std::lock_guard<std::mutex> lock(thgc->hoppy->popupCmdMutex);
+        thgc->hoppy->popupCmdQueue.push_back(cmd);
+    }
 }

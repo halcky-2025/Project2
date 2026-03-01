@@ -50,6 +50,8 @@ int ImageMouse(ThreadGC* thgc, NewElement* self, MouseEvent* e, NewLocal* local)
 				local->select.from = local->select.to = self;
 				local->select.fromid = local->select.toid = self->id;
 				local->select.m = local->select.n = 0;
+				Offscreen* seloff = FindOffscreen(self);
+				local->select.window = seloff ? seloff->window : nullptr;
 			}
 			else if (e->action == SDL_EVENT_MOUSE_BUTTON_UP || e->click) {
 				local->select.to = self;
@@ -74,17 +76,95 @@ int ImageMouse(ThreadGC* thgc, NewElement* self, MouseEvent* e, NewLocal* local)
 	return -1;
 }
 void initNewImage(ThreadGC* thgc, NewImage* im1) {
-	im1->type = LetterType::_Line;
+	im1->type = LetterType::_Image;
 	im1->next = im1;
 	im1->before = im1;
 	im1->parent = NULL;
 	im1->childend = NULL;
-	im1->orient = true;
-	im1->id = 0;
 	im1->Measure = NewImageMeasure;
 	im1->Draw = NewImageDraw;
 	im1->Mouse = ImageMouse;
 	im1->Key = ElementKey;
 	im1->DrawSelection = ImageDrawSelect;
 	im1->len = len1;
+}
+struct NewDrop : NewElement {
+	NewElement* childend2;
+};
+int DropMouse(ThreadGC* thgc, NewElement* self, MouseEvent* e, NewLocal* local) {
+	return 0;
+}
+int DropKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLocal* local) {
+	return 0;
+}
+void initNewDrop(ThreadGC* thgc, NewDrop* drop) {
+	drop->type = LetterType::_Drop;
+	drop->next = drop->before = drop;
+	drop->childend = (NewElement*)GC_alloc(thgc, CType::_EndC);
+	initNewEndElement(thgc, drop->childend, drop);
+	drop->offscreened = true;
+	drop->Measure = NewMeasureCall;
+	drop->Draw = NewDrawCall;
+	drop->Mouse = ElementMouse;
+	drop->Key = ElementKey;
+	drop->DrawSelection = ElementDrawSelect;
+	drop->len = len1;
+}
+struct NewDown : NewElement {
+	NewDrop* drop;
+};
+int DownMouse(ThreadGC* thgc, NewElement* self, MouseEvent* e, NewLocal* local) {
+	return 0;
+}
+int DownKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLocal* local) {
+	return 0;
+}
+void initNewDown(ThreadGC* thgc, NewDrop* down) {
+	down->type = LetterType::_Down;
+	down->next = down->before = down;
+	down->childend = (NewElement*)GC_alloc(thgc, CType::_EndC);
+	initNewEndElement(thgc, down->childend, down);
+	down->offscreened = true;
+	down->Measure = NewMeasureCall;
+	down->Draw = NewDrawCall;
+	down->Mouse = ElementMouse;
+	down->Key = ElementKey;
+	down->DrawSelection = ElementDrawSelect;
+	down->len = len1;
+}
+struct PopupWindow : NewElement {
+	NativeWindow* nw;
+	bool visible;
+};
+int PopupMouse(ThreadGC* thgc, NewElement* self, MouseEvent* e, NewLocal* local) {
+	return 0;
+}
+int PopupKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLocal* local) {
+	return 0;
+}
+void initPopup(ThreadGC* thgc, PopupWindow* popup, PopupAnchor pa, NewElement* elem) {
+	popup->type = LetterType::_Popup;
+	popup->next = popup->before = popup;
+	popup->childend = (NewElement*)GC_alloc(thgc, CType::_EndC);
+	initNewEndElement(thgc, popup->childend, popup);
+	popup->offscreened = true;
+	popup->Measure = NewMeasureCall;
+	popup->Draw = NewDrawCall;
+	popup->Mouse = ElementMouse;
+	popup->Key = PopupKey;
+	popup->DrawSelection = ElementDrawSelect;
+	popup->len = len1;
+	NativeWindow* p = myCreatePopupWindow(thgc, NativeWindowType::WindowType_Popup, pa, 0, 0, 200, 400, elem);
+	if (p) {
+		p->local = popup;
+		popup->nw = p;
+	}
+}
+// ポップアップをツリーに単騎挿入し、Offscreen の NativeWindow を設定する
+// 子要素はこの後に追加すること（子は popup->nw を継承する）
+void addPopupToTree(ThreadGC* thgc, NewLocal* local, NewElement* parent, PopupWindow* popup) {
+	NewElementAddLast(thgc, local, parent, popup);
+	if (popup->offscreen && popup->nw) {
+		popup->offscreen->window = popup->nw;
+	}
 }

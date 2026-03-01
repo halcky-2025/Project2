@@ -372,6 +372,20 @@ int main() {
 		HopStar* hoppy = new HopStar();
         hoppy->push_tab(magc);
 		magc->hoppy = hoppy;
+
+        // メインウィンドウを NativeWindow として管理
+        NativeWindow* mainWin = new NativeWindow();
+        mainWin->sdlWindow = window;
+        mainWin->size = { width, height };
+        mainWin->viewId = 30;
+        mainWin->type = WindowType_Main;
+        auto mainProps = SDL_GetWindowProperties(window);
+        mainWin->nwh = SDL_GetPointerProperty(mainProps, "SDL.window.win32.hwnd", nullptr);
+        hoppy->windows.push_back(mainWin);
+
+        // SDL User Event を登録（RenderThread → MainThread SDL委任用）
+        SDL_EVENT_SDL_REQUEST = SDL_RegisterEvents(1);
+
         RenderThread* render = new RenderThread(hoppy, window);
         render->start();
 		runGoThreadAsync(magc);
@@ -390,6 +404,24 @@ int main() {
                 Sleep(100);
             }*/
             while (SDL_PollEvent(&event)) {
+                // イベントのウィンドウIDからターゲットウィンドウを特定
+                SDL_WindowID eventWinId = 0;
+                if (event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP) {
+                    eventWinId = event.key.windowID;
+                } else if (event.type == SDL_EVENT_TEXT_INPUT) {
+                    eventWinId = event.text.windowID;
+                } else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN || event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+                    eventWinId = event.button.windowID;
+                } else if (event.type == SDL_EVENT_MOUSE_MOTION) {
+                    eventWinId = event.motion.windowID;
+                }
+
+                NativeWindow* targetNw = nullptr;
+                if (eventWinId != 0) {
+                    targetNw = hoppy->findWindowBySDLId(eventWinId);
+                }
+                bool isPopup = targetNw && targetNw->type != WindowType_Main && targetNw->local;
+
                 if (event.type == SDL_EVENT_KEY_DOWN) {
                     if (event.key.key == SDLK_KP_ENTER || event.key.key == SDLK_RETURN || event.key.key == SDLK_DELETE || event.key.key == SDLK_BACKSPACE ||
                         event.key.key == SDLK_LEFT || event.key.key == SDLK_RIGHT || event.key.key == SDLK_UP || event.key.key == SDLK_DOWN) {
@@ -403,9 +435,15 @@ int main() {
                         e.shift = (mod & SDL_KMOD_SHIFT);
                         e.ctrl = (mod & SDL_KMOD_CTRL);
                         e.alt = (mod & SDL_KMOD_ALT);
-                        auto ke = KeyButton(hoppy, &e);
-                        hoppy->target->queue->push(ke.coro);
-                        ke.coro = {};
+                        if (isPopup) {
+                            auto ke = PopupKeyButton(hoppy, targetNw, &e);
+                            hoppy->target->queue->push(ke.coro);
+                            ke.coro = {};
+                        } else {
+                            auto ke = KeyButton(hoppy, &e);
+                            hoppy->target->queue->push(ke.coro);
+                            ke.coro = {};
+                        }
                     }
                 }
                 else if (event.type == SDL_EVENT_TEXT_INPUT) {
@@ -421,14 +459,19 @@ int main() {
                         continue;
                     }
 
-                    // UTF-32 �� UTF-16
                     uint16_t utf16Buf[512];
                     size_t utf16len = utf32_to_utf16(utf32Buf, (size_t)utf32len, utf16Buf);
                     str = createString(hoppy->target, (char*)utf16Buf, utf16len, 2);
                     e.text = str;
-					auto ke = KeyButton(hoppy, &e);
-					hoppy->target->queue->push(ke.coro);
-					ke.coro = {};
+                    if (isPopup) {
+                        auto ke = PopupKeyButton(hoppy, targetNw, &e);
+                        hoppy->target->queue->push(ke.coro);
+                        ke.coro = {};
+                    } else {
+                        auto ke = KeyButton(hoppy, &e);
+                        hoppy->target->queue->push(ke.coro);
+                        ke.coro = {};
+                    }
 				}
 				else if (event.type == SDL_EVENT_QUIT) {
 					running = 0;
@@ -438,29 +481,90 @@ int main() {
 					e.x = event.button.x;
                     e.y = event.button.y;
                     e.action = event.type;
-					auto me = MouseButton(hoppy, &e);
-					hoppy->target->queue->push(me.coro);
-                    me.coro = {};
+                    e.window = targetNw;
+                    if (isPopup) {
+                        auto me = PopupMouseButton(hoppy, targetNw, &e);
+                        hoppy->target->queue->push(me.coro);
+                        me.coro = {};
+                    } else {
+                        auto me = MouseButton(hoppy, &e);
+                        hoppy->target->queue->push(me.coro);
+                        me.coro = {};
+                    }
                 }
                 else if (event.type == SDL_EVENT_MOUSE_MOTION) {
                     MouseEvent e = MouseEvent();
                     e.x = event.motion.x;
                     e.y = event.motion.y;
+                    e.window = targetNw;
                     SDL_MouseButtonFlags s = event.motion.state;
 
-                    // ���{�^����������Ă��邩
                     if (s & SDL_BUTTON_LMASK) {
                         e.click = true;
                     }
                     e.action = event.type;
-                    auto me = MouseButton(hoppy, &e);
-                    hoppy->target->queue->push(me.coro);
-                    me.coro = {};
+                    if (isPopup) {
+                        auto me = PopupMouseButton(hoppy, targetNw, &e);
+                        hoppy->target->queue->push(me.coro);
+                        me.coro = {};
+                    } else {
+                        auto me = MouseButton(hoppy, &e);
+                        hoppy->target->queue->push(me.coro);
+                        me.coro = {};
+                    }
                 }
                 else if (event.type == SDL_EVENT_MOUSE_WHEEL) {
-                    
+
                 }
                 else if (event.type == SDL_EVENT_WINDOW_RESIZED) {
+                }
+                // === RenderThread からの SDL 委任リクエスト ===
+                else if (event.type == SDL_EVENT_SDL_REQUEST) {
+                    auto* req = (SDLRequest*)event.user.data1;
+                    switch (req->type) {
+                    case SDLRequest::CreateWindow: {
+                        SDL_Window* sdlWin = nullptr;
+                        switch (req->winType) {
+                        case WindowType_Popup:
+                            sdlWin = SDL_CreatePopupWindow(req->parentSDLWindow,
+                                req->x, req->y, req->w, req->h, SDL_WINDOW_POPUP_MENU);
+                            break;
+                        case WindowType_AlwaysOnTop:
+                            sdlWin = SDL_CreateWindow("", req->w, req->h,
+                                SDL_WINDOW_BORDERLESS | SDL_WINDOW_ALWAYS_ON_TOP);
+                            if (sdlWin) SDL_SetWindowPosition(sdlWin, req->x, req->y);
+                            break;
+                        case WindowType_Modal:
+                            sdlWin = SDL_CreateWindow("", req->w, req->h, SDL_WINDOW_BORDERLESS);
+                            if (sdlWin && req->parentSDLWindow) {
+                                SDL_SetWindowParent(sdlWin, req->parentSDLWindow);
+                                SDL_SetWindowModal(sdlWin, true);
+                            }
+                            if (sdlWin) SDL_SetWindowPosition(sdlWin, req->x, req->y);
+                            break;
+                        default:
+                            break;
+                        }
+                        if (sdlWin) {
+                            auto props = SDL_GetWindowProperties(sdlWin);
+                            req->resultNwh = SDL_GetPointerProperty(props, "SDL.window.win32.hwnd", nullptr);
+                            SDL_ShowWindow(sdlWin);
+                        }
+                        req->resultSDLWindow = sdlWin;
+                        req->success = (sdlWin != nullptr);
+                        break;
+                    }
+                    case SDLRequest::ResizeWindow:
+                        req->success = SDL_SetWindowSize(req->target->sdlWindow, req->newW, req->newH);
+                        break;
+                    case SDLRequest::DestroyWindow:
+                        if (req->target && req->target->sdlWindow) {
+                            SDL_DestroyWindow(req->target->sdlWindow);
+                        }
+                        req->success = true;
+                        break;
+                    }
+                    req->done.set_value();
                 }
             }
         }
