@@ -1,4 +1,4 @@
-#define _CRT_SECURE_NO_WARNINGS
+﻿#define _CRT_SECURE_NO_WARNINGS
 #include <torch/torch.h>
 #include <iostream>
 #include <windows.h>
@@ -377,11 +377,11 @@ int main() {
         NativeWindow* mainWin = new NativeWindow();
         mainWin->sdlWindow = window;
         mainWin->size = { width, height };
-        mainWin->viewId = 30;
+        mainWin->viewId = hoppy->basicViewId++;
         mainWin->type = WindowType_Main;
         auto mainProps = SDL_GetWindowProperties(window);
         mainWin->nwh = SDL_GetPointerProperty(mainProps, "SDL.window.win32.hwnd", nullptr);
-        hoppy->windows.push_back(mainWin);
+        magc->windows.push_back(mainWin);
 
         // SDL User Event を登録（RenderThread → MainThread SDL委任用）
         SDL_EVENT_SDL_REQUEST = SDL_RegisterEvents(1);
@@ -524,18 +524,19 @@ int main() {
                     switch (req->type) {
                     case SDLRequest::CreateWindow: {
                         SDL_Window* sdlWin = nullptr;
+                        SDL_WindowFlags hideFlag = req->visible ? 0 : SDL_WINDOW_HIDDEN;
                         switch (req->winType) {
                         case WindowType_Popup:
                             sdlWin = SDL_CreatePopupWindow(req->parentSDLWindow,
-                                req->x, req->y, req->w, req->h, SDL_WINDOW_POPUP_MENU);
+                                req->x, req->y, req->w, req->h, SDL_WINDOW_POPUP_MENU | hideFlag);
                             break;
                         case WindowType_AlwaysOnTop:
                             sdlWin = SDL_CreateWindow("", req->w, req->h,
-                                SDL_WINDOW_BORDERLESS | SDL_WINDOW_ALWAYS_ON_TOP);
+                                SDL_WINDOW_BORDERLESS | SDL_WINDOW_ALWAYS_ON_TOP | hideFlag);
                             if (sdlWin) SDL_SetWindowPosition(sdlWin, req->x, req->y);
                             break;
                         case WindowType_Modal:
-                            sdlWin = SDL_CreateWindow("", req->w, req->h, SDL_WINDOW_BORDERLESS);
+                            sdlWin = SDL_CreateWindow("", req->w, req->h, SDL_WINDOW_BORDERLESS | hideFlag);
                             if (sdlWin && req->parentSDLWindow) {
                                 SDL_SetWindowParent(sdlWin, req->parentSDLWindow);
                                 SDL_SetWindowModal(sdlWin, true);
@@ -548,7 +549,7 @@ int main() {
                         if (sdlWin) {
                             auto props = SDL_GetWindowProperties(sdlWin);
                             req->resultNwh = SDL_GetPointerProperty(props, "SDL.window.win32.hwnd", nullptr);
-                            SDL_ShowWindow(sdlWin);
+                            if (req->visible) SDL_ShowWindow(sdlWin);
                         }
                         req->resultSDLWindow = sdlWin;
                         req->success = (sdlWin != nullptr);
@@ -562,6 +563,21 @@ int main() {
                             SDL_DestroyWindow(req->target->sdlWindow);
                         }
                         req->success = true;
+                        break;
+                    case SDLRequest::ShowWindow:
+                        if (req->target && req->target->sdlWindow) {
+                            req->success = SDL_ShowWindow(req->target->sdlWindow);
+                        }
+                        break;
+                    case SDLRequest::HideWindow:
+                        if (req->target && req->target->sdlWindow) {
+                            req->success = SDL_HideWindow(req->target->sdlWindow);
+                        }
+                        break;
+                    case SDLRequest::MoveWindow:
+                        if (req->target && req->target->sdlWindow) {
+                            req->success = SDL_SetWindowPosition(req->target->sdlWindow, req->x, req->y);
+                        }
                         break;
                     }
                     req->done.set_value();

@@ -8,8 +8,7 @@ enum DrawCommandType {
 	DelFBO = -2, FBO = -1, Fill = 0, Gradient = 1, Stripe = 2, Checker = 3, GradientChecker = 4,
 	Image = 5, PageCurl = 6, RawImage = 7, End = 8
 };
-typedef struct NewElement;
-typedef struct DrawCommand;
+struct NewElement;
 struct DrawCommand;
 struct RectDrawCommand;
 struct Background;
@@ -179,6 +178,9 @@ struct NativeWindow {
     bool visible = true;
 };
 
+void myShowWindow(ThreadGC* thgc, NativeWindow* nw);
+void myHideWindow(ThreadGC* thgc, NativeWindow* nw);
+void myMoveWindow(ThreadGC* thgc, NativeWindow* nw, int x, int y);
 struct PointF {
 	float x;
 	float y;
@@ -223,6 +225,7 @@ struct NewGraphic {
 	bgfx::FrameBufferHandle* fb;
 	PointI* fbsize;
 	int viewId = 0;
+	int viewId2 = 0;
 	ExtendedRenderGroup* group;
 };
 struct NewEndElement {
@@ -238,7 +241,25 @@ struct NewEndElement {
 int len1(NewElement* elem) {
 	return 1;
 }
-struct NewElement;
+enum class SIType {
+	None, StringValue, IntValue
+}; 
+typedef void (*SIValChangeCallback)(NewElement*, int);
+struct SIVal {
+	SIType type;
+	union {
+		int64_t n;
+		String* s;
+	};
+};
+struct SIValues {
+	SIVal values[7];
+	SIValChangeCallback valueCallbacks[7];
+};
+void SetSIValue(NewElement* elem, SIValues* values, int n, SIVal val) {
+	values->values[n] = val;
+	if (values->valueCallbacks[0] != NULL) values->valueCallbacks[n](elem, n);
+}
 struct NewLocal;
 struct NewElement : NewEndElement {
 	float margins[4];
@@ -259,6 +280,7 @@ struct NewElement : NewEndElement {
 	FontId font;
 	bool offscreened = false;
 	Offscreen* offscreen;
+	SIValues* values;
 	bool editable;
 };
 enum DirtyType {
@@ -928,7 +950,7 @@ void NewDrawCall(ThreadGC* thgc, NewElement* elem, NewGraphic* g, NewLocal* loca
 		pro = fmod(pro, 1.0f);
 		auto info2 = mygetStandaloneTextureInfo(thgc, elem->background->tex1);*/
 		g = new NewGraphic{g->layer, elem, elem, {0,0}, {elem->size2.x, elem->size2.y}, {0,0}, {0,0},
-			elem->offscreen->ping ? elem->offscreen->imPong : elem->offscreen->imPing,  &info->fbo,  &info->size, elem->offscreen->viewId = --viewId, elem->offscreen->group };
+			elem->offscreen->ping ? elem->offscreen->imPong : elem->offscreen->imPing,  &info->fbo,  &info->size, elem->offscreen->viewId = g->viewId2, 0, elem->offscreen->group };
 		elem->offscreen->ping = !elem->offscreen->ping;
 		bgfx::TextureHandle* tex1, * tex2;
 		if (isValidImageId(elem->background->tex1)) {
@@ -2389,7 +2411,8 @@ int LetterKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLo
 }
 // othelem.h で使うポップアップ関数の前方宣言
 NativeWindow* myCreatePopupWindow(ThreadGC* thgc, NativeWindowType type, PopupAnchor anchor,
-                                   int x, int y, int w, int h, NewElement* anchorElem);
+                                   int x, int y, int w, int h, NewElement* anchorElem,
+                                   bool visible = true);
 void myResizePopupWindow(ThreadGC* thgc, NativeWindow* popup, int newW, int newH);
 void myDestroyPopupWindow(ThreadGC* thgc, NativeWindow* popup);
 #include "othelem.h"

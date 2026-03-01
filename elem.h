@@ -279,7 +279,8 @@ void drawRightScrollBar(LayerInfo* layer,
 
 // ポップアップウィンドウ管理ラッパー（GoThread → RenderThread キュー経由）
 NativeWindow* myCreatePopupWindow(ThreadGC* thgc, NativeWindowType type, PopupAnchor anchor,
-                                   int x, int y, int w, int h, NewElement* anchorElem);
+                                   int x, int y, int w, int h, NewElement* anchorElem,
+                                   bool visible);
 void myResizePopupWindow(ThreadGC* thgc, NativeWindow* popup, int newW, int newH);
 void myDestroyPopupWindow(ThreadGC* thgc, NativeWindow* popup);
 
