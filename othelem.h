@@ -54,9 +54,13 @@ int ImageMouse(ThreadGC* thgc, NewElement* self, MouseEvent* e, NewLocal* local)
 				local->select.window = seloff ? seloff->window : nullptr;
 			}
 			else if (e->action == SDL_EVENT_MOUSE_BUTTON_UP || e->click) {
-				local->select.to = self;
-				local->select.toid = self->id;
-				local->select.n = 0;
+				Offscreen* tooff = FindOffscreen(self);
+				NativeWindow* toWin = tooff ? tooff->window : nullptr;
+				if (toWin == local->select.window) {
+					local->select.to = self;
+					local->select.toid = self->id;
+					local->select.n = 0;
+				}
 			}
 
 			if (self->BackMouseDown != NULL) {
