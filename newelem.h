@@ -1163,14 +1163,11 @@ void SelectDraw(ThreadGC* thgc, NewLocal* local, NewGraphic* g, RenderCommandQue
 		local->select.s = local->select.n;
 		local->select.e = local->select.m;
 	}
-	// endが別ウィンドウならend自体のwindowを事前チェック
-	Offscreen* endOff = FindOffscreen(local->select.end);
-	bool endInWindow = !endOff || endOff->window == local->select.window;
 	NewElement* start = local->select.start;
 	int s = local->select.s;
 	for (;;) {
 		if (start == local->select.end) {
-			if (endInWindow) start->DrawSelection(thgc, local, start, s, local->select.e, g, q);
+			start->DrawSelection(thgc, local, start, s, local->select.e, g, q);
 			break;
 		}
 		start->DrawSelection(thgc, local, start, s, start->len(start), g, q);
@@ -1357,9 +1354,6 @@ void SelectKey(ThreadGC* thgc, NewLocal* local, KeyEvent* e) {
 		local->select.s = local->select.n;
 		local->select.e = local->select.m;
 	}
-	// endが別ウィンドウならend自体のwindowを事前チェック
-	Offscreen* endOff = FindOffscreen(local->select.end);
-	bool endInWindow = !endOff || endOff->window == local->select.window;
 	NewElement* start = local->select.start;
 	std::vector<NewElement*> vec;
 	for (; start != NULL; start = start->parent) vec.push_back(start);
@@ -1381,7 +1375,7 @@ void SelectKey(ThreadGC* thgc, NewLocal* local, KeyEvent* e) {
 	int s = local->select.s;
 	for (;;) {
 		if (start == local->select.end) {
-			if (endInWindow) start->Key(thgc, start, s, local->select.e, e, local);
+			start->Key(thgc, start, s, local->select.e, e, local);
 			break;
 		}
 		NewElement* next = start->next;
@@ -1913,9 +1907,13 @@ int LetterMouse(ThreadGC* thgc, NewElement* self, MouseEvent* e, NewLocal* local
 					local->select.window = seloff ? seloff->window : nullptr;
 				}
 				else if (e->action == SDL_EVENT_MOUSE_BUTTON_UP || e->click) {
-					local->select.to = self;
-					local->select.toid = self->id;
-					local->select.n = rs->start + n;
+					Offscreen* tooff = FindOffscreen(self);
+					NativeWindow* toWin = tooff ? tooff->window : nullptr;
+					if (toWin == local->select.window) {
+						local->select.to = self;
+						local->select.toid = self->id;
+						local->select.n = rs->start + n;
+					}
 				}
 
 				if (self->BackMouseDown != NULL) {
