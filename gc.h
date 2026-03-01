@@ -216,6 +216,7 @@ class RenderCommandQueue;
 RenderCommandQueue* createRCQ();
 class HopStar;
 class SqlPool;
+struct NativeWindow;
 typedef struct Map Map;
 typedef struct String String;
 CoroutineQueue* queuefirst(ThreadGC* thgc);
@@ -251,7 +252,7 @@ char* wait_handle(ThreadGC* thgc, char* raw) {
 }
 enum CType {
 	_Struct,
-	_List, _String, _Element, _FRect, _LetterC, _Detection, _LocalC, _Select, _State, _LineC, _VLineC, _ImageC, _Background,
+	_List, _String, _Element, _FRect, _LetterC, _Detection, _LocalC, _PopupC, _Select, _State, _LineC, _VLineC, _ImageC, _DropC, _DownC, _Background, _SIValues, _SIVal,
     _MapData, _Map, _KV, _EndC, _CloneElemC, _HoppyWindow, _ColumnMeta, _Table, _Column, _TreeElement, _DivC, _SheetC,
     _MemTable, _MouseEvent, _KeyEvent, _MemFunc, _FuncType, _Offscreen, _OffscreenEnd,
     _ATSSpan, _StyleSpan, _RenderSpan,
@@ -539,6 +540,8 @@ struct ThreadGC {
     bool waitgc = false;
     Map* map;
     int staticid = -1;
+    std::vector<NativeWindow*> windows;  // このタブが所有するウィンドウ (windows[0] = メイン)
+    std::vector<NativeWindow*> openPopups;  // 現在開いているポップアップ
 };
 
 // =============================================================================
