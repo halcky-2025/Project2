@@ -208,12 +208,14 @@ struct LayerInfo {
     }
 
     void pushFill(float x, float y, float w, float h,
-        float radius, float borderWidth, float aaPixels,
+        float radiusTL, float radiusTR, float radiusBR, float radiusBL,
+        float borderWidth, float aaPixels,
         uint32_t fillColor, uint32_t borderColor,
         float shadowX, float shadowY, float shadowBlur,
         uint32_t shadowColor, float zIndex,
         bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId,
-        float blendMode = 0.0f)
+        float blendMode = 0.0f,
+        float cornerPattern = 0.0f)
     {
         UnifiedDrawCommand* cmd = new UnifiedDrawCommand();
         cmd->type = DrawCommandType::Fill;
@@ -222,7 +224,11 @@ struct LayerInfo {
         cmd->viewId = viewId;
         cmd->x = x; cmd->y = y;
         cmd->width = w; cmd->height = h;
-        cmd->radius = radius;
+        cmd->radiusTL = radiusTL;
+        cmd->radiusTR = radiusTR;
+        cmd->radiusBR = radiusBR;
+        cmd->radiusBL = radiusBL;
+        cmd->cornerPattern = cornerPattern;
         cmd->aa = aaPixels;
         cmd->shadowX = shadowX; cmd->shadowY = shadowY;
         cmd->shadowBlur = shadowBlur;

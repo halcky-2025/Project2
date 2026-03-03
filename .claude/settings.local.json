@@ -160,7 +160,13 @@
       "Bash(\"/c/Program Files/Microsoft Visual Studio/18/Community/MSBuild/Current/Bin/amd64/MSBuild.exe\" \"C:/Users/hayah/source/repos/Project2/Project2.sln\" -p:Configuration=Debug -p:Platform=x64 -t:Build)",
       "Bash(\"/c/Program Files/Microsoft Visual Studio/18/Community/MSBuild/Current/Bin/amd64/MSBuild.exe\" \"C:/Users/hayah/source/repos/Project2/Project2.sln\" -p:Configuration=Debug -p:Platform=x64 -t:Rebuild)",
       "Bash(tasklist.exe:*)",
-      "Bash(taskkill.exe:*)"
+      "Bash(taskkill.exe:*)",
+      "Bash(\"/c/Program Files \\(x86\\)/Microsoft Visual Studio/Installer/vswhere.exe\" -latest -property installationPath)",
+      "Bash(\"/c/Program Files/Microsoft Visual Studio/18/Community/MSBuild/Current/Bin/MSBuild.exe\" /c/Users/hayah/source/repos/Project2/Project2.sln /p:Configuration=Debug /p:Platform=x64 /verbosity:minimal)",
+      "Bash(MSBUILD=\"/c/Program Files/Microsoft Visual Studio/18/Community/MSBuild/Current/Bin/MSBuild.exe\")",
+      "Bash(\"$MSBUILD\" \"C:\\\\Users\\\\hayah\\\\source\\\\repos\\\\Project2\\\\Project2.sln\" //p:Configuration=Debug //p:Platform=x64 //verbosity:minimal)",
+      "Bash(\"/c/Program Files/Microsoft Visual Studio/18/Community/MSBuild/Current/Bin/amd64/MSBuild.exe\" \"C:\\\\Users\\\\hayah\\\\source\\\\repos\\\\Project2\\\\Project2.sln\" //p:Configuration=Debug //p:Platform=x64 //verbosity:minimal)",
+      "Bash(.shaderc.exe -f fs_unite2.sc -o fs_unite2.bin --type fragment --platform windows -p s_5_0 -i . --varyingdef v_unite2.def.sc)"
     ]
   }
 }

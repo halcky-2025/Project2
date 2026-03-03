@@ -2169,6 +2169,14 @@ public:
     std::unordered_map<ImageId, GlyphInfo> imageMap_;
 
     bgfx::TextureHandle nulltex = BGFX_INVALID_HANDLE;
+
+    // FontIdからフォント高さを取得
+    int getFontHeight(FontId font) {
+        std::lock_guard lock(mutex_);
+        auto it = fonts_.find(font);
+        if (it == fonts_.end() || !it->second.font) return 0;
+        return TTF_GetFontHeight(it->second.font);
+    }
 };
 
 class RenderGroupManager {

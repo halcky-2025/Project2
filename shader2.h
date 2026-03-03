@@ -54,6 +54,17 @@ struct DrawCommand {
     bgfx::TextureHandle* texture = nullptr;
     bgfx::TextureHandle* texture2 = nullptr;
     float blendMode = 0.0f; // 0=premultiplied, 1=overwrite
+    // Corner pattern (u_param1.z):
+    //   0: Normal (全辺あり)
+    //   1: 下辺なし (タブ上部形状)
+    //   2: 上辺なし
+    //   3: 左辺なし
+    //   4: 右辺なし
+    //   5: 下辺+右辺なし (左上角のみ)
+    //   6: 下辺+左辺なし (右上角のみ)
+    //   7: 上辺+右辺なし (左下角のみ)
+    //   8: 上辺+左辺なし (右下角のみ)
+    float cornerPattern = 0.0f;
 };
 
 struct UnifiedDrawCommand : DrawCommand {
@@ -75,13 +86,19 @@ struct UnifiedDrawCommand : DrawCommand {
     // i_data2
     float scrollX;      // Pattern: scrollX, Image: uvMax.x, PageCurl: uvSize.x
     float scrollY;      // Pattern: scrollY, Image: uvMax.y, PageCurl: uvSize.y
-    float radius;       // Pattern/Image: radius, PageCurl: progress
+    float radius;       // PageCurl専用: progress (他モードでは未使用)
     float aa;
+
+    // per-corner radius (packInstanceでdata2[2..3]にhalf16パック)
+    float radiusTL = 0.0f;
+    float radiusTR = 0.0f;
+    float radiusBR = 0.0f;
+    float radiusBL = 0.0f;
 
     // i_data3
     float shadowX;
     float shadowY;
-    float shadowBlur;
+    float shadowBlur;  // packInstanceでaaと共にhalf16パック → data3[2]
     float borderWidth;
 
     // i_data4 (colors)
@@ -95,14 +112,16 @@ struct UnifiedDrawCommand : DrawCommand {
 // ============================================================
 // インスタンスデータ（80バイト）
 // ============================================================
-// 新レイアウト:
+// レイアウト:
 // data0: x, y, width, height
-// data1: 
+// data1:
 //   Pattern: colorCount_dataOffset(packed), (unused), angle, (unused)
 //   Image:   (unused), (unused), uvMin.x, uvMin.y
 //   PageCurl: uvMin(packed), backUVMin(packed), curlAngle, curlRadius
-// data2: scrollX/uvMax.x/uvSize.x, scrollY/uvMax.y/uvSize.y, radius/progress, aa
-// data3: shadowX, shadowY, shadowBlur, borderWidth
+// data2: scrollX/uvMax.x/uvSize.x, scrollY/uvMax.y/uvSize.y,
+//   Fill/Image/Pattern: pack(radiusTL,radiusTR)(half16×2), pack(radiusBR,radiusBL)(half16×2)
+//   PageCurl: progress(float32), aa(float32)
+// data3: shadowX, shadowY, pack(shadowBlur,aa)(half16×2), borderWidth
 // data4: shadowColor(packed), fillColor(packed), borderColor(packed), zIndex
 
 struct alignas(16) UnifiedInstanceData {
@@ -129,6 +148,26 @@ inline float packUint16x2(uint16_t hi, uint16_t lo) {
 inline float packColorAsFloat(uint32_t color) {
     float result;
     std::memcpy(&result, &color, 4);
+    return result;
+}
+
+// float → half (IEEE 754 binary16) 変換
+inline uint16_t floatToHalf(float value) {
+    uint32_t f;
+    std::memcpy(&f, &value, 4);
+    uint32_t sign = (f >> 16) & 0x8000;
+    int32_t exponent = ((f >> 23) & 0xFF) - 127 + 15;
+    uint32_t mantissa = f & 0x7FFFFF;
+    if (exponent <= 0) return static_cast<uint16_t>(sign); // underflow → 0
+    if (exponent >= 31) return static_cast<uint16_t>(sign | 0x7C00); // overflow → inf
+    return static_cast<uint16_t>(sign | (exponent << 10) | (mantissa >> 13));
+}
+
+// half16 × 2 を 1 float にpack
+inline float packHalf2x16(float a, float b) {
+    uint32_t packed = (uint32_t(floatToHalf(a)) << 16) | uint32_t(floatToHalf(b));
+    float result;
+    std::memcpy(&result, &packed, 4);
     return result;
 }
 
@@ -178,13 +217,20 @@ inline void packInstance(UnifiedDrawCommand& cmd, UnifiedInstanceData& out, Draw
     // i_data2: 共通 (意味はモードによって異なる)
     out.data2[0] = cmd.scrollX;    // scrollX / uvMax.x / uvSize.x
     out.data2[1] = cmd.scrollY;    // scrollY / uvMax.y / uvSize.y
-    out.data2[2] = cmd.radius;     // radius / progress
-    out.data2[3] = cmd.aa;
+    if (type == DrawCommandType::PageCurl) {
+        // PageCurl: progress(float32) + aa(float32) をそのまま
+        out.data2[2] = cmd.radius;     // progress
+        out.data2[3] = cmd.aa;
+    } else {
+        // Fill/Image/Pattern: per-corner radius (half16 × 2) × 2
+        out.data2[2] = packHalf2x16(cmd.radiusTL, cmd.radiusTR);
+        out.data2[3] = packHalf2x16(cmd.radiusBR, cmd.radiusBL);
+    }
 
     // i_data3: 共通
     out.data3[0] = cmd.shadowX;
     out.data3[1] = cmd.shadowY;
-    out.data3[2] = cmd.shadowBlur;
+    out.data3[2] = packHalf2x16(cmd.shadowBlur, cmd.aa);  // pack(shadowBlur, aa)
     out.data3[3] = cmd.borderWidth;
 
     // i_data4: 共通
@@ -243,7 +289,8 @@ inline void drawUnifiedBatch(
 
     float mode = static_cast<float>(batchType);
     float blendMode = sorted[0]->blendMode;
-    float modeVec[4] = { mode, blendMode, 0.0f, 0.0f };
+    float cornerPattern = sorted[0]->cornerPattern;
+    float modeVec[4] = { mode, blendMode, cornerPattern, 0.0f };
     bgfx::setUniform(resources.param1Uniform, modeVec);
 
     bgfx::setInstanceDataBuffer(&idb);

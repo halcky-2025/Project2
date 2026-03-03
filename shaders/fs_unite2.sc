@@ -16,13 +16,46 @@ SAMPLER2D(s_widths, 1);
 #define MODE_RAW_IMAGE        7.0
 #define MODE_END              8.0
 
+// 旧: 均一radius版（PageCurl影用に残す）
 float sdRoundRect(vec2 p, vec2 b, float r)
 {
     vec2 q = abs(p) - (b - vec2(r, r));
     return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;
 }
 
-uniform vec4 u_param1; 
+// per-corner radius版 (Inigo Quilez)
+// r = vec4(topRight, bottomRight, bottomLeft, topLeft)
+float sdRoundBox(vec2 p, vec2 b, vec4 r)
+{
+    r.xy = (p.x > 0.0) ? r.xy : r.wz;
+    r.x  = (p.y > 0.0) ? r.x  : r.y;
+    float rr = r.x;
+    vec2 q = abs(p) - (b - vec2(rr, rr));
+    return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - rr;
+}
+
+// half16 アンパック (floatBitsToUint の上位/下位16bit)
+float unpackHalfHi(uint packed) {
+    uint h = (packed >> 16u) & 0xFFFFu;
+    uint sign = (h & 0x8000u) << 16u;
+    uint exponent = (h >> 10u) & 0x1Fu;
+    uint mantissa = h & 0x3FFu;
+    if (exponent == 0u) return 0.0;
+    uint f = sign | ((exponent + 112u) << 23u) | (mantissa << 13u);
+    return uintBitsToFloat(f);
+}
+
+float unpackHalfLo(uint packed) {
+    uint h = packed & 0xFFFFu;
+    uint sign = (h & 0x8000u) << 16u;
+    uint exponent = (h >> 10u) & 0x1Fu;
+    uint mantissa = h & 0x3FFu;
+    if (exponent == 0u) return 0.0;
+    uint f = sign | ((exponent + 112u) << 23u) | (mantissa << 13u);
+    return uintBitsToFloat(f);
+}
+
+uniform vec4 u_param1;
 
 void main()
 {
@@ -39,17 +72,20 @@ void main()
     float curlRadius = v_patternParams.w;
     
     // v_scroll:
-    //   パターンモード: scrollX, scrollY, radius, aa
-    //   Imageモード:    uvMax.x, uvMax.y, radius, aa
-    //   ページめくり:   uvSize.x, uvSize.y, progress, aa
+    //   Fill/Image/Pattern: scrollX, scrollY, pack(rTL,rTR), pack(rBR,rBL)
+    //   PageCurl: uvSize.x, uvSize.y, progress, aa
     vec2 scrollXY = v_scroll.xy;
-    float radius = v_scroll.z;
-    float aa = v_scroll.w;
-    
-    // v_shadowBorder: shadowX, shadowY, shadowBlur, borderWidth
+
+    // v_shadowBorder: shadowX, shadowY, pack(shadowBlur,aa), borderWidth
     vec2 shadowOffset = v_shadowBorder.xy;
-    float shadowBlur = v_shadowBorder.z;
+    uint sbPacked = floatBitsToUint(v_shadowBorder.z);
+    float shadowBlur = unpackHalfHi(sbPacked);
+    float aa = unpackHalfLo(sbPacked);
     float borderWidth = v_shadowBorder.w;
+
+    // per-corner radius アンパック (PageCurl以外)
+    vec4 cornerRadii = vec4(0.0, 0.0, 0.0, 0.0); // TR, BR, BL, TL
+    float radius = 0.0;  // PageCurl用 progress / 影の均一radius用
     
     // v_uvRange:
     //   .xy: colorCount, dataOffset (パターン) / uvMin.xy (PageCurl、整数)
@@ -323,8 +359,8 @@ void main()
         float curlRadiusRaw = curlRadius;            // v_patternParams.w
         
         vec2 uvSize = scrollXY;                      // v_scroll.xy
-        float progress = clamp(radius, 0.0, 1.0);    // v_scroll.z
-        // aa = v_scroll.w (共通)
+        float progress = clamp(v_scroll.z, 0.0, 1.0); // v_scroll.z (PageCurlはfloat32のまま)
+        // aa は v_shadowBorder.z からhalf16アンパック済み
         
         bool isSpread = curlRadiusRaw < 0.0;
         
@@ -412,37 +448,269 @@ void main()
     }
 
     // ============================================================
+    // per-corner radius アンパック
+    // ============================================================
+
+    if (mode < MODE_PAGE_CURL) {
+        // Fill/Image/Pattern: v_scroll.zw に half16 パックされた4角radius
+        uint rPack0 = floatBitsToUint(v_scroll.z);
+        uint rPack1 = floatBitsToUint(v_scroll.w);
+        float rTL = unpackHalfHi(rPack0);
+        float rTR = unpackHalfLo(rPack0);
+        float rBR = unpackHalfHi(rPack1);
+        float rBL = unpackHalfLo(rPack1);
+        cornerRadii = vec4(rTR, rBR, rBL, rTL);  // sdRoundBox の引数順
+    }
+    // PageCurl: cornerRadii は vec4(0) のまま（角丸なし）
+
+    // ============================================================
     // SDF計算
     // ============================================================
-    
+
     vec2 halfSize = resolution * 0.5;
     vec2 localPos = p - halfSize;
-    
-    float rSafe = min(max(radius, 0.0), min(halfSize.x, halfSize.y));
+    float maxR = min(halfSize.x, halfSize.y);
+
+    // 各角のradiusをクランプ
+    vec4 rSafe = min(max(cornerRadii, 0.0), vec4(maxR, maxR, maxR, maxR));
     float aaSafe = max(aa, 0.001);
     float shadowBlurSafe = max(shadowBlur, 0.001);
-    
+
     // ============================================================
-    // Shadow
+    // Corner pattern: SDF拡張 + 凹角（concave corner）
     // ============================================================
-    
-    vec2 shadowPos = localPos - shadowOffset;
-    float shadowDist = sdRoundRect(shadowPos, halfSize, rSafe);
+    // cornerPattern (u_param1.z):
+    //   0: 通常 (全辺あり)
+    //   1: 下辺なし (タブ上部)     2: 上辺なし
+    //   3: 左辺なし               4: 右辺なし
+    //   5: 下+右辺なし (左上角のみ) 6: 下+左辺なし (右上角のみ)
+    //   7: 上+右辺なし (左下角のみ) 8: 上+左辺なし (右下角のみ)
+
+    float cornerPattern = u_param1.z;
+
+    // 凹角の距離 (大きい正の値 = 寄与なし)
+    float concaveFill = 1000.0;
+    float concaveShadow = 1000.0;
+    float concaveInner = 1000.0;
+
+    // 内側SDF拡張 (オープン辺のボーダーだけ消す)
+    vec2 innerSdfExt = vec2(0.0, 0.0);
+    vec2 innerSdfShift = vec2(0.0, 0.0);
+
+    if (cornerPattern > 0.5) {
+        // 凹角 (concave corners): 四分円SDFのユニオン
+        vec2 cTL = vec2(-halfSize.x, -halfSize.y);
+        vec2 cTR = vec2( halfSize.x, -halfSize.y);
+        vec2 cBL = vec2(-halfSize.x,  halfSize.y);
+        vec2 cBR = vec2( halfSize.x,  halfSize.y);
+
+        // sdRoundBox の Y反転マッピング:
+        //   rSafe.x (packed rTR) → 画面右下
+        //   rSafe.y (packed rBR) → 画面右上
+        //   rSafe.z (packed rBL) → 画面左上
+        //   rSafe.w (packed rTL) → 画面左下
+        // したがって画面上の角に対応する凹角半径:
+        float scrTL = rSafe.z;  // 画面左上の半径
+        float scrTR = rSafe.y;  // 画面右上の半径
+        float scrBL = rSafe.w;  // 画面左下の半径
+        float scrBR = rSafe.x;  // 画面右下の半径
+
+        vec2 sLocal = localPos - shadowOffset;
+        float hx = halfSize.x;
+        float hy = halfSize.y;
+        float bExt = borderWidth + aaSafe * 2.0;
+
+        if (cornerPattern < 1.5) {
+            // 1: 下辺なし → 画面BL,BR が凹角
+            rSafe.w = 0.0;  // 画面BL凸なし
+            rSafe.x = 0.0;  // 画面BR凸なし
+            innerSdfExt = vec2(0.0, bExt);  innerSdfShift = vec2(0.0, bExt);
+            float blR = max(localPos.x + hx, hy - localPos.y);
+            float brR = max(hx - localPos.x, hy - localPos.y);
+            concaveFill = min(
+                max(length(localPos - cBL) - scrBL, blR),
+                max(length(localPos - cBR) - scrBR, brR));
+            float blSR = max(sLocal.x + hx, hy - sLocal.y);
+            float brSR = max(hx - sLocal.x, hy - sLocal.y);
+            concaveShadow = min(
+                max(length(sLocal - cBL) - scrBL, blSR),
+                max(length(sLocal - cBR) - scrBR, brSR));
+            concaveInner = min(
+                max(length(localPos - cBL) - max(scrBL - borderWidth, 0.0), blR),
+                max(length(localPos - cBR) - max(scrBR - borderWidth, 0.0), brR));
+        } else if (cornerPattern < 2.5) {
+            // 2: 上辺なし → 画面TL,TR が凹角
+            rSafe.z = 0.0;  // 画面TL凸なし
+            rSafe.y = 0.0;  // 画面TR凸なし
+            innerSdfExt = vec2(0.0, bExt);  innerSdfShift = vec2(0.0, -bExt);
+            float tlR = max(localPos.x + hx, -localPos.y - hy);
+            float trR = max(hx - localPos.x, -localPos.y - hy);
+            concaveFill = min(
+                max(length(localPos - cTL) - scrTL, tlR),
+                max(length(localPos - cTR) - scrTR, trR));
+            float tlSR = max(sLocal.x + hx, -sLocal.y - hy);
+            float trSR = max(hx - sLocal.x, -sLocal.y - hy);
+            concaveShadow = min(
+                max(length(sLocal - cTL) - scrTL, tlSR),
+                max(length(sLocal - cTR) - scrTR, trSR));
+            concaveInner = min(
+                max(length(localPos - cTL) - max(scrTL - borderWidth, 0.0), tlR),
+                max(length(localPos - cTR) - max(scrTR - borderWidth, 0.0), trR));
+        } else if (cornerPattern < 3.5) {
+            // 3: 左辺なし → 画面TL,BL が凹角
+            rSafe.z = 0.0;  // 画面TL凸なし
+            rSafe.w = 0.0;  // 画面BL凸なし
+            innerSdfExt = vec2(bExt, 0.0);  innerSdfShift = vec2(-bExt, 0.0);
+            float tlR = max(localPos.x + hx, -localPos.y - hy);
+            float blR = max(localPos.x + hx, localPos.y - hy);
+            concaveFill = min(
+                max(length(localPos - cTL) - scrTL, tlR),
+                max(length(localPos - cBL) - scrBL, blR));
+            float tlSR = max(sLocal.x + hx, -sLocal.y - hy);
+            float blSR = max(sLocal.x + hx, sLocal.y - hy);
+            concaveShadow = min(
+                max(length(sLocal - cTL) - scrTL, tlSR),
+                max(length(sLocal - cBL) - scrBL, blSR));
+            concaveInner = min(
+                max(length(localPos - cTL) - max(scrTL - borderWidth, 0.0), tlR),
+                max(length(localPos - cBL) - max(scrBL - borderWidth, 0.0), blR));
+        } else if (cornerPattern < 4.5) {
+            // 4: 右辺なし → 画面TR,BR が凹角
+            rSafe.y = 0.0;  // 画面TR凸なし
+            rSafe.x = 0.0;  // 画面BR凸なし
+            innerSdfExt = vec2(bExt, 0.0);  innerSdfShift = vec2(bExt, 0.0);
+            float trR = max(hx - localPos.x, -localPos.y - hy);
+            float brR = max(hx - localPos.x, localPos.y - hy);
+            concaveFill = min(
+                max(length(localPos - cTR) - scrTR, trR),
+                max(length(localPos - cBR) - scrBR, brR));
+            float trSR = max(hx - sLocal.x, -sLocal.y - hy);
+            float brSR = max(hx - sLocal.x, sLocal.y - hy);
+            concaveShadow = min(
+                max(length(sLocal - cTR) - scrTR, trSR),
+                max(length(sLocal - cBR) - scrBR, brSR));
+            concaveInner = min(
+                max(length(localPos - cTR) - max(scrTR - borderWidth, 0.0), trR),
+                max(length(localPos - cBR) - max(scrBR - borderWidth, 0.0), brR));
+        } else if (cornerPattern < 5.5) {
+            // 5: 下+右辺なし → 画面TLのみ凸, 画面TR/BR/BL が凹角
+            rSafe.y = 0.0; rSafe.x = 0.0; rSafe.w = 0.0;
+            innerSdfExt = vec2(bExt, bExt);  innerSdfShift = vec2(bExt, bExt);
+            float trR = max(hx - localPos.x, -localPos.y - hy);
+            float brR = max(hx - localPos.x, localPos.y - hy);
+            float blR = max(localPos.x + hx, localPos.y - hy);
+            concaveFill = min(min(
+                max(length(localPos - cTR) - scrTR, trR),
+                max(length(localPos - cBR) - scrBR, brR)),
+                max(length(localPos - cBL) - scrBL, blR));
+            float trSR = max(hx - sLocal.x, -sLocal.y - hy);
+            float brSR = max(hx - sLocal.x, sLocal.y - hy);
+            float blSR = max(sLocal.x + hx, sLocal.y - hy);
+            concaveShadow = min(min(
+                max(length(sLocal - cTR) - scrTR, trSR),
+                max(length(sLocal - cBR) - scrBR, brSR)),
+                max(length(sLocal - cBL) - scrBL, blSR));
+            concaveInner = min(min(
+                max(length(localPos - cTR) - max(scrTR - borderWidth, 0.0), trR),
+                max(length(localPos - cBR) - max(scrBR - borderWidth, 0.0), brR)),
+                max(length(localPos - cBL) - max(scrBL - borderWidth, 0.0), blR));
+        } else if (cornerPattern < 6.5) {
+            // 6: 下+左辺なし → 画面TRのみ凸, 画面TL/BR/BL が凹角
+            rSafe.z = 0.0; rSafe.x = 0.0; rSafe.w = 0.0;
+            innerSdfExt = vec2(bExt, bExt);  innerSdfShift = vec2(-bExt, bExt);
+            float tlR = max(localPos.x + hx, -localPos.y - hy);
+            float brR = max(hx - localPos.x, localPos.y - hy);
+            float blR = max(localPos.x + hx, localPos.y - hy);
+            concaveFill = min(min(
+                max(length(localPos - cTL) - scrTL, tlR),
+                max(length(localPos - cBR) - scrBR, brR)),
+                max(length(localPos - cBL) - scrBL, blR));
+            float tlSR = max(sLocal.x + hx, -sLocal.y - hy);
+            float brSR = max(hx - sLocal.x, sLocal.y - hy);
+            float blSR = max(sLocal.x + hx, sLocal.y - hy);
+            concaveShadow = min(min(
+                max(length(sLocal - cTL) - scrTL, tlSR),
+                max(length(sLocal - cBR) - scrBR, brSR)),
+                max(length(sLocal - cBL) - scrBL, blSR));
+            concaveInner = min(min(
+                max(length(localPos - cTL) - max(scrTL - borderWidth, 0.0), tlR),
+                max(length(localPos - cBR) - max(scrBR - borderWidth, 0.0), brR)),
+                max(length(localPos - cBL) - max(scrBL - borderWidth, 0.0), blR));
+        } else if (cornerPattern < 7.5) {
+            // 7: 上+右辺なし → 画面BLのみ凸, 画面TL/TR/BR が凹角
+            rSafe.z = 0.0; rSafe.y = 0.0; rSafe.x = 0.0;
+            innerSdfExt = vec2(bExt, bExt);  innerSdfShift = vec2(bExt, -bExt);
+            float tlR = max(localPos.x + hx, -localPos.y - hy);
+            float trR = max(hx - localPos.x, -localPos.y - hy);
+            float brR = max(hx - localPos.x, localPos.y - hy);
+            concaveFill = min(min(
+                max(length(localPos - cTL) - scrTL, tlR),
+                max(length(localPos - cTR) - scrTR, trR)),
+                max(length(localPos - cBR) - scrBR, brR));
+            float tlSR = max(sLocal.x + hx, -sLocal.y - hy);
+            float trSR = max(hx - sLocal.x, -sLocal.y - hy);
+            float brSR = max(hx - sLocal.x, sLocal.y - hy);
+            concaveShadow = min(min(
+                max(length(sLocal - cTL) - scrTL, tlSR),
+                max(length(sLocal - cTR) - scrTR, trSR)),
+                max(length(sLocal - cBR) - scrBR, brSR));
+            concaveInner = min(min(
+                max(length(localPos - cTL) - max(scrTL - borderWidth, 0.0), tlR),
+                max(length(localPos - cTR) - max(scrTR - borderWidth, 0.0), trR)),
+                max(length(localPos - cBR) - max(scrBR - borderWidth, 0.0), brR));
+        } else {
+            // 8: 上+左辺なし → 画面BRのみ凸, 画面TL/TR/BL が凹角
+            rSafe.z = 0.0; rSafe.y = 0.0; rSafe.w = 0.0;
+            innerSdfExt = vec2(bExt, bExt);  innerSdfShift = vec2(-bExt, -bExt);
+            float tlR = max(localPos.x + hx, -localPos.y - hy);
+            float trR = max(hx - localPos.x, -localPos.y - hy);
+            float blR = max(localPos.x + hx, localPos.y - hy);
+            concaveFill = min(min(
+                max(length(localPos - cTL) - scrTL, tlR),
+                max(length(localPos - cTR) - scrTR, trR)),
+                max(length(localPos - cBL) - scrBL, blR));
+            float tlSR = max(sLocal.x + hx, -sLocal.y - hy);
+            float trSR = max(hx - sLocal.x, -sLocal.y - hy);
+            float blSR = max(sLocal.x + hx, sLocal.y - hy);
+            concaveShadow = min(min(
+                max(length(sLocal - cTL) - scrTL, tlSR),
+                max(length(sLocal - cTR) - scrTR, trSR)),
+                max(length(sLocal - cBL) - scrBL, blSR));
+            concaveInner = min(min(
+                max(length(localPos - cTL) - max(scrTL - borderWidth, 0.0), tlR),
+                max(length(localPos - cTR) - max(scrTR - borderWidth, 0.0), trR)),
+                max(length(localPos - cBL) - max(scrBL - borderWidth, 0.0), blR));
+        }
+    }
+
+    vec2 sdfHalf = halfSize;
+    vec2 sdfPos = localPos;
+
+    // ============================================================
+    // Shadow (ベース矩形 + 凹角のユニオン)
+    // ============================================================
+
+    vec2 shadowPos = sdfPos - shadowOffset;
+    float shadowDist = min(sdRoundBox(shadowPos, sdfHalf, rSafe), concaveShadow);
     float shadowAlpha = 1.0 - smoothstep(-shadowBlurSafe, shadowBlurSafe, shadowDist);
-    
+
     // ============================================================
-    // Fill
+    // Fill (ベース矩形 + 凹角のユニオン)
     // ============================================================
-    
-    float dist = sdRoundRect(localPos, halfSize, rSafe);
+
+    float dist = min(sdRoundBox(sdfPos, sdfHalf, rSafe), concaveFill);
     float alphaFill = smoothstep(aaSafe, -aaSafe, dist);
-    
+
     // ============================================================
-    // Border
+    // Border (ベース矩形 + 凹角のユニオン, 内側も同様)
     // ============================================================
-    
-    float innerRadius = max(rSafe - borderWidth, 0.0);
-    float distInner = sdRoundRect(localPos, halfSize - vec2(borderWidth, borderWidth), innerRadius);
+
+    vec4 innerR = max(rSafe - vec4(borderWidth, borderWidth, borderWidth, borderWidth), 0.0);
+    vec2 innerHalf = sdfHalf + innerSdfExt - vec2(borderWidth, borderWidth);
+    vec2 innerPos = sdfPos - innerSdfShift;
+    float distInner = min(
+        sdRoundBox(innerPos, innerHalf, innerR),
+        concaveInner);
     float alphaInner = smoothstep(aaSafe, -aaSafe, distInner);
     float alphaBorder = clamp(alphaFill - alphaInner, 0.0, 1.0);
     

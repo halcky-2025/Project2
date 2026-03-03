@@ -212,16 +212,17 @@ void drawUnderPagingBar(LayerInfo* layer, FontAtlas& atlas, FontId font, float x
 
     // トラック（角丸矩形）
     // ※ layer->pushRectがあると仮定
+    {float r = trackHeight * 0.5f;
     layer->pushFill(
         trackX, centerY - trackHeight * 0.5f,
         trackWidth,
         trackHeight,
-        trackHeight * 0.5f, 0.0f, 0.0f,
+        r, r, r, r, 0.0f, 0.0f,
         trackColor, 0x00000000,
         0.5f, 1.0f, 0.0f,
         0x000000AA,
         zIndex,
-        targetFBO, fbsize, viewId);
+        targetFBO, fbsize, viewId);}
 
     // つまみ位置
     float progress = (totalPages > 1)
@@ -234,7 +235,7 @@ void drawUnderPagingBar(LayerInfo* layer, FontAtlas& atlas, FontId font, float x
         thumbX - thumbRadius / 2,
         centerY - thumbRadius,
         thumbRadius, thumbRadius * 2,
-        0.0, 0.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
         thumbColor, 0x00000000,
         0.0f, 0.0f, 0.0f,
         0x000000000,
@@ -282,17 +283,18 @@ void drawRightPagingBar(LayerInfo* layer, FontAtlas& atlas, FontId font,
         zIndex, downColor, group, targetFBO, fbsize, viewId);
 
     // トラック（縦の角丸矩形）
+    {float r = trackWidth * 0.5f;
     layer->pushFill(
         centerX - trackWidth * 0.5f,
         trackY,
         trackWidth,
         trackHeight,
-        trackWidth * 0.5f, 0.0f, 0.0f,
+        r, r, r, r, 0.0f, 0.0f,
         trackColor, 0x00000000,
         0.5f, 1.0f, 0.0f,
         0x000000AA,
         zIndex,
-        targetFBO, fbsize, viewId);
+        targetFBO, fbsize, viewId);}
 
     // つまみ位置
     float progress = (totalPages > 1)
@@ -306,7 +308,7 @@ void drawRightPagingBar(LayerInfo* layer, FontAtlas& atlas, FontId font,
         thumbY - thumbRadius / 2,
         thumbRadius * 2,
         thumbRadius,
-        0.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
         thumbColor, 0x00000000,
         0.0f, 0.0f, 0.0f,
         0x00000000,
@@ -331,16 +333,17 @@ void drawUnderScrollBar(LayerInfo* layer,
     float centerY = y + height * 0.5f;
 
     // トラック（幅いっぱい）
+    {float r = trackHeight * 0.5f;
     layer->pushFill(
         x, centerY - trackHeight * 0.5f,
         width,
         trackHeight,
-        trackHeight * 0.5f, 0.0f, 0.0f,
+        r, r, r, r, 0.0f, 0.0f,
         trackColor, 0x00000000,
         0.5f, 1.0f, 0.0f,
         0x000000AA,
         zIndex,
-        targetFBO, fbsize, viewId);
+        targetFBO, fbsize, viewId);}
 
     // つまみサイズ（pageWidth / totalWidth の比率）
     float thumbRatio = pageWidth / totalWidth;
@@ -354,17 +357,18 @@ void drawUnderScrollBar(LayerInfo* layer,
     float thumbX = x + (width - thumbWidth) * scrollRatio;
 
     // つまみ（角丸長方形）
+    {float r = trackHeight;
     layer->pushFill(
         thumbX,
         centerY - trackHeight * 1.5f,
         thumbWidth,
         trackHeight * 2,
-        trackHeight, 0.0f, 0.0f,
+        r, r, r, r, 0.0f, 0.0f,
         thumbColor, 0x00000000,
         0.0f, 0.0f, 0.0f,
         0x00000000,
         zIndex + 0.1f,
-        targetFBO, fbsize, viewId);
+        targetFBO, fbsize, viewId);}
 }
 
 void drawRightScrollBar(LayerInfo* layer,
@@ -385,16 +389,17 @@ void drawRightScrollBar(LayerInfo* layer,
     float centerX = x + width * 0.5f;
 
     // トラック（高さいっぱい）
+    {float r = trackWidth * 0.5f;
     layer->pushFill(
         centerX - trackWidth * 0.5f, y,
         trackWidth,
         height,
-        trackWidth * 0.5f, 0.0f, 0.0f,
+        r, r, r, r, 0.0f, 0.0f,
         trackColor, 0x00000000,
         0.5f, 1.0f, 0.0f,
         0x000000AA,
         zIndex,
-        targetFBO, fbsize, viewId);
+        targetFBO, fbsize, viewId);}
 
     // つまみサイズ（pageHeight / totalHeight の比率）
     float thumbRatio = pageHeight / totalHeight;
@@ -408,17 +413,18 @@ void drawRightScrollBar(LayerInfo* layer,
     float thumbY = y + (height - thumbHeight) * scrollRatio;
 
     // つまみ（角丸長方形）
+    {float r = trackWidth;
     layer->pushFill(
         centerX - trackWidth * 1.5f,
         thumbY,
         trackWidth * 2,
         thumbHeight,
-        trackWidth, 0.0f, 0.0f,
+        r, r, r, r, 0.0f, 0.0f,
         thumbColor, 0x00000000,
         0.0f, 0.0f, 0.0f,
         0x00000000,
         zIndex + 0.1f,
-        targetFBO, fbsize, viewId);
+        targetFBO, fbsize, viewId);}
 }
 void MeasureString(FontAtlas& atlas, FontId font, String* text, int n, float width, float* retwid, float* rethei, size_t* len, ExtendedRenderGroup* group) {
 
@@ -652,6 +658,7 @@ struct SDLRequest {
     SDL_Window* parentSDLWindow = nullptr;
     int x, y, w, h;
     bool visible = true;  // CreateWindow時に表示するか
+    int cornerRound = 0;  // 0=デフォルト, 1=角丸なし, 2=角丸(大), 3=角丸(小)
     // ResizeWindow 用
     NativeWindow* target = nullptr;
     int newW, newH;
@@ -674,6 +681,7 @@ struct PopupCmd {
     int x = 0, y = 0, w = 0, h = 0;
     NewElement* anchorElem = nullptr;
     bool visible = true;  // Create時に表示するか
+    int cornerRound = 2;  // 0=デフォルト, 1=角丸なし, 2=角丸(大), 3=角丸(小)
     // Resize 用 / Move 用
     NativeWindow* target = nullptr;
     int newW = 0, newH = 0;
@@ -882,9 +890,9 @@ public:
             for (int i = 0; i < local->screens->size; i++) {
                 Offscreen* screen = (Offscreen*)*get_list(local->screens, i);
                 if (screen->layout) {
-                    NewMeasure measure = NewMeasure();
+                    NewMeasure measure;
                     measure.pos.x = 0; measure.pos.y = 0; measure.size.x = screen->window->size.x; measure.size.y = screen->window->size.y;
-                    measure.start.x = 0; measure.start.y = 0;
+                    measure.start.x = 0; measure.start.y = 0; measure.group = screen->group;
                     int order = 0;
                     screen->elem->Measure(target, (NewElement*)screen->elem, &measure, local, &order);
                 }
@@ -941,7 +949,7 @@ Generator MouseButton(HopStar* hoppy, MouseEvent* mv) {
         hoppy->invalidate = 1;
     }
     TreeElement* tree = (TreeElement*)get_mapy(hoppy->target->map, createString(hoppy->target, (char*)"main", 4, 1));
-	tree->elem->Mouse(hoppy->target, tree->elem, mv, (NewLocal*)tree->elem);
+    tree->elem->Mouse(hoppy->target, tree->elem, mv, { 0.0f, 0.0f }, (NewLocal*)tree->elem);
 	hoppy->invalidate = 1;
 	co_return (char*)0;
 
@@ -959,7 +967,7 @@ Generator KeyButton(HopStar* hoppy, KeyEvent* kv) {
 Generator PopupMouseButton(HopStar* hoppy, NativeWindow* nw, MouseEvent* mv) {
     if (nw && nw->local) {
         TreeElement* tree = (TreeElement*)get_mapy(hoppy->target->map, createString(hoppy->target, (char*)"main", 4, 1));
-        ((NewElement*)nw->local)->Mouse(hoppy->target, nw->local, mv, (NewLocal*)tree->elem);
+        ((NewElement*)nw->local)->Mouse(hoppy->target, nw->local, mv, { 0.0f, 0.0f }, (NewLocal*)tree->elem);
         hoppy->invalidate = 1;
     }
     co_return (char*)0;
@@ -1357,8 +1365,9 @@ public:
                         // SDL座標を計算
                         int relX = cmd.x, relY = cmd.y;
                         if (cmd.anchor == Anchor_Element && cmd.anchorElem) {
-                            relX = (int)(cmd.anchorElem->pos2.x + cmd.anchorElem->pos.x) + cmd.x;
-                            relY = (int)(cmd.anchorElem->pos2.y + cmd.anchorElem->pos.y + cmd.anchorElem->size.y) + cmd.y;
+                            PointF p = getAbsolutePosition(cmd.anchorElem);
+                            relX = p.x;
+                            relY = p.y + cmd.anchorElem->size.y;
                         }
 
                         // SDL ウィンドウ作成をメインスレッドに委任
@@ -1368,6 +1377,7 @@ public:
                         req.parentSDLWindow = parent ? parent->sdlWindow : nullptr;
                         req.x = relX; req.y = relY; req.w = cmd.w; req.h = cmd.h;
                         req.visible = cmd.visible;
+                        req.cornerRound = cmd.cornerRound;
                         hoppy_->requestSDL(req);
 
                         if (req.success) {
@@ -1510,6 +1520,9 @@ public:
 FontAtlas* getAtlas(ThreadGC* thgc) {
     return &thgc->hoppy->master.fontAtlas();
 }
+int myGetFontHeight(ThreadGC* thgc, FontId font) {
+    return thgc->hoppy->master.fontAtlas().getFontHeight(font);
+}
 RenderCommandQueue* createRCQ() {
 	return new RenderCommandQueue();
 }
@@ -1542,7 +1555,7 @@ StandaloneTextureInfo* mygetStandaloneTextureInfo(ThreadGC* thgc, ImageId imageI
 
 // ポップアップ生成: NativeWindow* を即座に返す（SDL/FBO は RenderThread が後で埋める）
 NativeWindow* myCreatePopupWindow(ThreadGC* thgc, NativeWindowType type, PopupAnchor anchor,
-                                   int x, int y, int w, int h, NewElement* anchorElem,
+                                   int x, int y, int w, int h, int cornerRound, NewElement* anchorElem,
                                    bool visible) {
     // GoThread側でNativeWindowを先に確保（ポインタを即座に返せる）
     NativeWindow* nw = new NativeWindow{};
@@ -1560,6 +1573,7 @@ NativeWindow* myCreatePopupWindow(ThreadGC* thgc, NativeWindowType type, PopupAn
     cmd.anchor = anchor;
     cmd.x = x; cmd.y = y; cmd.w = w; cmd.h = h;
     cmd.anchorElem = anchorElem;
+    cmd.cornerRound = cornerRound;
     cmd.visible = visible;
     cmd.target = nw;  // 先に確保したNativeWindowを渡す
     {

@@ -69,32 +69,38 @@ struct LayerInfo {
 
 	void push(DrawCommand* cmd);
 void pushFill(float x, float y, float width, float height,
-	float radius, float borderWidth, float aaPixels,
+	float radiusTL, float radiusTR, float radiusBR, float radiusBL,
+	float borderWidth, float aaPixels,
 	uint32_t fillColor, uint32_t borderColor,
 	float shadowX, float shadowY, float shadowBlur,
 	uint32_t shadowColor, float zIndex,
 	bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId,
-	float blendMode = 0.0f);
+	float blendMode = 0.0f,
+	float cornerPattern = 0.0f);
 void  pushImage(float x, float y, float width, float height,
 	float atlasX, float atlasY, float atlasW, float atlasH,
-	float radius, float aaPixels, float borderWidth,
+	float radiusTL, float radiusTR, float radiusBR, float radiusBL,
+	float aaPixels, float borderWidth,
 	uint32_t borderColor,
 	float shadowX, float shadowY, float shadowBlur,
 	uint32_t shadowColor, uint32_t modulate,
 	float zIndex, bgfx::TextureHandle* tex1,
 	bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId,
-	float blendMode = 0.0f);
+	float blendMode = 0.0f,
+	float cornerPattern = 0.0f);
 void  pushPattern(enum DrawCommandType patternMode,
 	float x, float y, float width, float height,
 	float colorCount, float angle,
 	float scrollX, float scrollY,
-	float radius, float aaPixels,
+	float radiusTL, float radiusTR, float radiusBR, float radiusBL,
+	float aaPixels,
 	float borderWidth, uint32_t borderColor,
 	float shadowX, float shadowY, float shadowBlur,
 	uint32_t shadowColor,
 	int dataOffset, float zIndex,
 	bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId,
-	float blendMode = 0.0f);
+	float blendMode = 0.0f,
+	float cornerPattern = 0.0f);
 void  pushText(float x, float y, float width, float height,
 	float atlasX, float atlasY, float atlasW, float atlasH,
 	uint32_t color, float zIndex, bgfx::TextureHandle* tex1,
@@ -137,12 +143,14 @@ struct Background {
 	ImageId tex1, tex2;
 	float aa;
 	float curl;
-	float borderRadius, borderWidth;
+	float borderRadiusTL, borderRadiusTR, borderRadiusBR, borderRadiusBL;
+	float borderWidth;
 	uint32_t borderColor;
 	float shadowX, shadowY, shadowBlur;
 	uint32_t shadowColor;
 	float count, offset, angle;
 	float scrollX, scrollY;
+	float cornerPattern;
 };
 struct Offscreen;
 struct NewLocal;
@@ -231,9 +239,9 @@ struct NewGraphic {
 struct NewEndElement {
 	struct NewElement* next, * before, * parent, * childend;
 	enum LetterType type;
-	int (*Mouse)(ThreadGC*, NewElement*, MouseEvent*, NewLocal*);
+	int (*Mouse)(ThreadGC*, NewElement*, MouseEvent*, PointF, NewLocal*);
 	int (*Key)(ThreadGC*, NewElement*, int, int, KeyEvent*, NewLocal*);
-	void (*DrawSelection) (ThreadGC*, NewLocal*, NewElement*, int, int, NewGraphic*, RenderCommandQueue* q);
+	void (*DrawSelection) (ThreadGC*, NewLocal*, NewElement*, int, int, NewGraphic*, PointF pos, RenderCommandQueue* q);
 	MemFunc* GoMouseDown; MemFunc* BackMouseDown; MemFunc* GoKeyDown; MemFunc* BackKeyDown;
 	int (*len)(NewElement* elem);
 	uint64_t id;
@@ -362,12 +370,12 @@ struct NewLetter : NewElement {
 	bool recompile;
 };
 void initNewLetter(ThreadGC* thgc, NewLetter* letter, FontId font, enum LetterType type);
-void ElementDrawSelect(ThreadGC* thgc, NewLocal* local, NewElement* self, int m, int n, NewGraphic* g, RenderCommandQueue* q);
-void LetterDrawSelect(ThreadGC* thgc, NewLocal* local, NewElement* self, int m, int n, NewGraphic* g, RenderCommandQueue* q);
+void ElementDrawSelect(ThreadGC* thgc, NewLocal* local, NewElement* self, int m, int n, NewGraphic* g, PointF pos, RenderCommandQueue* q);
+void LetterDrawSelect(ThreadGC* thgc, NewLocal* local, NewElement* self, int m, int n, NewGraphic* g, PointF pos, RenderCommandQueue* q);
 int ElementKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLocal* local);
 int EndKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLocal* local);
-int ElementMouse(ThreadGC* thgc, NewElement* self, MouseEvent* e, NewLocal* local);
-int LetterMouse(ThreadGC* thgc, NewElement* self, MouseEvent* e, NewLocal* local);
+int ElementMouse(ThreadGC* thgc, NewElement* self, MouseEvent* e, PointF pos, NewLocal* local);
+int LetterMouse(ThreadGC* thgc, NewElement* self, MouseEvent* e, PointF pos, NewLocal* local);
 int LetterKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLocal* local);
 void initNewEndElement(ThreadGC* thgc, NewEndElement* end, NewElement* parent) {
 	end->next = end->before = (NewElement*)end;
@@ -838,18 +846,25 @@ void setTransform(NewElement* elem, float tx, float ty, float scale, float rot) 
 	if (surface) { surface->composite.translateX = tx; surface->composite.translateY = ty; surface->composite.scaleX = scale; surface->composite.scaleY = scale; surface->composite.rotation = rot;
 	}
 }*/
+PointF getAbsolutePosition(NewElement* elem) {
+	PointF abs = { 0, 0 };
+	for (NewElement* e = elem; e->parent != nullptr; e = e->parent) {
+		abs.x += e->pos2.x - e->parent->scroll.x;
+		abs.y += e->pos2.y - e->parent->scroll.y;
+	}
+	return abs;
+}
 void initNewLine(ThreadGC* thgc, NewLine* line);
 void NewElementAddLast(ThreadGC* thgc, NewLocal* local, NewElement* parent, NewElement* child) {
-	if (parent->childend->before->type != LetterType::_Line) {
+	if (parent->childend->before->type != LetterType::_Line && parent->childend->before->type != LetterType::_Down) {
 		auto line = (NewLine*)GC_alloc(thgc, CType::_LineC);
 		initNewLine(thgc, line);
 		NewBefore(thgc, local, parent->childend, line);
 	}
 	NewBeforeElement(thgc, local, parent->childend->before->childend, child);
 }
-void NewLineAddLast(ThreadGC* thgc, NewLocal* local, NewElement* parent, NewLine* line) {
-	NewBefore(thgc, local, parent->childend, line);
-	FindOffscreen(parent)->markLayout(local);
+void NewDirectAddLast(ThreadGC* thgc, NewLocal* local, NewElement* parent, NewElement* child) {
+	NewBeforeElement(thgc, local, parent->childend, child);
 }
 
 
@@ -860,25 +875,28 @@ void NewMeasureCall(ThreadGC* thgc, NewElement* elem, NewMeasure* measure, NewLo
 		measure->pos = { 0, 0 };
 		measure->size = { elem->size.x, elem->size.y };
 	}
-	elem->pos2.x = measure->pos.x;
-	elem->pos2.y = measure->pos.y;
-	measure->pos.x += elem->margins[3] + elem->borderRadius + elem->paddings[3];
-	measure->pos.y += elem->margins[0] + elem->borderRadius + elem->paddings[0];
-	measure->start = measure->pos;
+	NewMeasure newmeasure;
+	newmeasure.pos.x = measure->pos.x + elem->margins[3] + elem->borderRadius + elem->paddings[3];
+	newmeasure.pos.y = measure->pos.y + elem->margins[0] + elem->borderRadius + elem->paddings[0];
+	newmeasure.start = measure->pos; newmeasure.group = measure->group;
 	float sizex = 0, sizey = 0;
 	for (NewElement* child = elem->childend->next; child->type != LetterType::_ElemEnd; ) {
-		child->Measure(thgc, child, measure, local, n);
+		child->Measure(thgc, child, &newmeasure, local, n);
 		if (elem->orient) {
 			if (sizey < child->size.y) sizey = child->size.y;
-			measure->pos.x += child->size.x;
-			measure->pos.y = measure->start.y;
+			newmeasure.pos.x += child->size.x;
+			newmeasure.pos.y = newmeasure.start.y;
+			child->pos2.x = sizex;
+			child->pos2.y = 0;
 			sizex += child->size.x;
 		}
 		else
 		{
 			if (sizex < child->size.x) sizex = child->size.x;
-			measure->pos.y += child->size.y;
-			measure->pos.x = measure->start.x;
+			newmeasure.pos.y += child->size.y;
+			newmeasure.pos.x = newmeasure.start.x;
+			child->pos2.x = 0;
+			child->pos2.y = sizey;
 			sizey += child->size.y;
 		}
 		child = child->next;
@@ -913,8 +931,9 @@ void NewDrawCall(ThreadGC* thgc, NewElement* elem, NewGraphic* g, NewLocal* loca
 	if (elem->type == LetterType::_Main) {
 		offscreened = true;
 	}
+	NewGraphic g2;
+	float sizex = elem->size.x - sbarx; float sizey = elem->size.y - sbary;
 	if (elem->offscreen != NULL) {
-		float sizex = elem->size.x - sbarx; float sizey = elem->size.y - sbary;
 		if (elem->size2.x <= elem->size.x) sizex = elem->size2.x;
 		if (elem->size2.y <= elem->size.y) sizey = elem->size2.y;
 		float size3x = elem->offscreen->fbsize.x, size3y = elem->offscreen->fbsize.y;
@@ -949,9 +968,22 @@ void NewDrawCall(ThreadGC* thgc, NewElement* elem, NewGraphic* g, NewLocal* loca
 		pro += 0.004f;
 		pro = fmod(pro, 1.0f);
 		auto info2 = mygetStandaloneTextureInfo(thgc, elem->background->tex1);*/
-		g = new NewGraphic{g->layer, elem, elem, {0,0}, {elem->size2.x, elem->size2.y}, {0,0}, {0,0},
+		g2 = NewGraphic{g->layer, elem, elem, {0, 0}, {elem->size2.x, elem->size2.y}, {0,0}, {0,0},
 			elem->offscreen->ping ? elem->offscreen->imPong : elem->offscreen->imPing,  &info->fbo,  &info->size, elem->offscreen->viewId = g->viewId2, 0, elem->offscreen->group };
 		elem->offscreen->ping = !elem->offscreen->ping;
+		std::vector<float>* widths = new std::vector<float>{ 10.0f, 10.0f, 10.0f };
+		int size = widths->size();
+		//int n = addPattern(thgc, *colors, *widths);
+		//g->layer->pushPattern(DrawCommandType::GradientChecker, elem->pos.x, elem->pos.y, elem->size2.x / 3 * 2, elem->size2.y / 3 * 2, size, 0.0f, 0.0f, 0.0f, 6.0f, 1.0f, 1.0, 0x000000FF, 3.0f, 3.0f, 2.0f, 0x00ff00FF, n, 0, g->fb, g->fbsize, g->viewId);
+	}
+	else {
+		g2 = NewGraphic{ g->layer, elem, elem, {g->pos.x, g->pos.y}, {elem->size2.x, elem->size2.y}, {0,0}, {0,0},
+			g->im,  g->fb,  g->fbsize, g->viewId, 0, g->group };
+	}
+	g->pos.x += elem->margins[3] + elem->borderRadius + elem->paddings[3];
+	g->pos.y += elem->margins[0] + elem->borderRadius + elem->paddings[0];
+	g->start = g->pos;
+	if (elem->background != NULL) {
 		bgfx::TextureHandle* tex1, * tex2;
 		if (isValidImageId(elem->background->tex1)) {
 			auto info = mygetStandaloneTextureInfo(thgc, elem->background->tex1);
@@ -970,22 +1002,20 @@ void NewDrawCall(ThreadGC* thgc, NewElement* elem, NewGraphic* g, NewLocal* loca
 			0.0f, 1.0f, 0.0f, 1.0f,  // ��
 			0.0f, 0.0f, 1.0f, 1.0f,  // ��
 		};
-		std::vector<float>* widths = new std::vector<float>{ 10.0f, 10.0f, 10.0f };
-		int size = widths->size();
-		int n = addPattern(thgc, *colors, *widths);
-		//g->layer->pushPattern(DrawCommandType::GradientChecker, elem->pos.x, elem->pos.y, elem->size2.x / 3 * 2, elem->size2.y / 3 * 2, size, 0.0f, 0.0f, 0.0f, 6.0f, 1.0f, 1.0, 0x000000FF, 3.0f, 3.0f, 2.0f, 0x00ff00FF, n, 0, g->fb, g->fbsize, g->viewId);
 	}
-	g->pos.x += elem->margins[3] + elem->borderRadius + elem->paddings[3];
-	g->pos.y += elem->margins[0] + elem->borderRadius + elem->paddings[0];
-	g->start = g->pos;
-	if (elem->background != NULL) {
-		//g->layer->push(elem->background->cmd);
-	}
-	float sizex, sizey;
 	NewElement* start = elem->childend->next;
 	//background.draw
 	for (NewElement* child = elem->childend->next; child->type != LetterType::_ElemEnd; ) {
-		child->Draw(thgc, child, g, local, q);
+		child->Draw(thgc, child, &g2, local, q);
+		if (elem->orient) {
+			g2.pos.x += child->size.x;
+			g2.pos.y = g2.start.y;
+		}
+		else
+		{
+			g2.pos.y += child->size.y;
+			g2.pos.x = g2.start.x;
+		}
 		child = child->next;
 	}
 }
@@ -1145,8 +1175,8 @@ void NewLetterMeasureCall(ThreadGC* thgc, NewElement* elem, NewMeasure* measure,
 		add_list(thgc, letter->renderspans, (char *)r);
 	}
 	letter->size = letter->size2;
-	letter->pos2.x = measure->pos.x;
-	letter->pos2.y = measure->pos.y;
+	letter->pos2.x = 0;
+	letter->pos2.y = 0;
 }
 void SelectDraw(ThreadGC* thgc, NewLocal* local, NewGraphic* g, RenderCommandQueue* q) {
 	if (local->select.m == local->select.from->len(local->select.from)) {
@@ -1187,28 +1217,43 @@ void SelectDraw(ThreadGC* thgc, NewLocal* local, NewGraphic* g, RenderCommandQue
 	}
 	NewElement* start = local->select.start;
 	int s = local->select.s;
+	PointF pos = getAbsolutePosition(start);
+	std::vector<PointF> ps;
 	for (;;) {
 		if (start == local->select.end) {
-			start->DrawSelection(thgc, local, start, s, local->select.e, g, q);
+			start->DrawSelection(thgc, local, start, s, local->select.e, g, pos, q);
 			break;
 		}
-		start->DrawSelection(thgc, local, start, s, start->len(start), g, q);
+		start->DrawSelection(thgc, local, start, s, start->len(start), g, pos, q);
 		s = 0;
 		if (start->childend != NULL) {
 			start = start->childend->next;
+			ps.push_back(pos);
 			continue;
 		}
 		else if (start->type == _ElemEnd) {
 			start = start->parent->next;
+			if (ps.size() == 0) {
+				pos = getAbsolutePosition(start->parent);
+				ps.push_back(pos);
+			}
+			else {
+				pos = ps.back();
+				ps.pop_back();
+			}
+			pos.x += start->pos2.x - start->parent->scroll.x;
+			pos.y += start->pos2.y - start->parent->scroll.y;
 			continue;
 		}
+		if (start->orient) pos.x += start->size.x;
+		else pos.y += start->size.y;
 		start = start->next;
 	}
 }
-void ElementDrawSelect(ThreadGC* thgc, NewLocal* local, NewElement* self, int m, int n, NewGraphic* g, RenderCommandQueue* q) {
+void ElementDrawSelect(ThreadGC* thgc, NewLocal* local, NewElement* self, int m, int n, NewGraphic* g, PointF pos, RenderCommandQueue* q) {
 	return;
 }
-void LetterDrawSelect(ThreadGC* thgc, NewLocal* local, NewElement* self, int m, int n, NewGraphic* g, RenderCommandQueue* q) {
+void LetterDrawSelect(ThreadGC* thgc, NewLocal* local, NewElement* self, int m, int n, NewGraphic* g, PointF pos, RenderCommandQueue* q) {
 	NewLetter* letter = (NewLetter*)self;
 	int l = 0, r = letter->renderspans->size - 1;
 	while (l <= r) {
@@ -1228,11 +1273,11 @@ void LetterDrawSelect(ThreadGC* thgc, NewLocal* local, NewElement* self, int m, 
 					float w, h;
 					str = SubString(thgc, letter->text, s->start, s->end);
 					MeasureString(*getAtlas(thgc), s->font, str, n - s->start, 10000, &w, &h, &n2, NULL);
-					g->layer->pushFill(self->pos.x + self->pos2.x + s->x + w0, self->pos.y + self->pos2.y + s->y, w - w0 + 1, s->height, 0.0f, 0.0f, 0.0f, 0x4477ff66, 0, 0.0f, 0.0f, 1.0f, 0, 12000.0f, g->fb, g->fbsize, g->viewId);
+					g->layer->pushFill(pos.x + self->pos.x + s->x + w0, pos.y + self->pos.y + s->y, w - w0 + 1, s->height, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0x4477ff66, 0, 0.0f, 0.0f, 1.0f, 0, 12000.0f, g->fb, g->fbsize, g->viewId);
 					break;
 				}
 				else {
-					g->layer->pushFill(self->pos.x + self->pos2.x + s->x + w0, self->pos.y + self->pos2.y + s->y, s->width - w0 + 1, s->height, 0.0f, 0.0f, 0.0f, 0x4477ff66, 0, 0.0f, 0.0f, 1.0f, 0, 12000.0f, g->fb, g->fbsize, g->viewId);
+					g->layer->pushFill(pos.x + self->pos.x + s->x + w0, pos.y + self->pos.y + s->y, s->width - w0 + 1, s->height, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0x4477ff66, 0, 0.0f, 0.0f, 1.0f, 0, 12000.0f, g->fb, g->fbsize, g->viewId);
 				}
 				w0 = 0.0f; h0 = 0.0f;
 				m2++;
@@ -1248,7 +1293,7 @@ void NewLetterDrawCall(ThreadGC* thgc, NewElement* elem, NewGraphic* g, NewLocal
 	NewLetter* letter = (NewLetter*)elem;
 	for (int i = 0; i < letter->renderspans->size; i++) {
 		auto rs = *(RenderSpan**)get_list(letter->renderspans, i);
-		drawString((LayerInfo*)g->layer, *getAtlas(thgc), rs->font, SubString(thgc, letter->text, rs->start, rs->end - rs->start), g->pos.x + letter->pos2.x + rs->x, g->pos.y + letter->pos2.y + rs->y, std::floor(elem->zIndex) + 0.9,
+		drawString((LayerInfo*)g->layer, *getAtlas(thgc), rs->font, SubString(thgc, letter->text, rs->start, rs->end - rs->start), g->pos.x + letter->pos.x + rs->x, g->pos.y + letter->pos.y + rs->y, std::floor(elem->zIndex) + 0.9,
 			rs->color, g->group, g->fb, g->fbsize, g->viewId);
 	}
 }
@@ -1275,7 +1320,7 @@ void initNewLetter(ThreadGC* thgc, NewLetter* letter, FontId font, enum LetterTy
 	letter->renderspans = create_list(thgc, sizeof(RenderSpan*), CType::_RenderSpan);
 	letter->recompile = true;
 }
-int ElementMouse(ThreadGC* thgc, NewElement* self, MouseEvent* e, NewLocal* local) {
+int ElementMouse(ThreadGC* thgc, NewElement* self, MouseEvent* e, PointF pos, NewLocal* local) {
 	if (self->offscreened) e->group = self->offscreen->group;
 	if (self->GoMouseDown != NULL) {
 		MemObj* mo = (MemObj*)GC_clone(thgc, (char*)self->GoMouseDown->obj);
@@ -1289,16 +1334,18 @@ int ElementMouse(ThreadGC* thgc, NewElement* self, MouseEvent* e, NewLocal* loca
 		thgc->queue->push(h);
 	}
 	for (NewElement* elem = self->childend->next; elem->type != _ElemEnd; elem = elem->next) {
-		if (elem->orient) {
-			if (elem->pos.y + elem->pos2.y <= e->y && e->y < elem->pos.y + elem->pos2.y + elem->size.y) {
-				elem->Mouse(thgc, elem, e, local);
+		if (self->orient) {
+			if (elem->pos.x <= e->x - pos.x && e->x - pos.x < elem->pos.x + elem->size.x) {
+				elem->Mouse(thgc, elem, e, { pos.x + elem->pos.x, pos.y }, local);
 			}
+			pos.x += elem->size.x;
 		}
 		else {
-			if (elem->pos.x + elem->pos2.x <= e->x && e->x < elem->pos.x + elem->pos2.x + elem->size.x) {
-				elem->Mouse(thgc, elem, e, local);
+			if (elem->pos.y <= e->y - pos.y && e->y - pos.y < elem->pos.y + elem->size.y) {
+				elem->Mouse(thgc, elem, e, { pos.x, pos.y + elem->pos.y }, local);
 			}
 
+			pos.y += elem->size.y;
 		}
 	}
 
@@ -1899,12 +1946,12 @@ int EndKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLocal
 	}
 	return -1;
 }
-int LetterMouse(ThreadGC* thgc, NewElement* self, MouseEvent* e, NewLocal* local) {
+int LetterMouse(ThreadGC* thgc, NewElement* self, MouseEvent* e, PointF pos, NewLocal* local) {
 	NewLetter* letter = (NewLetter*)self;
 	for (int i = 0; i < letter->renderspans->size; i++) {
 		auto rs = *(RenderSpan**)get_list(letter->renderspans, i);
-		if (self->pos2.x + self->pos.x + rs->x <= e->x && e->x < self->pos2.x + self->pos.x + rs->x + rs->width) {
-			if (self->pos2.y + self->pos.y + rs->y <= e->y && e->y < self->pos2.y + self->pos.y + rs->y + rs->height) {
+		if (self->pos.x + rs->x <= e->x - pos.x && e->x - pos.x < self->pos.x + rs->x + rs->width) {
+			if (self->pos.y + rs->y <= e->y - pos.y && e->y - pos.y < self->pos.y + rs->y + rs->height) {
 				if (self->GoMouseDown != NULL) {
 					MemObj* mo = (MemObj*)GC_clone(thgc, (char*)self->GoMouseDown->obj);
 					MemTable* res = (MemTable*)GC_alloc(thgc, _MemTable);
@@ -1920,7 +1967,7 @@ int LetterMouse(ThreadGC* thgc, NewElement* self, MouseEvent* e, NewLocal* local
 				String* str = SubString(thgc, letter->text, rs->start, rs->end - rs->start);
 				size_t n;
 				float hei;
-				MeasureString(*getAtlas(thgc), rs->font, str, str->size, e->x - self->pos2.x - self->pos.x - rs->x, &width, &hei, &n, e->group);
+				MeasureString(*getAtlas(thgc), rs->font, str, str->size, e->x - pos.x - self->pos.x - rs->x, &width, &hei, &n, e->group);
 				if (e->action == SDL_EVENT_MOUSE_BUTTON_DOWN) {
 					local->select.from = local->select.to = self;
 					local->select.fromid = local->select.toid = self->id;
@@ -2411,7 +2458,7 @@ int LetterKey(ThreadGC* thgc, NewElement* self, int m, int n, KeyEvent* e, NewLo
 }
 // othelem.h で使うポップアップ関数の前方宣言
 NativeWindow* myCreatePopupWindow(ThreadGC* thgc, NativeWindowType type, PopupAnchor anchor,
-                                   int x, int y, int w, int h, NewElement* anchorElem,
+                                   int x, int y, int w, int h, int cornerRound, NewElement* anchorElem,
                                    bool visible = true);
 void myResizePopupWindow(ThreadGC* thgc, NativeWindow* popup, int newW, int newH);
 void myDestroyPopupWindow(ThreadGC* thgc, NativeWindow* popup);

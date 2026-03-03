@@ -16,12 +16,14 @@ void LayerInfo::push(DrawCommand* cmd) {
 // ============================================================
 
 void LayerInfo::pushFill(float x, float y, float width, float height,
-    float radius, float borderWidth, float aaPixels,
+    float radiusTL, float radiusTR, float radiusBR, float radiusBL,
+    float borderWidth, float aaPixels,
     uint32_t fillColor, uint32_t borderColor,
     float shadowX, float shadowY, float shadowBlur,
     uint32_t shadowColor, float zIndex,
     bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId,
-    float blendMode)
+    float blendMode,
+    float cornerPattern)
 {
     UnifiedDrawCommand* cmd = new UnifiedDrawCommand();
     cmd->type = DrawCommandType::Fill;
@@ -30,8 +32,12 @@ void LayerInfo::pushFill(float x, float y, float width, float height,
     cmd->viewId = viewId;
     cmd->x = x; cmd->y = y;
     cmd->width = width; cmd->height = height;
-    cmd->radius = radius;
     cmd->aa = aaPixels;
+    cmd->radiusTL = radiusTL;
+    cmd->radiusTR = radiusTR;
+    cmd->radiusBR = radiusBR;
+    cmd->radiusBL = radiusBL;
+    cmd->cornerPattern = cornerPattern;
     cmd->shadowX = shadowX; cmd->shadowY = shadowY;
     cmd->shadowBlur = shadowBlur;
     cmd->borderWidth = borderWidth;   // i_data3.w
@@ -119,13 +125,15 @@ void LayerInfo::pushPageCurl(float x, float y, float width, float height,
 
 void LayerInfo::pushImage(float x, float y, float width, float height,
     float atlasX, float atlasY, float atlasW, float atlasH,
-    float radius, float aaPixels, float borderWidth,
+    float radiusTL, float radiusTR, float radiusBR, float radiusBL,
+    float aaPixels, float borderWidth,
     uint32_t borderColor,
     float shadowX, float shadowY, float shadowBlur,
     uint32_t shadowColor, uint32_t modulate,
     float zIndex, bgfx::TextureHandle* tex1,
     bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId,
-    float blendMode)
+    float blendMode,
+    float cornerPattern)
 {
     UnifiedDrawCommand* cmd = new UnifiedDrawCommand();
     cmd->type = DrawCommandType::Image;
@@ -141,7 +149,9 @@ void LayerInfo::pushImage(float x, float y, float width, float height,
     cmd->scrollX = atlasX + atlasW;   // uvMax.x (i_data2.x)
     cmd->scrollY = atlasY + atlasH;   // uvMax.y (i_data2.y)
 
-    cmd->radius = radius;
+    cmd->radiusTL = radiusTL; cmd->radiusTR = radiusTR;
+    cmd->radiusBR = radiusBR; cmd->radiusBL = radiusBL;
+    cmd->cornerPattern = cornerPattern;
     cmd->aa = aaPixels;
     cmd->shadowX = shadowX; cmd->shadowY = shadowY;
     cmd->shadowBlur = shadowBlur;
@@ -199,13 +209,15 @@ void LayerInfo::pushPattern(enum DrawCommandType patternMode,
     float x, float y, float width, float height,
     float colorCount, float angle,
     float scrollX, float scrollY,
-    float radius, float aaPixels,
+    float radiusTL, float radiusTR, float radiusBR, float radiusBL,
+    float aaPixels,
     float borderWidth, uint32_t borderColor,
     float shadowX, float shadowY, float shadowBlur,
     uint32_t shadowColor,
     int dataOffset, float zIndex,
     bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId,
-    float blendMode)
+    float blendMode,
+    float cornerPattern)
 {
     UnifiedDrawCommand* cmd = new UnifiedDrawCommand();
     cmd->type = patternMode;
@@ -217,7 +229,9 @@ void LayerInfo::pushPattern(enum DrawCommandType patternMode,
     cmd->colorCount = colorCount;
     cmd->angle = angle;
     cmd->scrollX = scrollX; cmd->scrollY = scrollY;
-    cmd->radius = radius;
+    cmd->radiusTL = radiusTL; cmd->radiusTR = radiusTR;
+    cmd->radiusBR = radiusBR; cmd->radiusBL = radiusBL;
+    cmd->cornerPattern = cornerPattern;
     cmd->aa = aaPixels;
     cmd->shadowX = shadowX; cmd->shadowY = shadowY;
     cmd->shadowBlur = shadowBlur;
@@ -293,7 +307,9 @@ void LayerInfo::pushBackground(Background* back, float x, float y, float width, 
     cmd->scrollX = back->scrollX;   // uvMax.x (i_data2.x)
     cmd->scrollY = back->scrollY;   // uvMax.y (i_data2.y)
 
-    cmd->radius = back->borderRadius;
+    cmd->radiusTL = back->borderRadiusTL; cmd->radiusTR = back->borderRadiusTR;
+    cmd->radiusBR = back->borderRadiusBR; cmd->radiusBL = back->borderRadiusBL;
+    cmd->cornerPattern = back->cornerPattern;
     cmd->aa = back->aa;
     cmd->shadowBlur = back->shadowBlur;
     cmd->borderWidth = back->borderWidth;             // i_data3.w
@@ -557,6 +573,7 @@ struct RenderPassKey {
     bgfx::TextureHandle* texture;
     bgfx::TextureHandle* texture2;
     float blendMode;
+    float cornerPattern;
 
     bool operator<(const RenderPassKey& other) const {
         if (fbo != other.fbo) return fbo < other.fbo;
@@ -564,6 +581,7 @@ struct RenderPassKey {
         if (zIndexBucket != other.zIndexBucket) return zIndexBucket < other.zIndexBucket;
         if (dctype != other.dctype) return dctype < other.dctype;
         if (blendMode != other.blendMode) return blendMode < other.blendMode;
+        if (cornerPattern != other.cornerPattern) return cornerPattern < other.cornerPattern;
         if (texture != other.texture) return texture < other.texture;
         return texture2 < other.texture2;
     }
@@ -598,6 +616,7 @@ GroupedCommands groupDrawCommands(
         passKey.texture = cmd->texture;    // ★ テクスチャポインタ
         passKey.texture2 = cmd->texture2;
         passKey.blendMode = cmd->blendMode;
+        passKey.cornerPattern = cmd->cornerPattern;
 
         passGroups[passKey].push_back(cmd);
     }
@@ -808,8 +827,8 @@ void initRenderResources(RenderResources& resources) {
     // Load shaders with automatic platform suffix
     // Windows: vs_unite2.bin, macOS/iOS: shaders/vs_unite2_mtl.bin, Linux/Android: shaders/vs_unite2_spv.bin
 #if defined(_WIN32)
-    bgfx::ShaderHandle vsu = loadShader("vs_unite2", HopStarIO::Location::Resource);
-    bgfx::ShaderHandle fsu = loadShader("fs_unite2", HopStarIO::Location::Resource);
+    bgfx::ShaderHandle vsu = loadShader("shaders/vs_unite2", HopStarIO::Location::Resource);
+    bgfx::ShaderHandle fsu = loadShader("shaders/fs_unite2", HopStarIO::Location::Resource);
 #else
     bgfx::ShaderHandle vsu = loadShader("shaders/vs_unite2", HopStarIO::Location::Resource);
     bgfx::ShaderHandle fsu = loadShader("shaders/fs_unite2", HopStarIO::Location::Resource);

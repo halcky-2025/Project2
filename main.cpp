@@ -27,6 +27,8 @@ extern "C" {
 #define UTF8PROC_STATIC
 #include <utf8proc.h>
 #pragma comment(lib, "utf8proc_static.lib")
+#include <dwmapi.h>
+#pragma comment(lib, "dwmapi.lib")
 #include "file_engine.h"
 namespace F = torch::nn::functional;
 #include "gc.h"
@@ -549,6 +551,12 @@ int main() {
                         if (sdlWin) {
                             auto props = SDL_GetWindowProperties(sdlWin);
                             req->resultNwh = SDL_GetPointerProperty(props, "SDL.window.win32.hwnd", nullptr);
+                            // 角丸設定（Windows 11 DWM）
+                            if (req->resultNwh && req->cornerRound > 0) {
+                                DWORD pref = (DWORD)req->cornerRound;
+                                DwmSetWindowAttribute((HWND)req->resultNwh,
+                                    33 /*DWMWA_WINDOW_CORNER_PREFERENCE*/, &pref, sizeof(pref));
+                            }
                             if (req->visible) SDL_ShowWindow(sdlWin);
                         }
                         req->resultSDLWindow = sdlWin;
