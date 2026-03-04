@@ -1,4 +1,7 @@
 {
+  "env": {
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "64000"
+  },
   "permissions": {
     "allow": [
       "Bash(grep:*)",
@@ -169,7 +172,12 @@
       "Bash(.shaderc.exe -f fs_unite2.sc -o fs_unite2.bin --type fragment --platform windows -p s_5_0 -i . --varyingdef v_unite2.def.sc)",
       "Bash(\"C:/Users/hayah/source/repos/Project2/Project2/shaders/shaderc.exe\" -f \"C:/Users/hayah/source/repos/Project2/Project2/shaders/fs_unite2.sc\" -o \"C:/Users/hayah/source/repos/Project2/Project2/shaders/fs_unite2.bin\" --type f --platform windows -p s_5_0 -i \"C:/Users/hayah/source/repos/Project2/android/app/jni/src/bgfx/src\" --varyingdef \"C:/Users/hayah/source/repos/Project2/Project2/shaders/v_unite2.def.sc\")",
       "Bash(\"C:/Users/hayah/source/repos/Project2/Project2/shaders/shaderc.exe\" -f \"C:/Users/hayah/source/repos/Project2/Project2/shaders/fs_unite2.sc\" -o \"C:/Users/hayah/source/repos/Project2/Project2/shaders/fs_unite2.bin\" --type f --platform windows -p ps_5_0 -i \"C:/Users/hayah/source/repos/Project2/android/app/jni/src/bgfx/src\" --varyingdef \"C:/Users/hayah/source/repos/Project2/Project2/shaders/v_unite2.def.sc\")",
-      "Bash(git checkout -- shaders/fs_unite2.sc)"
+      "Bash(git checkout -- shaders/fs_unite2.sc)",
+      "Bash(test -f ~/.claude/settings.json)",
+      "Bash(test -f ~/.claude/settings.local.json)",
+      "Skill(claude-developer-platform)",
+      "Skill(claude-developer-platform:*)",
+      "Bash(git checkout -- Project2/shaders/fs_unite2.sc)"
     ]
   }
 }
