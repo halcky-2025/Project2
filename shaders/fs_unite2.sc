@@ -537,7 +537,9 @@ void main()
             concaveShadow = min(max(scrBL - blSD, blSM), max(scrBR - brSD, brSM));
             float blIR = scrBL + borderWidth;
             float brIR = scrBR + borderWidth;
-            concaveInner = min(max(blIR - blD, blM), max(brIR - brD, brM));
+            float blMI = max(max(max(-localPos.x - hx - scrBL, localPos.x + hx - borderWidth), hy - scrBL - localPos.y), localPos.y - hy);
+            float brMI = max(max(max( localPos.x - hx - scrBR, hx - borderWidth - localPos.x), hy - scrBR - localPos.y), localPos.y - hy);
+            concaveInner = min(max(blIR - blD, blMI), max(brIR - brD, brMI));
         } else if (cornerPattern < 2.5) {
             // 2: 上辺なし → 画面TL,TR が凹角
             rSafe.z = 0.0;  // 画面TL凸なし
@@ -557,7 +559,9 @@ void main()
             concaveShadow = min(max(scrTL - tlSD, tlSM), max(scrTR - trSD, trSM));
             float tlIR = scrTL + borderWidth;
             float trIR = scrTR + borderWidth;
-            concaveInner = min(max(tlIR - tlD, tlM), max(trIR - trD, trM));
+            float tlMI = max(max(max(-localPos.x - hx - scrTL, localPos.x + hx - borderWidth), localPos.y + hy - scrTL), -localPos.y - hy);
+            float trMI = max(max(max( localPos.x - hx - scrTR, hx - borderWidth - localPos.x), localPos.y + hy - scrTR), -localPos.y - hy);
+            concaveInner = min(max(tlIR - tlD, tlMI), max(trIR - trD, trMI));
         } else if (cornerPattern < 3.5) {
             // 3: 左辺なし → 画面TL,BL が凹角
             rSafe.z = 0.0;  // 画面TL凸なし
@@ -628,10 +632,11 @@ void main()
             float trIR = scrTR + borderWidth;
             float brIR = scrBR + borderWidth;
             float blIR = scrBL + borderWidth;
+            float blMI = max(max(max(-localPos.x - hx - scrBL, localPos.x + hx - borderWidth), hy - scrBL - localPos.y), localPos.y - hy);
             concaveInner = min(min(
                 max(trIR - trD, trM),
                 max(brIR - brD, brM)),
-                max(blIR - blD, blM));
+                max(blIR - blD, blMI));
         } else if (cornerPattern < 6.5) {
             // 6: 下+左辺なし → 画面TRのみ凸, 画面TL/BR/BL が凹角
             rSafe.z = 0.0; rSafe.x = 0.0; rSafe.w = 0.0;
@@ -662,9 +667,10 @@ void main()
             float tlIR = scrTL + borderWidth;
             float brIR = scrBR + borderWidth;
             float blIR = scrBL + borderWidth;
+            float brMI = max(max(max( localPos.x - hx - scrBR, hx - borderWidth - localPos.x), hy - scrBR - localPos.y), localPos.y - hy);
             concaveInner = min(min(
                 max(tlIR - tlD, tlM),
-                max(brIR - brD, brM)),
+                max(brIR - brD, brMI)),
                 max(blIR - blD, blM));
         } else if (cornerPattern < 7.5) {
             // 7: 上+右辺なし → 画面BLのみ凸, 画面TL/TR/BR が凹角
@@ -696,8 +702,9 @@ void main()
             float tlIR = scrTL + borderWidth;
             float trIR = scrTR + borderWidth;
             float brIR = scrBR + borderWidth;
+            float tlMI = max(max(max(-localPos.x - hx - scrTL, localPos.x + hx - borderWidth), localPos.y + hy - scrTL), -localPos.y - hy);
             concaveInner = min(min(
-                max(tlIR - tlD, tlM),
+                max(tlIR - tlD, tlMI),
                 max(trIR - trD, trM)),
                 max(brIR - brD, brM));
         } else {
@@ -730,9 +737,10 @@ void main()
             float tlIR = scrTL + borderWidth;
             float trIR = scrTR + borderWidth;
             float blIR = scrBL + borderWidth;
+            float trMI = max(max(max( localPos.x - hx - scrTR, hx - borderWidth - localPos.x), localPos.y + hy - scrTR), -localPos.y - hy);
             concaveInner = min(min(
                 max(tlIR - tlD, tlM),
-                max(trIR - trD, trM)),
+                max(trIR - trD, trMI)),
                 max(blIR - blD, blM));
         }
     }
