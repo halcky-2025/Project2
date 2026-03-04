@@ -387,7 +387,7 @@ void NewTabDraw(ThreadGC* thgc, NewElement* elem, NewGraphic* g, NewLocal* local
 	}
 	g->layer->pushBackground(elem->background, g->pos.x, g->pos.y, elem->size.x, elem->size.y, elem->zIndex + 0.1,
 		tex1, tex2, g->fb, g->fbsize, g->viewId, 0.0f);
-	g->layer->pushFill(g->pos.x + 100, g->pos.y, 100, elem->size.y, 8.0f, 8.0f, 8.0f, 8.0f, 1.0f, 3.0f, 0xc0c0ffff, 0x202040ff, 0, 0, 0, 0, elem->zIndex + 0.3, g->fb, g->fbsize, g->viewId, 0.0, 1.0f);
+	g->layer->pushFill(g->pos.x + 80, g->pos.y, 100, elem->size.y - 2, 8.0f, 8.0f, 8.0f, 8.0f, 1.0f, 3.0f, 0xc0c0ffff, 0x202040ff, 0, 0, 0, 0, elem->zIndex + 0.3, g->fb, g->fbsize, g->viewId, 0.0, 3.0f);
 	drawString((LayerInfo*)g->layer, *getAtlas(thgc), elem->font, *(String**)get_list(tab->strs, 0), g->pos.x + elem->pos.x, g->pos.y + elem->pos.y, std::floor(elem->zIndex) + 0.9,
 		0x000000FF, g->group, g->fb, g->fbsize, g->viewId);
 	drawString((LayerInfo*)g->layer, *getAtlas(thgc), elem->font, *(String**)get_list(tab->strs, 1), g->pos.x + elem->pos.x + 100, g->pos.y + elem->pos.y, std::floor(elem->zIndex) + 0.9,

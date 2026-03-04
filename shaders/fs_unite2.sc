@@ -494,6 +494,8 @@ void main()
     float concaveFill = 1000.0;
     float concaveShadow = 1000.0;
     float concaveInner = 1000.0;
+    float concaveJunctionFactor = 0.0;  // 接合部ブレンド係数 (0=補正なし)
+    float concaveArcBorder = 0.0;       // 弧に基づくボーダーアルファ
 
     // 内側SDF拡張 (オープン辺のボーダーだけ消す)
     vec2 innerSdfExt = vec2(0.0, 0.0);
@@ -540,6 +542,14 @@ void main()
             float blMI = max(max(max(-localPos.x - hx - scrBL, localPos.x + hx - borderWidth), hy - scrBL - localPos.y), localPos.y - hy);
             float brMI = max(max(max( localPos.x - hx - scrBR, hx - borderWidth - localPos.x), hy - scrBR - localPos.y), localPos.y - hy);
             concaveInner = min(max(blIR - blD, blMI), max(brIR - brD, brMI));
+            // 接合部: 接合点より下で矩形ボーダーを弧ボーダーに置換
+            float jBL = smoothstep(0.0, aaSafe, localPos.y - (hy - scrBL));
+            float arcBordBL = clamp(smoothstep(aaSafe, -aaSafe, scrBL - blD) - smoothstep(aaSafe, -aaSafe, blIR - blD), 0.0, 1.0);
+            float jBR = smoothstep(0.0, aaSafe, localPos.y - (hy - scrBR));
+            float arcBordBR = clamp(smoothstep(aaSafe, -aaSafe, scrBR - brD) - smoothstep(aaSafe, -aaSafe, brIR - brD), 0.0, 1.0);
+            float rightSide = step(0.0, localPos.x);
+            concaveJunctionFactor = mix(jBL, jBR, rightSide);
+            concaveArcBorder = mix(arcBordBL, arcBordBR, rightSide);
         } else if (cornerPattern < 2.5) {
             // 2: 上辺なし → 画面TL,TR が凹角
             rSafe.z = 0.0;  // 画面TL凸なし
@@ -562,6 +572,14 @@ void main()
             float tlMI = max(max(max(-localPos.x - hx - scrTL, localPos.x + hx - borderWidth), localPos.y + hy - scrTL), -localPos.y - hy);
             float trMI = max(max(max( localPos.x - hx - scrTR, hx - borderWidth - localPos.x), localPos.y + hy - scrTR), -localPos.y - hy);
             concaveInner = min(max(tlIR - tlD, tlMI), max(trIR - trD, trMI));
+            // 接合部: 接合点より上で矩形ボーダーを弧ボーダーに置換
+            float jTL = smoothstep(0.0, aaSafe, (-hy + scrTL) - localPos.y);
+            float arcBordTL = clamp(smoothstep(aaSafe, -aaSafe, scrTL - tlD) - smoothstep(aaSafe, -aaSafe, tlIR - tlD), 0.0, 1.0);
+            float jTR = smoothstep(0.0, aaSafe, (-hy + scrTR) - localPos.y);
+            float arcBordTR = clamp(smoothstep(aaSafe, -aaSafe, scrTR - trD) - smoothstep(aaSafe, -aaSafe, trIR - trD), 0.0, 1.0);
+            float rightSide2 = step(0.0, localPos.x);
+            concaveJunctionFactor = mix(jTL, jTR, rightSide2);
+            concaveArcBorder = mix(arcBordTL, arcBordTR, rightSide2);
         } else if (cornerPattern < 3.5) {
             // 3: 左辺なし → 画面TL,BL が凹角
             rSafe.z = 0.0;  // 画面TL凸なし
@@ -637,6 +655,9 @@ void main()
                 max(trIR - trD, trM),
                 max(brIR - brD, brM)),
                 max(blIR - blD, blMI));
+            // 接合部: BL接合点より下で矩形ボーダーを弧ボーダーに置換
+            concaveJunctionFactor = smoothstep(0.0, aaSafe, localPos.y - (hy - scrBL));
+            concaveArcBorder = clamp(smoothstep(aaSafe, -aaSafe, scrBL - blD) - smoothstep(aaSafe, -aaSafe, blIR - blD), 0.0, 1.0);
         } else if (cornerPattern < 6.5) {
             // 6: 下+左辺なし → 画面TRのみ凸, 画面TL/BR/BL が凹角
             rSafe.z = 0.0; rSafe.x = 0.0; rSafe.w = 0.0;
@@ -672,6 +693,9 @@ void main()
                 max(tlIR - tlD, tlM),
                 max(brIR - brD, brMI)),
                 max(blIR - blD, blM));
+            // 接合部: BR接合点より下で矩形ボーダーを弧ボーダーに置換
+            concaveJunctionFactor = smoothstep(0.0, aaSafe, localPos.y - (hy - scrBR));
+            concaveArcBorder = clamp(smoothstep(aaSafe, -aaSafe, scrBR - brD) - smoothstep(aaSafe, -aaSafe, brIR - brD), 0.0, 1.0);
         } else if (cornerPattern < 7.5) {
             // 7: 上+右辺なし → 画面BLのみ凸, 画面TL/TR/BR が凹角
             rSafe.z = 0.0; rSafe.y = 0.0; rSafe.x = 0.0;
@@ -707,6 +731,9 @@ void main()
                 max(tlIR - tlD, tlMI),
                 max(trIR - trD, trM)),
                 max(brIR - brD, brM));
+            // 接合部: TL接合点より上で矩形ボーダーを弧ボーダーに置換
+            concaveJunctionFactor = smoothstep(0.0, aaSafe, (-hy + scrTL) - localPos.y);
+            concaveArcBorder = clamp(smoothstep(aaSafe, -aaSafe, scrTL - tlD) - smoothstep(aaSafe, -aaSafe, tlIR - tlD), 0.0, 1.0);
         } else {
             // 8: 上+左辺なし → 画面BRのみ凸, 画面TL/TR/BL が凹角
             rSafe.z = 0.0; rSafe.y = 0.0; rSafe.w = 0.0;
@@ -742,6 +769,9 @@ void main()
                 max(tlIR - tlD, tlM),
                 max(trIR - trD, trMI)),
                 max(blIR - blD, blM));
+            // 接合部: TR接合点より上で矩形ボーダーを弧ボーダーに置換
+            concaveJunctionFactor = smoothstep(0.0, aaSafe, (-hy + scrTR) - localPos.y);
+            concaveArcBorder = clamp(smoothstep(aaSafe, -aaSafe, scrTR - trD) - smoothstep(aaSafe, -aaSafe, trIR - trD), 0.0, 1.0);
         }
     }
 
@@ -775,6 +805,10 @@ void main()
         concaveInner);
     float alphaInner = smoothstep(aaSafe, -aaSafe, distInner);
     float alphaBorder = clamp(alphaFill - alphaInner, 0.0, 1.0);
+    // 接合部補正: 矩形の直線ボーダーを弧の曲線ボーダーに置換
+    // arcBorderは弧のfill-inner差分で計算済み、alphaFillでキャップしてはみ出し防止
+    alphaBorder = mix(alphaBorder, min(concaveArcBorder, alphaFill), concaveJunctionFactor);
+    alphaInner = alphaFill - alphaBorder;
     
     // ============================================================
     // 合成
