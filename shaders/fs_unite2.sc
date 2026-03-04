@@ -459,7 +459,9 @@ void main()
         float rTR = unpackHalfLo(rPack0);
         float rBR = unpackHalfHi(rPack1);
         float rBL = unpackHalfLo(rPack1);
-        cornerRadii = vec4(rTR, rBR, rBL, rTL);  // sdRoundBox の引数順
+        // sdRoundBox は Y上向き座標系用なので、画面座標(Y下向き)では T↔B を入替
+        // これにより C++ の radiusTL が画面左上に、radiusBL が画面左下に正しく対応
+        cornerRadii = vec4(rBR, rTR, rTL, rBL);
     }
     // PageCurl: cornerRadii は vec4(0) のまま（角丸なし）
 
@@ -498,22 +500,18 @@ void main()
     vec2 innerSdfShift = vec2(0.0, 0.0);
 
     if (cornerPattern > 0.5) {
-        // 凹角 (concave corners): 四分円SDFのユニオン
-        vec2 cTL = vec2(-halfSize.x, -halfSize.y);
-        vec2 cTR = vec2( halfSize.x, -halfSize.y);
-        vec2 cBL = vec2(-halfSize.x,  halfSize.y);
-        vec2 cBR = vec2( halfSize.x,  halfSize.y);
-
-        // sdRoundBox の Y反転マッピング:
-        //   rSafe.x (packed rTR) → 画面右下
-        //   rSafe.y (packed rBR) → 画面右上
-        //   rSafe.z (packed rBL) → 画面左上
-        //   rSafe.w (packed rTL) → 画面左下
-        // したがって画面上の角に対応する凹角半径:
-        float scrTL = rSafe.z;  // 画面左上の半径
-        float scrTR = rSafe.y;  // 画面右上の半径
-        float scrBL = rSafe.w;  // 画面左下の半径
-        float scrBR = rSafe.x;  // 画面右下の半径
+        // 凹角 (concave corners): オフセット中心による四分円SDF
+        // 円の中心を矩形角から radius だけオフセットし、辺との G1 接線連続を実現
+        // 例: 画面BL凹角 → 中心 (-hx - r, hy - r), 左辺と下辺に接する
+        // cornerRadii 構築時に T↔B 入替済みなので:
+        //   rSafe.x = rBR → 画面右下
+        //   rSafe.y = rTR → 画面右上
+        //   rSafe.z = rTL → 画面左上
+        //   rSafe.w = rBL → 画面左下
+        float scrTL = rSafe.z;  // 画面左上 = C++ radiusTL
+        float scrTR = rSafe.y;  // 画面右上 = C++ radiusTR
+        float scrBL = rSafe.w;  // 画面左下 = C++ radiusBL
+        float scrBR = rSafe.x;  // 画面右下 = C++ radiusBR
 
         vec2 sLocal = localPos - shadowOffset;
         float hx = halfSize.x;
@@ -525,161 +523,217 @@ void main()
             rSafe.w = 0.0;  // 画面BL凸なし
             rSafe.x = 0.0;  // 画面BR凸なし
             innerSdfExt = vec2(0.0, bExt);  innerSdfShift = vec2(0.0, bExt);
-            float blR = max(localPos.x + hx, hy - localPos.y);
-            float brR = max(hx - localPos.x, hy - localPos.y);
-            concaveFill = min(
-                max(length(localPos - cBL) - scrBL, blR),
-                max(length(localPos - cBR) - scrBR, brR));
-            float blSR = max(sLocal.x + hx, hy - sLocal.y);
-            float brSR = max(hx - sLocal.x, hy - sLocal.y);
-            concaveShadow = min(
-                max(length(sLocal - cBL) - scrBL, blSR),
-                max(length(sLocal - cBR) - scrBR, brSR));
-            concaveInner = min(
-                max(length(localPos - cBL) - max(scrBL - borderWidth, 0.0), blR),
-                max(length(localPos - cBR) - max(scrBR - borderWidth, 0.0), brR));
+            vec2 blC = vec2(-hx - scrBL, hy - scrBL);
+            vec2 brC = vec2( hx + scrBR, hy - scrBR);
+            float blD = length(localPos - blC);
+            float brD = length(localPos - brC);
+            float blM = max(-localPos.x - hx - scrBL, hy - scrBL - localPos.y);
+            float brM = max( localPos.x - hx - scrBR, hy - scrBR - localPos.y);
+            concaveFill = min(max(blD - scrBL, blM), max(brD - scrBR, brM));
+            float blSD = length(sLocal - blC);
+            float brSD = length(sLocal - brC);
+            float blSM = max(-sLocal.x - hx - scrBL, hy - scrBL - sLocal.y);
+            float brSM = max( sLocal.x - hx - scrBR, hy - scrBR - sLocal.y);
+            concaveShadow = min(max(blSD - scrBL, blSM), max(brSD - scrBR, brSM));
+            float blIR = max(scrBL - borderWidth, 0.0);
+            float brIR = max(scrBR - borderWidth, 0.0);
+            concaveInner = min(max(blD - blIR, blM), max(brD - brIR, brM));
         } else if (cornerPattern < 2.5) {
             // 2: 上辺なし → 画面TL,TR が凹角
             rSafe.z = 0.0;  // 画面TL凸なし
             rSafe.y = 0.0;  // 画面TR凸なし
             innerSdfExt = vec2(0.0, bExt);  innerSdfShift = vec2(0.0, -bExt);
-            float tlR = max(localPos.x + hx, -localPos.y - hy);
-            float trR = max(hx - localPos.x, -localPos.y - hy);
-            concaveFill = min(
-                max(length(localPos - cTL) - scrTL, tlR),
-                max(length(localPos - cTR) - scrTR, trR));
-            float tlSR = max(sLocal.x + hx, -sLocal.y - hy);
-            float trSR = max(hx - sLocal.x, -sLocal.y - hy);
-            concaveShadow = min(
-                max(length(sLocal - cTL) - scrTL, tlSR),
-                max(length(sLocal - cTR) - scrTR, trSR));
-            concaveInner = min(
-                max(length(localPos - cTL) - max(scrTL - borderWidth, 0.0), tlR),
-                max(length(localPos - cTR) - max(scrTR - borderWidth, 0.0), trR));
+            vec2 tlC = vec2(-hx - scrTL, -hy + scrTL);
+            vec2 trC = vec2( hx + scrTR, -hy + scrTR);
+            float tlD = length(localPos - tlC);
+            float trD = length(localPos - trC);
+            float tlM = max(-localPos.x - hx - scrTL, localPos.y + hy - scrTL);
+            float trM = max( localPos.x - hx - scrTR, localPos.y + hy - scrTR);
+            concaveFill = min(max(tlD - scrTL, tlM), max(trD - scrTR, trM));
+            float tlSD = length(sLocal - tlC);
+            float trSD = length(sLocal - trC);
+            float tlSM = max(-sLocal.x - hx - scrTL, sLocal.y + hy - scrTL);
+            float trSM = max( sLocal.x - hx - scrTR, sLocal.y + hy - scrTR);
+            concaveShadow = min(max(tlSD - scrTL, tlSM), max(trSD - scrTR, trSM));
+            float tlIR = max(scrTL - borderWidth, 0.0);
+            float trIR = max(scrTR - borderWidth, 0.0);
+            concaveInner = min(max(tlD - tlIR, tlM), max(trD - trIR, trM));
         } else if (cornerPattern < 3.5) {
             // 3: 左辺なし → 画面TL,BL が凹角
             rSafe.z = 0.0;  // 画面TL凸なし
             rSafe.w = 0.0;  // 画面BL凸なし
             innerSdfExt = vec2(bExt, 0.0);  innerSdfShift = vec2(-bExt, 0.0);
-            float tlR = max(localPos.x + hx, -localPos.y - hy);
-            float blR = max(localPos.x + hx, localPos.y - hy);
-            concaveFill = min(
-                max(length(localPos - cTL) - scrTL, tlR),
-                max(length(localPos - cBL) - scrBL, blR));
-            float tlSR = max(sLocal.x + hx, -sLocal.y - hy);
-            float blSR = max(sLocal.x + hx, sLocal.y - hy);
-            concaveShadow = min(
-                max(length(sLocal - cTL) - scrTL, tlSR),
-                max(length(sLocal - cBL) - scrBL, blSR));
-            concaveInner = min(
-                max(length(localPos - cTL) - max(scrTL - borderWidth, 0.0), tlR),
-                max(length(localPos - cBL) - max(scrBL - borderWidth, 0.0), blR));
+            vec2 tlC = vec2(-hx - scrTL, -hy + scrTL);
+            vec2 blC = vec2(-hx - scrBL,  hy - scrBL);
+            float tlD = length(localPos - tlC);
+            float blD = length(localPos - blC);
+            float tlM = max(-localPos.x - hx - scrTL, localPos.y + hy - scrTL);
+            float blM = max(-localPos.x - hx - scrBL, hy - scrBL - localPos.y);
+            concaveFill = min(max(tlD - scrTL, tlM), max(blD - scrBL, blM));
+            float tlSD = length(sLocal - tlC);
+            float blSD = length(sLocal - blC);
+            float tlSM = max(-sLocal.x - hx - scrTL, sLocal.y + hy - scrTL);
+            float blSM = max(-sLocal.x - hx - scrBL, hy - scrBL - sLocal.y);
+            concaveShadow = min(max(tlSD - scrTL, tlSM), max(blSD - scrBL, blSM));
+            float tlIR = max(scrTL - borderWidth, 0.0);
+            float blIR = max(scrBL - borderWidth, 0.0);
+            concaveInner = min(max(tlD - tlIR, tlM), max(blD - blIR, blM));
         } else if (cornerPattern < 4.5) {
             // 4: 右辺なし → 画面TR,BR が凹角
             rSafe.y = 0.0;  // 画面TR凸なし
             rSafe.x = 0.0;  // 画面BR凸なし
             innerSdfExt = vec2(bExt, 0.0);  innerSdfShift = vec2(bExt, 0.0);
-            float trR = max(hx - localPos.x, -localPos.y - hy);
-            float brR = max(hx - localPos.x, localPos.y - hy);
-            concaveFill = min(
-                max(length(localPos - cTR) - scrTR, trR),
-                max(length(localPos - cBR) - scrBR, brR));
-            float trSR = max(hx - sLocal.x, -sLocal.y - hy);
-            float brSR = max(hx - sLocal.x, sLocal.y - hy);
-            concaveShadow = min(
-                max(length(sLocal - cTR) - scrTR, trSR),
-                max(length(sLocal - cBR) - scrBR, brSR));
-            concaveInner = min(
-                max(length(localPos - cTR) - max(scrTR - borderWidth, 0.0), trR),
-                max(length(localPos - cBR) - max(scrBR - borderWidth, 0.0), brR));
+            vec2 trC = vec2(hx + scrTR, -hy + scrTR);
+            vec2 brC = vec2(hx + scrBR,  hy - scrBR);
+            float trD = length(localPos - trC);
+            float brD = length(localPos - brC);
+            float trM = max(localPos.x - hx - scrTR, localPos.y + hy - scrTR);
+            float brM = max(localPos.x - hx - scrBR, hy - scrBR - localPos.y);
+            concaveFill = min(max(trD - scrTR, trM), max(brD - scrBR, brM));
+            float trSD = length(sLocal - trC);
+            float brSD = length(sLocal - brC);
+            float trSM = max(sLocal.x - hx - scrTR, sLocal.y + hy - scrTR);
+            float brSM = max(sLocal.x - hx - scrBR, hy - scrBR - sLocal.y);
+            concaveShadow = min(max(trSD - scrTR, trSM), max(brSD - scrBR, brSM));
+            float trIR = max(scrTR - borderWidth, 0.0);
+            float brIR = max(scrBR - borderWidth, 0.0);
+            concaveInner = min(max(trD - trIR, trM), max(brD - brIR, brM));
         } else if (cornerPattern < 5.5) {
             // 5: 下+右辺なし → 画面TLのみ凸, 画面TR/BR/BL が凹角
             rSafe.y = 0.0; rSafe.x = 0.0; rSafe.w = 0.0;
             innerSdfExt = vec2(bExt, bExt);  innerSdfShift = vec2(bExt, bExt);
-            float trR = max(hx - localPos.x, -localPos.y - hy);
-            float brR = max(hx - localPos.x, localPos.y - hy);
-            float blR = max(localPos.x + hx, localPos.y - hy);
+            vec2 trC = vec2( hx + scrTR, -hy + scrTR);
+            vec2 brC = vec2( hx + scrBR,  hy - scrBR);
+            vec2 blC = vec2(-hx - scrBL,  hy - scrBL);
+            float trD = length(localPos - trC);
+            float brD = length(localPos - brC);
+            float blD = length(localPos - blC);
+            float trM = max( localPos.x - hx - scrTR, localPos.y + hy - scrTR);
+            float brM = max( localPos.x - hx - scrBR, hy - scrBR - localPos.y);
+            float blM = max(-localPos.x - hx - scrBL, hy - scrBL - localPos.y);
             concaveFill = min(min(
-                max(length(localPos - cTR) - scrTR, trR),
-                max(length(localPos - cBR) - scrBR, brR)),
-                max(length(localPos - cBL) - scrBL, blR));
-            float trSR = max(hx - sLocal.x, -sLocal.y - hy);
-            float brSR = max(hx - sLocal.x, sLocal.y - hy);
-            float blSR = max(sLocal.x + hx, sLocal.y - hy);
+                max(trD - scrTR, trM),
+                max(brD - scrBR, brM)),
+                max(blD - scrBL, blM));
+            float trSD = length(sLocal - trC);
+            float brSD = length(sLocal - brC);
+            float blSD = length(sLocal - blC);
+            float trSM = max( sLocal.x - hx - scrTR, sLocal.y + hy - scrTR);
+            float brSM = max( sLocal.x - hx - scrBR, hy - scrBR - sLocal.y);
+            float blSM = max(-sLocal.x - hx - scrBL, hy - scrBL - sLocal.y);
             concaveShadow = min(min(
-                max(length(sLocal - cTR) - scrTR, trSR),
-                max(length(sLocal - cBR) - scrBR, brSR)),
-                max(length(sLocal - cBL) - scrBL, blSR));
+                max(trSD - scrTR, trSM),
+                max(brSD - scrBR, brSM)),
+                max(blSD - scrBL, blSM));
+            float trIR = max(scrTR - borderWidth, 0.0);
+            float brIR = max(scrBR - borderWidth, 0.0);
+            float blIR = max(scrBL - borderWidth, 0.0);
             concaveInner = min(min(
-                max(length(localPos - cTR) - max(scrTR - borderWidth, 0.0), trR),
-                max(length(localPos - cBR) - max(scrBR - borderWidth, 0.0), brR)),
-                max(length(localPos - cBL) - max(scrBL - borderWidth, 0.0), blR));
+                max(trD - trIR, trM),
+                max(brD - brIR, brM)),
+                max(blD - blIR, blM));
         } else if (cornerPattern < 6.5) {
             // 6: 下+左辺なし → 画面TRのみ凸, 画面TL/BR/BL が凹角
             rSafe.z = 0.0; rSafe.x = 0.0; rSafe.w = 0.0;
             innerSdfExt = vec2(bExt, bExt);  innerSdfShift = vec2(-bExt, bExt);
-            float tlR = max(localPos.x + hx, -localPos.y - hy);
-            float brR = max(hx - localPos.x, localPos.y - hy);
-            float blR = max(localPos.x + hx, localPos.y - hy);
+            vec2 tlC = vec2(-hx - scrTL, -hy + scrTL);
+            vec2 brC = vec2( hx + scrBR,  hy - scrBR);
+            vec2 blC = vec2(-hx - scrBL,  hy - scrBL);
+            float tlD = length(localPos - tlC);
+            float brD = length(localPos - brC);
+            float blD = length(localPos - blC);
+            float tlM = max(-localPos.x - hx - scrTL, localPos.y + hy - scrTL);
+            float brM = max( localPos.x - hx - scrBR, hy - scrBR - localPos.y);
+            float blM = max(-localPos.x - hx - scrBL, hy - scrBL - localPos.y);
             concaveFill = min(min(
-                max(length(localPos - cTL) - scrTL, tlR),
-                max(length(localPos - cBR) - scrBR, brR)),
-                max(length(localPos - cBL) - scrBL, blR));
-            float tlSR = max(sLocal.x + hx, -sLocal.y - hy);
-            float brSR = max(hx - sLocal.x, sLocal.y - hy);
-            float blSR = max(sLocal.x + hx, sLocal.y - hy);
+                max(tlD - scrTL, tlM),
+                max(brD - scrBR, brM)),
+                max(blD - scrBL, blM));
+            float tlSD = length(sLocal - tlC);
+            float brSD = length(sLocal - brC);
+            float blSD = length(sLocal - blC);
+            float tlSM = max(-sLocal.x - hx - scrTL, sLocal.y + hy - scrTL);
+            float brSM = max( sLocal.x - hx - scrBR, hy - scrBR - sLocal.y);
+            float blSM = max(-sLocal.x - hx - scrBL, hy - scrBL - sLocal.y);
             concaveShadow = min(min(
-                max(length(sLocal - cTL) - scrTL, tlSR),
-                max(length(sLocal - cBR) - scrBR, brSR)),
-                max(length(sLocal - cBL) - scrBL, blSR));
+                max(tlSD - scrTL, tlSM),
+                max(brSD - scrBR, brSM)),
+                max(blSD - scrBL, blSM));
+            float tlIR = max(scrTL - borderWidth, 0.0);
+            float brIR = max(scrBR - borderWidth, 0.0);
+            float blIR = max(scrBL - borderWidth, 0.0);
             concaveInner = min(min(
-                max(length(localPos - cTL) - max(scrTL - borderWidth, 0.0), tlR),
-                max(length(localPos - cBR) - max(scrBR - borderWidth, 0.0), brR)),
-                max(length(localPos - cBL) - max(scrBL - borderWidth, 0.0), blR));
+                max(tlD - tlIR, tlM),
+                max(brD - brIR, brM)),
+                max(blD - blIR, blM));
         } else if (cornerPattern < 7.5) {
             // 7: 上+右辺なし → 画面BLのみ凸, 画面TL/TR/BR が凹角
             rSafe.z = 0.0; rSafe.y = 0.0; rSafe.x = 0.0;
             innerSdfExt = vec2(bExt, bExt);  innerSdfShift = vec2(bExt, -bExt);
-            float tlR = max(localPos.x + hx, -localPos.y - hy);
-            float trR = max(hx - localPos.x, -localPos.y - hy);
-            float brR = max(hx - localPos.x, localPos.y - hy);
+            vec2 tlC = vec2(-hx - scrTL, -hy + scrTL);
+            vec2 trC = vec2( hx + scrTR, -hy + scrTR);
+            vec2 brC = vec2( hx + scrBR,  hy - scrBR);
+            float tlD = length(localPos - tlC);
+            float trD = length(localPos - trC);
+            float brD = length(localPos - brC);
+            float tlM = max(-localPos.x - hx - scrTL, localPos.y + hy - scrTL);
+            float trM = max( localPos.x - hx - scrTR, localPos.y + hy - scrTR);
+            float brM = max( localPos.x - hx - scrBR, hy - scrBR - localPos.y);
             concaveFill = min(min(
-                max(length(localPos - cTL) - scrTL, tlR),
-                max(length(localPos - cTR) - scrTR, trR)),
-                max(length(localPos - cBR) - scrBR, brR));
-            float tlSR = max(sLocal.x + hx, -sLocal.y - hy);
-            float trSR = max(hx - sLocal.x, -sLocal.y - hy);
-            float brSR = max(hx - sLocal.x, sLocal.y - hy);
+                max(tlD - scrTL, tlM),
+                max(trD - scrTR, trM)),
+                max(brD - scrBR, brM));
+            float tlSD = length(sLocal - tlC);
+            float trSD = length(sLocal - trC);
+            float brSD = length(sLocal - brC);
+            float tlSM = max(-sLocal.x - hx - scrTL, sLocal.y + hy - scrTL);
+            float trSM = max( sLocal.x - hx - scrTR, sLocal.y + hy - scrTR);
+            float brSM = max( sLocal.x - hx - scrBR, hy - scrBR - sLocal.y);
             concaveShadow = min(min(
-                max(length(sLocal - cTL) - scrTL, tlSR),
-                max(length(sLocal - cTR) - scrTR, trSR)),
-                max(length(sLocal - cBR) - scrBR, brSR));
+                max(tlSD - scrTL, tlSM),
+                max(trSD - scrTR, trSM)),
+                max(brSD - scrBR, brSM));
+            float tlIR = max(scrTL - borderWidth, 0.0);
+            float trIR = max(scrTR - borderWidth, 0.0);
+            float brIR = max(scrBR - borderWidth, 0.0);
             concaveInner = min(min(
-                max(length(localPos - cTL) - max(scrTL - borderWidth, 0.0), tlR),
-                max(length(localPos - cTR) - max(scrTR - borderWidth, 0.0), trR)),
-                max(length(localPos - cBR) - max(scrBR - borderWidth, 0.0), brR));
+                max(tlD - tlIR, tlM),
+                max(trD - trIR, trM)),
+                max(brD - brIR, brM));
         } else {
             // 8: 上+左辺なし → 画面BRのみ凸, 画面TL/TR/BL が凹角
             rSafe.z = 0.0; rSafe.y = 0.0; rSafe.w = 0.0;
             innerSdfExt = vec2(bExt, bExt);  innerSdfShift = vec2(-bExt, -bExt);
-            float tlR = max(localPos.x + hx, -localPos.y - hy);
-            float trR = max(hx - localPos.x, -localPos.y - hy);
-            float blR = max(localPos.x + hx, localPos.y - hy);
+            vec2 tlC = vec2(-hx - scrTL, -hy + scrTL);
+            vec2 trC = vec2( hx + scrTR, -hy + scrTR);
+            vec2 blC = vec2(-hx - scrBL,  hy - scrBL);
+            float tlD = length(localPos - tlC);
+            float trD = length(localPos - trC);
+            float blD = length(localPos - blC);
+            float tlM = max(-localPos.x - hx - scrTL, localPos.y + hy - scrTL);
+            float trM = max( localPos.x - hx - scrTR, localPos.y + hy - scrTR);
+            float blM = max(-localPos.x - hx - scrBL, hy - scrBL - localPos.y);
             concaveFill = min(min(
-                max(length(localPos - cTL) - scrTL, tlR),
-                max(length(localPos - cTR) - scrTR, trR)),
-                max(length(localPos - cBL) - scrBL, blR));
-            float tlSR = max(sLocal.x + hx, -sLocal.y - hy);
-            float trSR = max(hx - sLocal.x, -sLocal.y - hy);
-            float blSR = max(sLocal.x + hx, sLocal.y - hy);
+                max(tlD - scrTL, tlM),
+                max(trD - scrTR, trM)),
+                max(blD - scrBL, blM));
+            float tlSD = length(sLocal - tlC);
+            float trSD = length(sLocal - trC);
+            float blSD = length(sLocal - blC);
+            float tlSM = max(-sLocal.x - hx - scrTL, sLocal.y + hy - scrTL);
+            float trSM = max( sLocal.x - hx - scrTR, sLocal.y + hy - scrTR);
+            float blSM = max(-sLocal.x - hx - scrBL, hy - scrBL - sLocal.y);
             concaveShadow = min(min(
-                max(length(sLocal - cTL) - scrTL, tlSR),
-                max(length(sLocal - cTR) - scrTR, trSR)),
-                max(length(sLocal - cBL) - scrBL, blSR));
+                max(tlSD - scrTL, tlSM),
+                max(trSD - scrTR, trSM)),
+                max(blSD - scrBL, blSM));
+            float tlIR = max(scrTL - borderWidth, 0.0);
+            float trIR = max(scrTR - borderWidth, 0.0);
+            float blIR = max(scrBL - borderWidth, 0.0);
             concaveInner = min(min(
-                max(length(localPos - cTL) - max(scrTL - borderWidth, 0.0), tlR),
-                max(length(localPos - cTR) - max(scrTR - borderWidth, 0.0), trR)),
-                max(length(localPos - cBL) - max(scrBL - borderWidth, 0.0), blR));
+                max(tlD - tlIR, tlM),
+                max(trD - trIR, trM)),
+                max(blD - blIR, blM));
         }
     }
 
