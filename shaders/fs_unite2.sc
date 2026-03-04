@@ -604,14 +604,14 @@ void main()
             concaveShadow = min(max(scrTL - tlSD, tlSM), max(scrBL - blSD, blSM));
             float tlIR = scrTL + borderWidth;
             float blIR = scrBL + borderWidth;
-            // MI: borderWidthシフトをY方向に (上辺/下辺ボーダー生成)
-            float tlMI = max(max(max(-localPos.y - hy - scrTL, localPos.y + hy + borderWidth), localPos.x + hx - scrTL), -localPos.x - hx);
-            float blMI = max(max(max( localPos.y - hy - scrBL, hy + borderWidth - localPos.y), localPos.x + hx - scrBL), -localPos.x - hx);
+            // MI: borderWidthを引く (Case1と同じパターン: rect辺の制約からborderWidth減算)
+            float tlMI = max(max(max(-localPos.y - hy - scrTL, localPos.y + hy - borderWidth), localPos.x + hx - scrTL), -localPos.x - hx);
+            float blMI = max(max(max( localPos.y - hy - scrBL, hy - borderWidth - localPos.y), localPos.x + hx - scrBL), -localPos.x - hx);
             concaveInner = min(max(tlIR - tlD, tlMI), max(blIR - blD, blMI));
-            // 接合部: 上下ボーダーが弧と接合
-            float jTL3 = smoothstep(0.0, aaSafe, (-hy) - localPos.y);
+            // 接合部: 上下ボーダーがX方向に走るのでX座標で遷移
+            float jTL3 = smoothstep(0.0, aaSafe, (-hx + scrTL) - localPos.x);
             float arcBordTL3 = clamp(smoothstep(aaSafe, -aaSafe, scrTL - tlD) - smoothstep(aaSafe, -aaSafe, tlIR - tlD), 0.0, 1.0);
-            float jBL3 = smoothstep(0.0, aaSafe, localPos.y - hy);
+            float jBL3 = smoothstep(0.0, aaSafe, (-hx + scrBL) - localPos.x);
             float arcBordBL3 = clamp(smoothstep(aaSafe, -aaSafe, scrBL - blD) - smoothstep(aaSafe, -aaSafe, blIR - blD), 0.0, 1.0);
             float bottomHalf3 = step(0.0, localPos.y);
             concaveJunctionFactor = mix(jTL3, jBL3, bottomHalf3);
@@ -640,14 +640,14 @@ void main()
             concaveShadow = min(max(scrTR - trSD, trSM), max(scrBR - brSD, brSM));
             float trIR = scrTR + borderWidth;
             float brIR = scrBR + borderWidth;
-            // MI: borderWidthシフトをY方向に (上辺/下辺ボーダー生成)
-            float trMI = max(max(max(-localPos.y - hy - scrTR, localPos.y + hy + borderWidth), hx - scrTR - localPos.x), localPos.x - hx);
-            float brMI = max(max(max( localPos.y - hy - scrBR, hy + borderWidth - localPos.y), hx - scrBR - localPos.x), localPos.x - hx);
+            // MI: borderWidthを引く (Case1と同じパターン: rect辺の制約からborderWidth減算)
+            float trMI = max(max(max(-localPos.y - hy - scrTR, localPos.y + hy - borderWidth), hx - scrTR - localPos.x), localPos.x - hx);
+            float brMI = max(max(max( localPos.y - hy - scrBR, hy - borderWidth - localPos.y), hx - scrBR - localPos.x), localPos.x - hx);
             concaveInner = min(max(trIR - trD, trMI), max(brIR - brD, brMI));
-            // 接合部: 上下ボーダーが弧と接合
-            float jTR4 = smoothstep(0.0, aaSafe, (-hy) - localPos.y);
+            // 接合部: 上下ボーダーがX方向に走るのでX座標で遷移
+            float jTR4 = smoothstep(0.0, aaSafe, localPos.x - (hx - scrTR));
             float arcBordTR4 = clamp(smoothstep(aaSafe, -aaSafe, scrTR - trD) - smoothstep(aaSafe, -aaSafe, trIR - trD), 0.0, 1.0);
-            float jBR4 = smoothstep(0.0, aaSafe, localPos.y - hy);
+            float jBR4 = smoothstep(0.0, aaSafe, localPos.x - (hx - scrBR));
             float arcBordBR4 = clamp(smoothstep(aaSafe, -aaSafe, scrBR - brD) - smoothstep(aaSafe, -aaSafe, brIR - brD), 0.0, 1.0);
             float bottomHalf4 = step(0.0, localPos.y);
             concaveJunctionFactor = mix(jTR4, jBR4, bottomHalf4);
