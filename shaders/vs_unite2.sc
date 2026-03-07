@@ -15,7 +15,7 @@ $output v_uv, v_rectParams, v_patternParams, v_scroll, v_shadowBorder, v_uvRange
 // v_scroll:
 //   Fill/Image/Pattern: scrollX, scrollY, pack(rTL,rTR)(half16×2), pack(rBR,rBL)(half16×2)
 //   PageCurl: uvSize.x, uvSize.y, progress, aa
-// v_shadowBorder: pack(shadowX,shadowY)(half16×2), pack(bTop,bRight)(half16×2), pack(bBottom,bLeft)(half16×2), pack(shadowBlur,aa)(half16×2)
+// v_shadowBorder: pack(bTop,bRight)(half16×2), pack(bBottom,bLeft)(half16×2), pack(aa,shadowBlur)(half16×2), pack(shadowX,shadowY)(half16×2)
 // v_uvRange:
 //   .xy:           colorCount, dataOffset (パターン、整数)
 //                  uvMin.x, uvMin.y (PageCurl、整数、FSで/65535.0)
@@ -54,17 +54,17 @@ void main()
     vec4 rectParams = i_data0;      // x, y, width, height
     vec4 patternParams = i_data1;   // colorCount_dataOffset/frontUVMin, (unused)/backUVMin, angle/curlAngle, (unused)/curlRadius
     vec4 scroll = i_data2;          // scrollX/uvSize.x, scrollY/uvSize.y, pack(rTL,rTR)/progress, pack(rBR,rBL)/aa
-    vec4 shadowBorder = i_data3;    // pack(shadowX,shadowY), pack(bTop,bRight), pack(bBottom,bLeft), pack(shadowBlur,aa)
+    vec4 shadowBorder = i_data3;    // pack(bTop,bRight), pack(bBottom,bLeft), pack(aa,shadowBlur), pack(shadowX,shadowY)
     vec4 colors = i_data4;          // shadowColor(packed), fillColor(packed), borderColor(packed), zIndex/1000(float)
 
     // shadowX, shadowY を half16 からアンパック
-    uint sxyPacked = floatBitsToUint(shadowBorder.x);
+    uint sxyPacked = floatBitsToUint(shadowBorder.w);
     float shadowX = unpackHalfHi(sxyPacked);
     float shadowY = unpackHalfLo(sxyPacked);
 
     // shadowBlur を half16 からアンパック（影マージン計算に必要）
     // pack順: aa(上位), shadowBlur(下位)
-    uint sbPacked = floatBitsToUint(shadowBorder.w);
+    uint sbPacked = floatBitsToUint(shadowBorder.z);
     float shadowBlur = unpackHalfLo(sbPacked);
 
     // 影パラメータ
@@ -130,7 +130,7 @@ void main()
     v_rectParams = rectParams;
     v_patternParams = vec4(0.0, 0.0, patternParams.z, patternParams.w);  // .xy未使用, .z=angle/curlAngle, .w=curlRadius
     v_scroll = scroll;           // FSでモード別にアンパック
-    v_shadowBorder = shadowBorder; // FS側で全half16アンパック (shadowXY, border4辺, shadowBlur, aa)
+    v_shadowBorder = shadowBorder; // FS側で全half16アンパック (border4辺, aa, shadowBlur, shadowXY)
     v_uvRange = vec4(uvRange0, uvRange1, uvRange2, uvRange3);
 
     // shadowColor アンパック (8bit×4, i_data4.x)

@@ -190,7 +190,9 @@
       "Bash(./shaderc.exe -f vs_unite2.sc -o vs_unite2.bin --type v --platform windows -p s_5_0 -i /c/Users/hayah/source/repos/Project2/android/app/jni/src/bgfx/src/ --varyingdef v_unite2.def.sc)",
       "Bash(./shaderc.exe -f fs_unite2.sc -o fs_unite2.bin --type f --platform windows -p s_5_0 -i /c/Users/hayah/source/repos/Project2/android/app/jni/src/bgfx/src/ --varyingdef v_unite2.def.sc)",
       "Bash(./shaderc.exe -f vs_unite2.sc -o vs_unite2.bin --type v --platform windows -p s_5_0 -i \"C:/Users/hayah/source/repos/Project2/android/app/jni/src/bgfx/src\" --varyingdef v_unite2.def.sc)",
-      "Bash(./shaderc.exe -f fs_unite2.sc -o fs_unite2.bin --type f --platform windows -p s_5_0 -i \"C:/Users/hayah/source/repos/Project2/android/app/jni/src/bgfx/src\" --varyingdef v_unite2.def.sc)"
+      "Bash(./shaderc.exe -f fs_unite2.sc -o fs_unite2.bin --type f --platform windows -p s_5_0 -i \"C:/Users/hayah/source/repos/Project2/android/app/jni/src/bgfx/src\" --varyingdef v_unite2.def.sc)",
+      "Bash(./shaderc.exe -f vs_unite2.sc -o vs_unite2.bin --type vertex --platform windows -p s_5_0 --varyingdef v_unite2.def.sc -i \"C:/Users/hayah/source/repos/Project2/android/app/jni/src/bgfx/src/\")",
+      "Bash(./shaderc.exe -f fs_unite2.sc -o fs_unite2.bin --type fragment --platform windows -p s_5_0 --varyingdef v_unite2.def.sc -i \"C:/Users/hayah/source/repos/Project2/android/app/jni/src/bgfx/src/\")"
     ]
   }
 }

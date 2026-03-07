@@ -76,22 +76,22 @@ void main()
     //   PageCurl: uvSize.x, uvSize.y, progress, aa
     vec2 scrollXY = v_scroll.xy;
 
-    // v_shadowBorder: pack(shadowX,shadowY), pack(bTop,bRight), pack(bBottom,bLeft), pack(shadowBlur,aa)
-    uint sxyPacked = floatBitsToUint(v_shadowBorder.x);
-    vec2 shadowOffset = vec2(unpackHalfHi(sxyPacked), unpackHalfLo(sxyPacked));
-
-    uint btPacked = floatBitsToUint(v_shadowBorder.y);
+    // v_shadowBorder: pack(bTop,bRight), pack(bBottom,bLeft), pack(aa,shadowBlur), pack(shadowX,shadowY)
+    uint btPacked = floatBitsToUint(v_shadowBorder.x);
     float borderTop = unpackHalfHi(btPacked);
     float borderRight = unpackHalfLo(btPacked);
 
-    uint bbPacked = floatBitsToUint(v_shadowBorder.z);
+    uint bbPacked = floatBitsToUint(v_shadowBorder.y);
     float borderBottom = unpackHalfHi(bbPacked);
     float borderLeft = unpackHalfLo(bbPacked);
 
     // pack順: aa(上位), shadowBlur(下位)
-    uint sbPacked = floatBitsToUint(v_shadowBorder.w);
+    uint sbPacked = floatBitsToUint(v_shadowBorder.z);
     float aa = unpackHalfHi(sbPacked);
     float shadowBlur = unpackHalfLo(sbPacked);
+
+    uint sxyPacked = floatBitsToUint(v_shadowBorder.w);
+    vec2 shadowOffset = vec2(unpackHalfHi(sxyPacked), unpackHalfLo(sxyPacked));
 
     // cornerPattern>0 用の均一borderWidth (4辺の最大値)
     float borderWidth = max(max(borderTop, borderRight), max(borderBottom, borderLeft));

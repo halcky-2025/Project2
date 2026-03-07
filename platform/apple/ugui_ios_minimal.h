@@ -165,10 +165,10 @@ inline void packInstance(UnifiedDrawCommand& cmd, UnifiedInstanceData& out, Draw
     out.data2[2] = cmd.radius;
     out.data2[3] = cmd.aa;
 
-    out.data3[0] = packHalf2x16(cmd.shadowX, cmd.shadowY);
-    out.data3[1] = packHalf2x16(cmd.borderTop, cmd.borderRight);
-    out.data3[2] = packHalf2x16(cmd.borderBottom, cmd.borderLeft);
-    out.data3[3] = packHalf2x16(cmd.shadowBlur, cmd.aa);
+    out.data3[0] = packHalf2x16(cmd.borderTop, cmd.borderRight);
+    out.data3[1] = packHalf2x16(cmd.borderBottom, cmd.borderLeft);
+    out.data3[2] = packHalf2x16(cmd.aa, cmd.shadowBlur);
+    out.data3[3] = packHalf2x16(cmd.shadowX, cmd.shadowY);
 
     out.data4[0] = packColorAsFloat(cmd.shadowColor);
     out.data4[1] = packColorAsFloat(cmd.fillColor);

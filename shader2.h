@@ -124,14 +124,14 @@ struct UnifiedDrawCommand : DrawCommand {
 // data2: scrollX/uvMax.x/uvSize.x, scrollY/uvMax.y/uvSize.y,
 //   Fill/Image/Pattern: pack(radiusTL,radiusTR)(half16×2), pack(radiusBR,radiusBL)(half16×2)
 //   PageCurl: progress(float32), aa(float32)
-// data3: pack(shadowX,shadowY)(half16×2), pack(borderTop,borderRight)(half16×2), pack(borderBottom,borderLeft)(half16×2), pack(shadowBlur,aa)(half16×2)
+// data3: pack(borderTop,borderRight)(half16×2), pack(borderBottom,borderLeft)(half16×2), pack(aa,shadowBlur)(half16×2), pack(shadowX,shadowY)(half16×2)
 // data4: shadowColor(packed), fillColor(packed), borderColor(packed), zIndex/1000(float)
 
 struct alignas(16) UnifiedInstanceData {
     float data0[4];  // x, y, width, height
     float data1[4];  // (モード別)
     float data2[4];  // scrollX/uvMax.x/uvSize.x, scrollY/uvMax.y/uvSize.y, radius/progress, aa
-    float data3[4];  // pack(shadowXY), pack(borderTR), pack(borderBL), pack(shadowBlur,aa)
+    float data3[4];  // pack(borderTR), pack(borderBL), pack(aa,shadowBlur), pack(shadowXY)
     float data4[4];  // shadowColor(packed), fillColor(packed), borderColor(packed), zIndex/1000(float)
 };
 
@@ -236,10 +236,10 @@ inline void packInstance(UnifiedDrawCommand& cmd, UnifiedInstanceData& out, Draw
     }
 
     // i_data3: 共通 (全half16パック)
-    out.data3[0] = packHalf2x16(cmd.shadowX, cmd.shadowY);       // pack(shadowX, shadowY)
-    out.data3[1] = packHalf2x16(cmd.borderTop, cmd.borderRight);  // pack(borderTop, borderRight)
-    out.data3[2] = packHalf2x16(cmd.borderBottom, cmd.borderLeft); // pack(borderBottom, borderLeft)
-    out.data3[3] = packHalf2x16(cmd.aa, cmd.shadowBlur);          // pack(aa, shadowBlur) ※aaを上位に置きデノーマル回避
+    out.data3[0] = packHalf2x16(cmd.borderTop, cmd.borderRight);  // pack(borderTop, borderRight)
+    out.data3[1] = packHalf2x16(cmd.borderBottom, cmd.borderLeft); // pack(borderBottom, borderLeft)
+    out.data3[2] = packHalf2x16(cmd.aa, cmd.shadowBlur);          // pack(aa, shadowBlur) ※aaを上位に置きデノーマル回避
+    out.data3[3] = packHalf2x16(cmd.shadowX, cmd.shadowY);        // pack(shadowX, shadowY)
 
     // i_data4: 共通
     out.data4[0] = packColorAsFloat(cmd.shadowColor);
