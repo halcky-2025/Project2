@@ -192,7 +192,8 @@
       "Bash(./shaderc.exe -f vs_unite2.sc -o vs_unite2.bin --type v --platform windows -p s_5_0 -i \"C:/Users/hayah/source/repos/Project2/android/app/jni/src/bgfx/src\" --varyingdef v_unite2.def.sc)",
       "Bash(./shaderc.exe -f fs_unite2.sc -o fs_unite2.bin --type f --platform windows -p s_5_0 -i \"C:/Users/hayah/source/repos/Project2/android/app/jni/src/bgfx/src\" --varyingdef v_unite2.def.sc)",
       "Bash(./shaderc.exe -f vs_unite2.sc -o vs_unite2.bin --type vertex --platform windows -p s_5_0 --varyingdef v_unite2.def.sc -i \"C:/Users/hayah/source/repos/Project2/android/app/jni/src/bgfx/src/\")",
-      "Bash(./shaderc.exe -f fs_unite2.sc -o fs_unite2.bin --type fragment --platform windows -p s_5_0 --varyingdef v_unite2.def.sc -i \"C:/Users/hayah/source/repos/Project2/android/app/jni/src/bgfx/src/\")"
+      "Bash(./shaderc.exe -f fs_unite2.sc -o fs_unite2.bin --type fragment --platform windows -p s_5_0 --varyingdef v_unite2.def.sc -i \"C:/Users/hayah/source/repos/Project2/android/app/jni/src/bgfx/src/\")",
+      "Bash(FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch --force --index-filter 'git rm --cached --ignore-unmatch \"\"x64/Debug/Project2.ilk\"\" \"\"Project2/x64/Debug/Project2.ilk\"\" \"\"avcodec-62.dll\"\"' --prune-empty -- --all)"
     ]
   }
 }
