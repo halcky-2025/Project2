@@ -537,7 +537,6 @@ void main()
             // 1: 下辺なし → 画面BL,BR が凹角
             rSafe.w = 0.0;  // 画面BL凸なし
             rSafe.x = 0.0;  // 画面BR凸なし
-            innerSdfExt = vec2(0.0, bExt);  innerSdfShift = vec2(0.0, bExt);
             vec2 blC = vec2(-hx - scrBL, hy - scrBL);
             vec2 brC = vec2( hx + scrBR, hy - scrBR);
             float blD = length(localPos - blC);
@@ -550,24 +549,24 @@ void main()
             float blSM = max(max(max(-sLocal.x - hx - scrBL, sLocal.x + hx), hy - scrBL - sLocal.y), sLocal.y - hy);
             float brSM = max(max(max( sLocal.x - hx - scrBR, hx - sLocal.x), hy - scrBR - sLocal.y), sLocal.y - hy);
             concaveShadow = min(max(scrBL - blSD, blSM), max(scrBR - brSD, brSM));
-            float blIR = scrBL + borderWidth;
-            float brIR = scrBR + borderWidth;
-            float blMI = max(max(max(-localPos.x - hx - scrBL, localPos.x + hx - borderWidth), hy - scrBL - localPos.y), localPos.y - hy);
-            float brMI = max(max(max( localPos.x - hx - scrBR, hx - borderWidth - localPos.x), hy - scrBR - localPos.y), localPos.y - hy);
+            float blIR = scrBL + max(borderLeft, borderBottom);
+            float brIR = scrBR + max(borderRight, borderBottom);
+            float blMI = max(max(max(-localPos.x - hx - scrBL, localPos.x + hx - borderLeft), hy - scrBL - localPos.y), localPos.y - hy + borderBottom);
+            float brMI = max(max(max( localPos.x - hx - scrBR, hx - borderRight - localPos.x), hy - scrBR - localPos.y), localPos.y - hy + borderBottom);
             concaveInner = min(max(blIR - blD, blMI), max(brIR - brD, brMI));
-            // 接合部: 接合点より下で矩形ボーダーを弧ボーダーに置換
+            // 接合部: 接合点より下で矩形ボーダーを弧ボーダーに置換（弧付近のみ）
             float jBL = smoothstep(0.0, aaSafe, localPos.y - (hy - scrBL));
+            jBL *= (1.0 - smoothstep(-aaSafe, aaSafe, localPos.x + hx));
             float arcBordBL = clamp(smoothstep(aaSafe, -aaSafe, scrBL - blD) - smoothstep(aaSafe, -aaSafe, blIR - blD), 0.0, 1.0);
             float jBR = smoothstep(0.0, aaSafe, localPos.y - (hy - scrBR));
+            jBR *= smoothstep(-aaSafe, aaSafe, localPos.x - hx);
             float arcBordBR = clamp(smoothstep(aaSafe, -aaSafe, scrBR - brD) - smoothstep(aaSafe, -aaSafe, brIR - brD), 0.0, 1.0);
-            float rightSide = step(0.0, localPos.x);
-            concaveJunctionFactor = mix(jBL, jBR, rightSide);
-            concaveArcBorder = mix(arcBordBL, arcBordBR, rightSide);
+            concaveJunctionFactor = max(jBL, jBR);
+            concaveArcBorder = mix(arcBordBL, arcBordBR, step(0.0, localPos.x));
         } else if (cornerPattern < 2.5) {
             // 2: 上辺なし → 画面TL,TR が凹角
             rSafe.z = 0.0;  // 画面TL凸なし
             rSafe.y = 0.0;  // 画面TR凸なし
-            innerSdfExt = vec2(0.0, bExt);  innerSdfShift = vec2(0.0, -bExt);
             vec2 tlC = vec2(-hx - scrTL, -hy + scrTL);
             vec2 trC = vec2( hx + scrTR, -hy + scrTR);
             float tlD = length(localPos - tlC);
@@ -580,19 +579,20 @@ void main()
             float tlSM = max(max(max(-sLocal.x - hx - scrTL, sLocal.x + hx), sLocal.y + hy - scrTL), -sLocal.y - hy);
             float trSM = max(max(max( sLocal.x - hx - scrTR, hx - sLocal.x), sLocal.y + hy - scrTR), -sLocal.y - hy);
             concaveShadow = min(max(scrTL - tlSD, tlSM), max(scrTR - trSD, trSM));
-            float tlIR = scrTL + borderWidth;
-            float trIR = scrTR + borderWidth;
-            float tlMI = max(max(max(-localPos.x - hx - scrTL, localPos.x + hx - borderWidth), localPos.y + hy - scrTL), -localPos.y - hy);
-            float trMI = max(max(max( localPos.x - hx - scrTR, hx - borderWidth - localPos.x), localPos.y + hy - scrTR), -localPos.y - hy);
+            float tlIR = scrTL + max(borderLeft, borderTop);
+            float trIR = scrTR + max(borderRight, borderTop);
+            float tlMI = max(max(max(-localPos.x - hx - scrTL, localPos.x + hx - borderLeft), localPos.y + hy - scrTL), -localPos.y - hy + borderTop);
+            float trMI = max(max(max( localPos.x - hx - scrTR, hx - borderRight - localPos.x), localPos.y + hy - scrTR), -localPos.y - hy + borderTop);
             concaveInner = min(max(tlIR - tlD, tlMI), max(trIR - trD, trMI));
-            // 接合部: 接合点より上で矩形ボーダーを弧ボーダーに置換
+            // 接合部: 接合点より上で矩形ボーダーを弧ボーダーに置換（弧付近のみ）
             float jTL = smoothstep(0.0, aaSafe, (-hy + scrTL) - localPos.y);
+            jTL *= (1.0 - smoothstep(-aaSafe, aaSafe, localPos.x + hx));
             float arcBordTL = clamp(smoothstep(aaSafe, -aaSafe, scrTL - tlD) - smoothstep(aaSafe, -aaSafe, tlIR - tlD), 0.0, 1.0);
             float jTR = smoothstep(0.0, aaSafe, (-hy + scrTR) - localPos.y);
+            jTR *= smoothstep(-aaSafe, aaSafe, localPos.x - hx);
             float arcBordTR = clamp(smoothstep(aaSafe, -aaSafe, scrTR - trD) - smoothstep(aaSafe, -aaSafe, trIR - trD), 0.0, 1.0);
-            float rightSide2 = step(0.0, localPos.x);
-            concaveJunctionFactor = mix(jTL, jTR, rightSide2);
-            concaveArcBorder = mix(arcBordTL, arcBordTR, rightSide2);
+            concaveJunctionFactor = max(jTL, jTR);
+            concaveArcBorder = mix(arcBordTL, arcBordTR, step(0.0, localPos.x));
         } else if (cornerPattern < 3.5) {
             // 3: 左辺なし → 画面TL,BL が凹角 (上下ボーダーが跳ねる)
             // Case1の上下左右入替: 弧を上下方向に突出させる
@@ -600,7 +600,6 @@ void main()
             //   BL弧: 中心(-hx+r, hy+r),  下方向へ突出, 下辺ボーダーが跳ねる
             rSafe.z = 0.0;  // 画面TL凸なし
             rSafe.w = 0.0;  // 画面BL凸なし
-            innerSdfExt = vec2(bExt, 0.0);  innerSdfShift = vec2(-bExt, 0.0);
             vec2 tlC = vec2(-hx + scrTL, -hy - scrTL);
             vec2 blC = vec2(-hx + scrBL,  hy + scrBL);
             float tlD = length(localPos - tlC);
@@ -615,20 +614,20 @@ void main()
             float tlSM = max(max(max(-sLocal.y - hy - scrTL, sLocal.y + hy), sLocal.x + hx - scrTL), -sLocal.x - hx);
             float blSM = max(max(max( sLocal.y - hy - scrBL, hy - sLocal.y), sLocal.x + hx - scrBL), -sLocal.x - hx);
             concaveShadow = min(max(scrTL - tlSD, tlSM), max(scrBL - blSD, blSM));
-            float tlIR = scrTL + borderWidth;
-            float blIR = scrBL + borderWidth;
-            // MI: borderWidthを引く (Case1と同じパターン: rect辺の制約からborderWidth減算)
-            float tlMI = max(max(max(-localPos.y - hy - scrTL, localPos.y + hy - borderWidth), localPos.x + hx - scrTL), -localPos.x - hx);
-            float blMI = max(max(max( localPos.y - hy - scrBL, hy - borderWidth - localPos.y), localPos.x + hx - scrBL), -localPos.x - hx);
+            float tlIR = scrTL + max(borderTop, borderLeft);
+            float blIR = scrBL + max(borderBottom, borderLeft);
+            float tlMI = max(max(max(-localPos.y - hy - scrTL, localPos.y + hy - borderTop), localPos.x + hx - scrTL), -localPos.x - hx + borderLeft);
+            float blMI = max(max(max( localPos.y - hy - scrBL, hy - borderBottom - localPos.y), localPos.x + hx - scrBL), -localPos.x - hx + borderLeft);
             concaveInner = min(max(tlIR - tlD, tlMI), max(blIR - blD, blMI));
-            // 接合部: 上下ボーダーがX方向に走るのでX座標で遷移
+            // 接合部: X方向遷移（弧付近のみ）
             float jTL3 = smoothstep(0.0, aaSafe, (-hx + scrTL) - localPos.x);
+            jTL3 *= (1.0 - smoothstep(-aaSafe, aaSafe, localPos.y + hy));
             float arcBordTL3 = clamp(smoothstep(aaSafe, -aaSafe, scrTL - tlD) - smoothstep(aaSafe, -aaSafe, tlIR - tlD), 0.0, 1.0);
             float jBL3 = smoothstep(0.0, aaSafe, (-hx + scrBL) - localPos.x);
+            jBL3 *= smoothstep(-aaSafe, aaSafe, localPos.y - hy);
             float arcBordBL3 = clamp(smoothstep(aaSafe, -aaSafe, scrBL - blD) - smoothstep(aaSafe, -aaSafe, blIR - blD), 0.0, 1.0);
-            float bottomHalf3 = step(0.0, localPos.y);
-            concaveJunctionFactor = mix(jTL3, jBL3, bottomHalf3);
-            concaveArcBorder = mix(arcBordTL3, arcBordBL3, bottomHalf3);
+            concaveJunctionFactor = max(jTL3, jBL3);
+            concaveArcBorder = mix(arcBordTL3, arcBordBL3, step(0.0, localPos.y));
         } else if (cornerPattern < 4.5) {
             // 4: 右辺なし → 画面TR,BR が凹角 (上下ボーダーが跳ねる)
             // Case3の左右反転: 弧を上下方向に突出させる
@@ -636,7 +635,6 @@ void main()
             //   BR弧: 中心(hx-r, hy+r),  下方向へ突出, 下辺ボーダーが跳ねる
             rSafe.y = 0.0;  // 画面TR凸なし
             rSafe.x = 0.0;  // 画面BR凸なし
-            innerSdfExt = vec2(bExt, 0.0);  innerSdfShift = vec2(bExt, 0.0);
             vec2 trC = vec2(hx - scrTR, -hy - scrTR);
             vec2 brC = vec2(hx - scrBR,  hy + scrBR);
             float trD = length(localPos - trC);
@@ -651,20 +649,20 @@ void main()
             float trSM = max(max(max(-sLocal.y - hy - scrTR, sLocal.y + hy), hx - scrTR - sLocal.x), sLocal.x - hx);
             float brSM = max(max(max( sLocal.y - hy - scrBR, hy - sLocal.y), hx - scrBR - sLocal.x), sLocal.x - hx);
             concaveShadow = min(max(scrTR - trSD, trSM), max(scrBR - brSD, brSM));
-            float trIR = scrTR + borderWidth;
-            float brIR = scrBR + borderWidth;
-            // MI: borderWidthを引く (Case1と同じパターン: rect辺の制約からborderWidth減算)
-            float trMI = max(max(max(-localPos.y - hy - scrTR, localPos.y + hy - borderWidth), hx - scrTR - localPos.x), localPos.x - hx);
-            float brMI = max(max(max( localPos.y - hy - scrBR, hy - borderWidth - localPos.y), hx - scrBR - localPos.x), localPos.x - hx);
+            float trIR = scrTR + max(borderTop, borderRight);
+            float brIR = scrBR + max(borderBottom, borderRight);
+            float trMI = max(max(max(-localPos.y - hy - scrTR, localPos.y + hy - borderTop), hx - scrTR - localPos.x), localPos.x - hx + borderRight);
+            float brMI = max(max(max( localPos.y - hy - scrBR, hy - borderBottom - localPos.y), hx - scrBR - localPos.x), localPos.x - hx + borderRight);
             concaveInner = min(max(trIR - trD, trMI), max(brIR - brD, brMI));
-            // 接合部: 上下ボーダーがX方向に走るのでX座標で遷移
+            // 接合部: X方向遷移（弧付近のみ）
             float jTR4 = smoothstep(0.0, aaSafe, localPos.x - (hx - scrTR));
+            jTR4 *= (1.0 - smoothstep(-aaSafe, aaSafe, localPos.y + hy));
             float arcBordTR4 = clamp(smoothstep(aaSafe, -aaSafe, scrTR - trD) - smoothstep(aaSafe, -aaSafe, trIR - trD), 0.0, 1.0);
             float jBR4 = smoothstep(0.0, aaSafe, localPos.x - (hx - scrBR));
+            jBR4 *= smoothstep(-aaSafe, aaSafe, localPos.y - hy);
             float arcBordBR4 = clamp(smoothstep(aaSafe, -aaSafe, scrBR - brD) - smoothstep(aaSafe, -aaSafe, brIR - brD), 0.0, 1.0);
-            float bottomHalf4 = step(0.0, localPos.y);
-            concaveJunctionFactor = mix(jTR4, jBR4, bottomHalf4);
-            concaveArcBorder = mix(arcBordTR4, arcBordBR4, bottomHalf4);
+            concaveJunctionFactor = max(jTR4, jBR4);
+            concaveArcBorder = mix(arcBordTR4, arcBordBR4, step(0.0, localPos.y));
         } else if (cornerPattern < 5.5) {
             // 5: 下+右辺なし → 画面TLのみ凸, 画面TR/BL が凹角, BR は凸角のまま
             //   TR: 右辺なし → 上に突出 (上ボーダーが跳ねる)
@@ -672,7 +670,6 @@ void main()
             //   BR: 両辺なし → クレセント不要、通常の凸角
             rSafe.y = 0.0; rSafe.w = 0.0;
             // rSafe.x (BR) は凸角のまま残す
-            innerSdfExt = vec2(bExt, bExt);  innerSdfShift = vec2(bExt, bExt);
             vec2 trC = vec2(hx - scrTR, -hy - scrTR);
             vec2 blC = vec2(-hx - scrBL,  hy - scrBL);
             float trD = length(localPos - trC);
@@ -691,23 +688,24 @@ void main()
             concaveShadow = min(
                 max(scrTR - trSD, trSM),
                 max(scrBL - blSD, blSM));
-            float trIR = scrTR + borderWidth;
-            float blIR = scrBL + borderWidth;
-            // TR MI: 上ボーダーが跳ねる (Y制約からborderWidth減算)
-            float trMI = max(max(max(-localPos.y - hy - scrTR, localPos.y + hy - borderWidth), hx - scrTR - localPos.x), localPos.x - hx);
-            // BL MI: 左ボーダーが跳ねる (X制約からborderWidth減算, Case1と同じ)
-            float blMI = max(max(max(-localPos.x - hx - scrBL, localPos.x + hx - borderWidth), hy - scrBL - localPos.y), localPos.y - hy);
+            float trIR = scrTR + max(borderTop, borderRight);
+            float blIR = scrBL + max(borderLeft, borderBottom);
+            // TR MI: 上ボーダーが跳ねる + 右辺ボーダー
+            float trMI = max(max(max(-localPos.y - hy - scrTR, localPos.y + hy - borderTop), hx - scrTR - localPos.x), localPos.x - hx + borderRight);
+            // BL MI: 左ボーダーが跳ねる + 下辺ボーダー
+            float blMI = max(max(max(-localPos.x - hx - scrBL, localPos.x + hx - borderLeft), hy - scrBL - localPos.y), localPos.y - hy + borderBottom);
             concaveInner = min(
                 max(trIR - trD, trMI),
                 max(blIR - blD, blMI));
-            // 接合部: TR(上ボーダー, X遷移) と BL(左ボーダー, Y遷移)
+            // 接合部: TR(X遷移,上付近) と BL(Y遷移,左付近)
             float jTR5 = smoothstep(0.0, aaSafe, localPos.x - (hx - scrTR));
+            jTR5 *= (1.0 - smoothstep(-aaSafe, aaSafe, localPos.y + hy));
             float arcBordTR5 = clamp(smoothstep(aaSafe, -aaSafe, scrTR - trD) - smoothstep(aaSafe, -aaSafe, trIR - trD), 0.0, 1.0);
             float jBL5 = smoothstep(0.0, aaSafe, localPos.y - (hy - scrBL));
+            jBL5 *= (1.0 - smoothstep(-aaSafe, aaSafe, localPos.x + hx));
             float arcBordBL5 = clamp(smoothstep(aaSafe, -aaSafe, scrBL - blD) - smoothstep(aaSafe, -aaSafe, blIR - blD), 0.0, 1.0);
-            float bottomHalf5 = step(0.0, localPos.y);
-            concaveJunctionFactor = mix(jTR5, jBL5, bottomHalf5);
-            concaveArcBorder = mix(arcBordTR5, arcBordBL5, bottomHalf5);
+            concaveJunctionFactor = max(jTR5, jBL5);
+            concaveArcBorder = mix(arcBordTR5, arcBordBL5, step(0.0, localPos.y));
         } else if (cornerPattern < 6.5) {
             // 6: 下+左辺なし → 画面TRのみ凸, 画面TL/BR が凹角, BL は凸角のまま
             //   TL: 左辺なし → 上に突出 (上ボーダーが跳ねる)
@@ -715,7 +713,6 @@ void main()
             //   BL: 両辺なし → クレセント不要、通常の凸角
             rSafe.z = 0.0; rSafe.x = 0.0;
             // rSafe.w (BL) は凸角のまま残す
-            innerSdfExt = vec2(bExt, bExt);  innerSdfShift = vec2(-bExt, bExt);
             vec2 tlC = vec2(-hx + scrTL, -hy - scrTL);
             vec2 brC = vec2( hx + scrBR,  hy - scrBR);
             float tlD = length(localPos - tlC);
@@ -734,23 +731,24 @@ void main()
             concaveShadow = min(
                 max(scrTL - tlSD, tlSM),
                 max(scrBR - brSD, brSM));
-            float tlIR = scrTL + borderWidth;
-            float brIR = scrBR + borderWidth;
-            // TL MI: 上ボーダーが跳ねる (Y制約からborderWidth減算)
-            float tlMI = max(max(max(-localPos.y - hy - scrTL, localPos.y + hy - borderWidth), localPos.x + hx - scrTL), -localPos.x - hx);
-            // BR MI: 右ボーダーが跳ねる (X制約からborderWidth減算, Case1と同じ)
-            float brMI = max(max(max( localPos.x - hx - scrBR, hx - borderWidth - localPos.x), hy - scrBR - localPos.y), localPos.y - hy);
+            float tlIR = scrTL + max(borderTop, borderLeft);
+            float brIR = scrBR + max(borderRight, borderBottom);
+            // TL MI: 上ボーダーが跳ねる + 左辺ボーダー
+            float tlMI = max(max(max(-localPos.y - hy - scrTL, localPos.y + hy - borderTop), localPos.x + hx - scrTL), -localPos.x - hx + borderLeft);
+            // BR MI: 右ボーダーが跳ねる + 下辺ボーダー
+            float brMI = max(max(max( localPos.x - hx - scrBR, hx - borderRight - localPos.x), hy - scrBR - localPos.y), localPos.y - hy + borderBottom);
             concaveInner = min(
                 max(tlIR - tlD, tlMI),
                 max(brIR - brD, brMI));
-            // 接合部: TL(上ボーダー, X遷移) と BR(右ボーダー, Y遷移)
+            // 接合部: TL(X遷移,上付近) と BR(Y遷移,右付近)
             float jTL6 = smoothstep(0.0, aaSafe, (-hx + scrTL) - localPos.x);
+            jTL6 *= (1.0 - smoothstep(-aaSafe, aaSafe, localPos.y + hy));
             float arcBordTL6 = clamp(smoothstep(aaSafe, -aaSafe, scrTL - tlD) - smoothstep(aaSafe, -aaSafe, tlIR - tlD), 0.0, 1.0);
             float jBR6 = smoothstep(0.0, aaSafe, localPos.y - (hy - scrBR));
+            jBR6 *= smoothstep(-aaSafe, aaSafe, localPos.x - hx);
             float arcBordBR6 = clamp(smoothstep(aaSafe, -aaSafe, scrBR - brD) - smoothstep(aaSafe, -aaSafe, brIR - brD), 0.0, 1.0);
-            float rightSide6 = step(0.0, localPos.x);
-            concaveJunctionFactor = mix(jTL6, jBR6, rightSide6);
-            concaveArcBorder = mix(arcBordTL6, arcBordBR6, rightSide6);
+            concaveJunctionFactor = max(jTL6, jBR6);
+            concaveArcBorder = mix(arcBordTL6, arcBordBR6, step(0.0, localPos.x));
         } else if (cornerPattern < 7.5) {
             // 7: 上+右辺なし → 画面BLのみ凸, 画面TL/BR が凹角, TR は凸角のまま
             //   TL: 上辺なし → 左に突出 (左ボーダーが跳ねる, Case2と同じ)
@@ -758,7 +756,6 @@ void main()
             //   TR: 両辺なし → クレセント不要、通常の凸角
             rSafe.z = 0.0; rSafe.x = 0.0;
             // rSafe.y (TR) は凸角のまま残す
-            innerSdfExt = vec2(bExt, bExt);  innerSdfShift = vec2(bExt, -bExt);
             vec2 tlC = vec2(-hx - scrTL, -hy + scrTL);
             vec2 brC = vec2(hx - scrBR,  hy + scrBR);
             float tlD = length(localPos - tlC);
@@ -777,23 +774,24 @@ void main()
             concaveShadow = min(
                 max(scrTL - tlSD, tlSM),
                 max(scrBR - brSD, brSM));
-            float tlIR = scrTL + borderWidth;
-            float brIR = scrBR + borderWidth;
-            // TL MI: 左ボーダーが跳ねる (X制約からborderWidth減算, Case2と同じ)
-            float tlMI = max(max(max(-localPos.x - hx - scrTL, localPos.x + hx - borderWidth), localPos.y + hy - scrTL), -localPos.y - hy);
-            // BR MI: 下ボーダーが跳ねる (Y制約からborderWidth減算)
-            float brMI = max(max(max( localPos.y - hy - scrBR, hy - borderWidth - localPos.y), hx - scrBR - localPos.x), localPos.x - hx);
+            float tlIR = scrTL + max(borderLeft, borderTop);
+            float brIR = scrBR + max(borderBottom, borderRight);
+            // TL MI: 左ボーダーが跳ねる + 上辺ボーダー
+            float tlMI = max(max(max(-localPos.x - hx - scrTL, localPos.x + hx - borderLeft), localPos.y + hy - scrTL), -localPos.y - hy + borderTop);
+            // BR MI: 下ボーダーが跳ねる + 右辺ボーダー
+            float brMI = max(max(max( localPos.y - hy - scrBR, hy - borderBottom - localPos.y), hx - scrBR - localPos.x), localPos.x - hx + borderRight);
             concaveInner = min(
                 max(tlIR - tlD, tlMI),
                 max(brIR - brD, brMI));
-            // 接合部: TL(左ボーダー, Y遷移) と BR(下ボーダー, X遷移)
+            // 接合部: TL(Y遷移,左付近) と BR(X遷移,下付近)
             float jTL7 = smoothstep(0.0, aaSafe, (-hy + scrTL) - localPos.y);
+            jTL7 *= (1.0 - smoothstep(-aaSafe, aaSafe, localPos.x + hx));
             float arcBordTL7 = clamp(smoothstep(aaSafe, -aaSafe, scrTL - tlD) - smoothstep(aaSafe, -aaSafe, tlIR - tlD), 0.0, 1.0);
             float jBR7 = smoothstep(0.0, aaSafe, localPos.x - (hx - scrBR));
+            jBR7 *= smoothstep(-aaSafe, aaSafe, localPos.y - hy);
             float arcBordBR7 = clamp(smoothstep(aaSafe, -aaSafe, scrBR - brD) - smoothstep(aaSafe, -aaSafe, brIR - brD), 0.0, 1.0);
-            float rightSide7 = step(0.0, localPos.x);
-            concaveJunctionFactor = mix(jTL7, jBR7, rightSide7);
-            concaveArcBorder = mix(arcBordTL7, arcBordBR7, rightSide7);
+            concaveJunctionFactor = max(jTL7, jBR7);
+            concaveArcBorder = mix(arcBordTL7, arcBordBR7, step(0.0, localPos.x));
         } else {
             // 8: 上+左辺なし → 画面BRのみ凸, 画面TR/BL が凹角, TL は凸角のまま
             //   TR: 上辺なし → 右に突出 (右ボーダーが跳ねる, Case2と同じ)
@@ -801,7 +799,6 @@ void main()
             //   TL: 両辺なし → クレセント不要、通常の凸角
             rSafe.y = 0.0; rSafe.w = 0.0;
             // rSafe.z (TL) は凸角のまま残す
-            innerSdfExt = vec2(bExt, bExt);  innerSdfShift = vec2(-bExt, -bExt);
             vec2 trC = vec2( hx + scrTR, -hy + scrTR);
             vec2 blC = vec2(-hx + scrBL,  hy + scrBL);
             float trD = length(localPos - trC);
@@ -820,26 +817,26 @@ void main()
             concaveShadow = min(
                 max(scrTR - trSD, trSM),
                 max(scrBL - blSD, blSM));
-            float trIR = scrTR + borderWidth;
-            float blIR = scrBL + borderWidth;
-            // TR MI: 右ボーダーが跳ねる (X制約からborderWidth減算, Case2と同じ)
-            float trMI = max(max(max( localPos.x - hx - scrTR, hx - borderWidth - localPos.x), localPos.y + hy - scrTR), -localPos.y - hy);
-            // BL MI: 下ボーダーが跳ねる (Y制約からborderWidth減算)
-            float blMI = max(max(max( localPos.y - hy - scrBL, hy - borderWidth - localPos.y), localPos.x + hx - scrBL), -localPos.x - hx);
+            float trIR = scrTR + max(borderRight, borderTop);
+            float blIR = scrBL + max(borderBottom, borderLeft);
+            // TR MI: 右ボーダーが跳ねる + 上辺ボーダー
+            float trMI = max(max(max( localPos.x - hx - scrTR, hx - borderRight - localPos.x), localPos.y + hy - scrTR), -localPos.y - hy + borderTop);
+            // BL MI: 下ボーダーが跳ねる + 左辺ボーダー
+            float blMI = max(max(max( localPos.y - hy - scrBL, hy - borderBottom - localPos.y), localPos.x + hx - scrBL), -localPos.x - hx + borderLeft);
             concaveInner = min(
                 max(trIR - trD, trMI),
                 max(blIR - blD, blMI));
-            // 接合部: TR(右ボーダー, Y遷移) と BL(下ボーダー, X遷移)
+            // 接合部: TR(Y遷移,右付近) と BL(X遷移,下付近)
             float jTR8 = smoothstep(0.0, aaSafe, (-hy + scrTR) - localPos.y);
+            jTR8 *= smoothstep(-aaSafe, aaSafe, localPos.x - hx);
             float arcBordTR8 = clamp(smoothstep(aaSafe, -aaSafe, scrTR - trD) - smoothstep(aaSafe, -aaSafe, trIR - trD), 0.0, 1.0);
             float jBL8 = smoothstep(0.0, aaSafe, (-hx + scrBL) - localPos.x);
+            jBL8 *= smoothstep(-aaSafe, aaSafe, localPos.y - hy);
             float arcBordBL8 = clamp(smoothstep(aaSafe, -aaSafe, scrBL - blD) - smoothstep(aaSafe, -aaSafe, blIR - blD), 0.0, 1.0);
-            float bottomHalf8 = step(0.0, localPos.y);
-            concaveJunctionFactor = mix(jTR8, jBL8, bottomHalf8);
-            concaveArcBorder = mix(arcBordTR8, arcBordBL8, bottomHalf8);
+            concaveJunctionFactor = max(jTR8, jBL8);
+            concaveArcBorder = mix(arcBordTR8, arcBordBL8, step(0.0, localPos.y));
         }
     }
-
     vec2 sdfHalf = halfSize;
     vec2 sdfPos = localPos;
 
@@ -867,24 +864,21 @@ void main()
     float bwV = (borderTop + borderBottom) * 0.5;    // 垂直方向の平均
     vec2 borderShift = vec2((borderLeft - borderRight) * 0.5, (borderTop - borderBottom) * 0.5);
 
-    // cornerPattern>0 の場合は均一borderWidthを使用 (凹角計算との互換性)
-    float useBW = step(0.5, cornerPattern);
-    float effH = mix(bwH, borderWidth, useBW);
-    float effV = mix(bwV, borderWidth, useBW);
-    vec2 effShift = mix(borderShift, vec2(0.0, 0.0), useBW);
+    // 個別ボーダー幅を使用 (cornerPatternモードでも per-side)
+    float effH = bwH;
+    float effV = bwV;
+    vec2 effShift = borderShift;
 
     // 各角の内側radius: 隣接2辺の最大値で縮小
     vec4 innerR = max(vec4(
-        rSafe.x - mix(max(borderBottom, borderRight), borderWidth, useBW),  // BR
-        rSafe.y - mix(max(borderTop, borderRight), borderWidth, useBW),     // TR
-        rSafe.z - mix(max(borderTop, borderLeft), borderWidth, useBW),      // TL
-        rSafe.w - mix(max(borderBottom, borderLeft), borderWidth, useBW)    // BL
+        rSafe.x - max(borderBottom, borderRight),  // BR
+        rSafe.y - max(borderTop, borderRight),     // TR
+        rSafe.z - max(borderTop, borderLeft),      // TL
+        rSafe.w - max(borderBottom, borderLeft)    // BL
     ), 0.0);
     vec2 innerHalf = sdfHalf + innerSdfExt - vec2(effH, effV);
     vec2 innerPos = sdfPos - innerSdfShift - effShift;
-    float distInner = min(
-        sdRoundBox(innerPos, innerHalf, innerR),
-        concaveInner);
+    float distInner = sdRoundBox(innerPos, innerHalf, innerR);
     // ボーダーAA適応: ボーダー幅に応じてAA幅を調整し、薄いボーダーでも色が薄くならないようにする
     // approxBW = 外側SDFから内側SDFまでの距離 ≈ そのピクセルでのボーダー幅
     float approxBW = max(-dist + distInner, 0.001);

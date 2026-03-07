@@ -168,7 +168,12 @@ inline uint16_t floatToHalf(float value) {
 
 // half16 × 2 を 1 float にpack
 inline float packHalf2x16(float a, float b) {
-    uint32_t packed = (uint32_t(floatToHalf(a)) << 16) | uint32_t(floatToHalf(b));
+    uint16_t ha = floatToHalf(a);
+    uint16_t hb = floatToHalf(b);
+    // 上位halfが0で下位halfが非0のとき、float表現がデノーマルになりGPUでゼロに潰される。
+    // 最小の正規化half(0x0400 ≈ 0.000061)を入れてデノーマル回避。
+    if (ha == 0 && hb != 0) ha = 0x0400;
+    uint32_t packed = (uint32_t(ha) << 16) | uint32_t(hb);
     float result;
     std::memcpy(&result, &packed, 4);
     return result;
