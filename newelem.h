@@ -67,25 +67,32 @@ struct LayerInfo {
 	int height = 600;
 	std::vector<DrawCommand*> cmds;
 
+	// タイルFBO描画状態: 設定されている間、push関数がタイルごとにコマンドを展開する
+	TiledTextureInfo* tiledTarget = nullptr;       // 描画先のタイル情報
+	bgfx::FrameBufferHandle* tiledPlaceholderFBO = nullptr;  // 展開対象を識別するFBOポインタ
+	uint64_t tiledBaseViewId = 0;                   // タイル0の論理viewId
+
 	void push(DrawCommand* cmd);
 void pushFill(float x, float y, float width, float height,
 	float radiusTL, float radiusTR, float radiusBR, float radiusBL,
-	float borderWidth, float aaPixels,
+	float borderTop, float borderRight, float borderBottom, float borderLeft,
+	float aaPixels,
 	uint32_t fillColor, uint32_t borderColor,
 	float shadowX, float shadowY, float shadowBlur,
 	uint32_t shadowColor, float zIndex,
-	bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId,
+	bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint64_t viewId,
 	float blendMode = 0.0f,
 	float cornerPattern = 0.0f);
 void  pushImage(float x, float y, float width, float height,
 	float atlasX, float atlasY, float atlasW, float atlasH,
 	float radiusTL, float radiusTR, float radiusBR, float radiusBL,
-	float aaPixels, float borderWidth,
+	float aaPixels,
+	float borderTop, float borderRight, float borderBottom, float borderLeft,
 	uint32_t borderColor,
 	float shadowX, float shadowY, float shadowBlur,
 	uint32_t shadowColor, uint32_t modulate,
 	float zIndex, bgfx::TextureHandle* tex1,
-	bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId,
+	bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint64_t viewId,
 	float blendMode = 0.0f,
 	float cornerPattern = 0.0f);
 void  pushPattern(enum DrawCommandType patternMode,
@@ -94,37 +101,39 @@ void  pushPattern(enum DrawCommandType patternMode,
 	float scrollX, float scrollY,
 	float radiusTL, float radiusTR, float radiusBR, float radiusBL,
 	float aaPixels,
-	float borderWidth, uint32_t borderColor,
+	float borderTop, float borderRight, float borderBottom, float borderLeft,
+	uint32_t borderColor,
 	float shadowX, float shadowY, float shadowBlur,
 	uint32_t shadowColor,
 	int dataOffset, float zIndex,
-	bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId,
+	bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint64_t viewId,
 	float blendMode = 0.0f,
 	float cornerPattern = 0.0f);
 void  pushText(float x, float y, float width, float height,
 	float atlasX, float atlasY, float atlasW, float atlasH,
 	uint32_t color, float zIndex, bgfx::TextureHandle* tex1,
-	bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId,
+	bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint64_t viewId,
 	float blendMode = 0.0f);
 void pushPageCurl(float x, float y, float width, float height,
 	float progress, float curlRadius, float curlAngle,
 	uint32_t fillColor,
 	float uvMinX, float uvMinY, float uvSizeX, float uvSizeY,
-	float backUVMinX, float backUVMinY, float borderWidth,
+	float backUVMinX, float backUVMinY,
+	float borderTop, float borderRight, float borderBottom, float borderLeft,
 	uint32_t borderColor,
 	float shadowX, float shadowY, float shadowBlur,
 	uint32_t shadowColor,
 	bgfx::TextureHandle* tex1, bgfx::TextureHandle* tex2, float zIndex,
-	bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId,
+	bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint64_t viewId,
 	float blendMode = 0.0f);
 void pushRawImage(float x, float y, float width, float height,
 	float atlasX, float atlasY, float atlasW, float atlasH,
 	uint32_t modulate, float zIndex, bgfx::TextureHandle* tex1,
-	bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId,
+	bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint64_t viewId,
 	float blendMode = 0.0f);
 void pushBackground(Background* back, float x, float y, float width, float height,
 	float zIndex, bgfx::TextureHandle* tex1, bgfx::TextureHandle* tex2,
-	bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId,
+	bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint64_t viewId,
 	float blendMode);
 
 	LayerInfo& setUniform(const std::string& name, const std::vector<float>& data);
@@ -144,7 +153,7 @@ struct Background {
 	float aa;
 	float curl;
 	float borderRadiusTL, borderRadiusTR, borderRadiusBR, borderRadiusBL;
-	float borderWidth;
+	float borderTop, borderRight, borderBottom, borderLeft;
 	uint32_t borderColor;
 	float shadowX, shadowY, shadowBlur;
 	uint32_t shadowColor;
@@ -170,7 +179,7 @@ struct NativeWindow {
     NativeWindow* parent = nullptr;
     void* nwh = nullptr;
     bgfx::FrameBufferHandle fbo = BGFX_INVALID_HANDLE;  // メインは INVALID、それ以外はスワップチェーンFBO
-    uint8_t viewId = 0;
+    uint64_t viewId = 0;  // 論理viewId
     PointI size = { 0, 0 };
     NewElement* local = nullptr;
 
@@ -232,8 +241,8 @@ struct NewGraphic {
 	ImageId im;
 	bgfx::FrameBufferHandle* fb;
 	PointI* fbsize;
-	int viewId = 0;
-	int viewId2 = 0;
+	uint64_t viewId = 0;   // 論理viewId（描画先）
+	uint64_t viewId2 = 0;  // 論理viewId（オフスクリーン書き込み先）
 	ExtendedRenderGroup* group;
 };
 struct NewEndElement {
@@ -334,11 +343,11 @@ struct Offscreen : OffscreenEnd {
 	NativeWindow* window = nullptr;  // 所属するウィンドウ
 	void markLayout(NewLocal* local) { layout = true; paint = true; local->dirty = (DirtyType)(local->dirty | DirtyType::Partial); }
 	void markPaint(NewLocal* local) { paint = true; local->dirty = (DirtyType)(local->dirty | DirtyType::Partial); }
-	int viewId = 0;
+	uint64_t viewId = 0;  // 論理viewId
 	ExtendedRenderGroup *group;
 	bool dirty = false;
 };
-static int viewId = 0;
+static uint64_t viewId = 0;  // グローバル論理viewIdカウンタ
 
 struct NewLine : NewElement {
 };
@@ -881,7 +890,19 @@ void NewMeasureCall(ThreadGC* thgc, NewElement* elem, NewMeasure* measure, NewLo
 	newmeasure.start = measure->pos; newmeasure.group = measure->group;
 	float sizex = 0, sizey = 0;
 	for (NewElement* child = elem->childend->next; child->type != LetterType::_ElemEnd; ) {
-		child->Measure(thgc, child, &newmeasure, local, n);
+		if (child->offscreen == NULL) {
+			child->Measure(thgc, child, &newmeasure, local, n);
+		} else if (child->offscreen->layout) {
+			// オフスクリーン子: layoutフラグが立っていれば独立座標系でMeasure
+			NewMeasure offMeasure;
+			offMeasure.pos = { 0, 0 };
+			offMeasure.size = { child->size.x, child->size.y };
+			offMeasure.start = { 0, 0 };
+			offMeasure.group = child->offscreen->group;
+			child->Measure(thgc, child, &offMeasure, local, n);
+			child->offscreen->layout = false;
+		}
+		// layout==false のオフスクリーン子は既存のsizeをそのまま使う
 		if (elem->orient) {
 			if (sizey < child->size.y) sizey = child->size.y;
 			newmeasure.pos.x += child->size.x;
@@ -958,18 +979,64 @@ void NewDrawCall(ThreadGC* thgc, NewElement* elem, NewGraphic* g, NewLocal* loca
 			queueOffscreenResize(thgc, elem->offscreen->imPing, size3x, size3y);
 			queueOffscreenResize(thgc, elem->offscreen->imPong, size3x, size3y);
 		}
-		auto info = mygetStandaloneTextureInfo(thgc, elem->offscreen->ping ? elem->offscreen->imPing : elem->offscreen->imPong);
-		g->layer->pushText(elem->pos2.x, elem->pos2.y, sizex, sizey,
-			elem->scroll.x / size3x, elem->scroll.y / size3y, sizex / size3x, sizey / size3y, 0xFFFFFFFF, 10000, &info->handle, g->fb, g->fbsize, g->viewId);
-		/*drawUnderPagingBar(g->layer, *getAtlas(thgc), getFont("sans", 16), elem->pos2.x, sizey + 110.0f, sizex, 5.0f, 3.0, 16.0, 0.0f, g->group, g->fb, g->fbsize, g->viewId);
-		drawRightPagingBar(g->layer, *getAtlas(thgc), getFont("sans", 16), sizex + 10.0f, elem->pos2.y, 5.0f, 100.0f, 3.0, 16.0, 0.0f, g->group, g->fb, g->fbsize, g->viewId);
-		drawUnderScrollBar(g->layer, elem->pos2.x, sizey + 100.0f, sizex, 5.0f, 100.0f, 50.0f, 300.0f, 0.0f, g->fb, g->fbsize, g->viewId);
-		drawRightScrollBar(g->layer, sizex, elem->pos2.y, 5.0f, 100.0f, 100.0f, 50.0f, 300.0f, 0.0f, g->fb, g->fbsize, g->viewId);
-		pro += 0.004f;
-		pro = fmod(pro, 1.0f);
-		auto info2 = mygetStandaloneTextureInfo(thgc, elem->background->tex1);*/
-		g2 = NewGraphic{g->layer, elem, elem, {0, 0}, {elem->size2.x, elem->size2.y}, {0,0}, {0,0},
-			elem->offscreen->ping ? elem->offscreen->imPong : elem->offscreen->imPing,  &info->fbo,  &info->size, elem->offscreen->viewId = g->viewId2, 0, elem->offscreen->group };
+		ImageId readId = elem->offscreen->ping ? elem->offscreen->imPing : elem->offscreen->imPong;
+		ImageId writeId = elem->offscreen->ping ? elem->offscreen->imPong : elem->offscreen->imPing;
+
+		// タイルFBOか通常FBOかで分岐
+		TiledTextureInfo* tiledRead = mygetTiledTextureInfo(thgc, readId);
+		if (tiledRead) {
+			// 読み取り: 表示領域と交差するタイルのみ O(1) ルックアップで描画
+			float scaleX = sizex / size3x;
+			float scaleY = sizey / size3y;
+			// 表示領域に対応するソース座標の矩形
+			int srcX = (int)elem->scroll.x;
+			int srcY = (int)elem->scroll.y;
+			int srcW = (int)std::ceil(size3x);
+			int srcH = (int)std::ceil(size3y);
+			int ts = (int)tiledRead->tileSize;
+			if (ts > 0) {
+				int col0 = std::max(0, srcX / ts);
+				int row0 = std::max(0, srcY / ts);
+				int col1 = std::min(tiledRead->tilesX - 1, (srcX + srcW - 1) / ts);
+				int row1 = std::min(tiledRead->tilesY - 1, (srcY + srcH - 1) / ts);
+				for (int row = row0; row <= row1; ++row) {
+					for (int col = col0; col <= col1; ++col) {
+						auto& tile = tiledRead->tiles[row * tiledRead->tilesX + col];
+						if (!bgfx::isValid(tile.handle)) continue;
+						float drawX = elem->pos2.x + (tile.x - elem->scroll.x) * scaleX;
+						float drawY = elem->pos2.y + (tile.y - elem->scroll.y) * scaleY;
+						float drawW = tile.w * scaleX;
+						float drawH = tile.h * scaleY;
+						g->layer->pushText(drawX, drawY, drawW, drawH,
+							0, 0, 1, 1, 0xFFFFFFFF, 10000, &tile.handle, g->fb, g->fbsize, g->viewId);
+					}
+				}
+			}
+
+			// 書き込み: LayerInfoにタイル状態を設定し、push関数が自動的にタイル展開する
+			TiledTextureInfo* tiledWrite = mygetTiledTextureInfo(thgc, writeId);
+			if (tiledWrite && !tiledWrite->tiles.empty()) {
+				auto& firstTile = tiledWrite->tiles[0];
+				// タイル数分の論理viewIdをグローバルカウンタから確保
+				uint64_t tileBaseId = ::viewId;
+				::viewId += (uint64_t)tiledWrite->tiles.size();
+				g2 = NewGraphic{g->layer, elem, elem, {0, 0}, {elem->size2.x, elem->size2.y}, {0,0}, {0,0},
+					writeId, &firstTile.fbo, &tiledWrite->totalSize,
+					elem->offscreen->viewId = tileBaseId, 0, elem->offscreen->group };
+				// LayerInfoにタイル展開状態を設定
+				g->layer->tiledTarget = tiledWrite;
+				g->layer->tiledPlaceholderFBO = &firstTile.fbo;
+				g->layer->tiledBaseViewId = tileBaseId;
+			}
+		}
+		else {
+			auto info = mygetStandaloneTextureInfo(thgc, readId);
+			g->layer->pushText(elem->pos2.x, elem->pos2.y, sizex, sizey,
+				elem->scroll.x / size3x, elem->scroll.y / size3y, sizex / size3x, sizey / size3y, 0xFFFFFFFF, 10000, &info->handle, g->fb, g->fbsize, g->viewId);
+			uint64_t offscreenViewId = ::viewId++;
+			g2 = NewGraphic{g->layer, elem, elem, {0, 0}, {elem->size2.x, elem->size2.y}, {0,0}, {0,0},
+				writeId, &info->fbo, &info->size, elem->offscreen->viewId = offscreenViewId, 0, elem->offscreen->group };
+		}
 		elem->offscreen->ping = !elem->offscreen->ping;
 		std::vector<float>* widths = new std::vector<float>{ 10.0f, 10.0f, 10.0f };
 		int size = widths->size();
@@ -1006,6 +1073,7 @@ void NewDrawCall(ThreadGC* thgc, NewElement* elem, NewGraphic* g, NewLocal* loca
 	NewElement* start = elem->childend->next;
 	//background.draw
 	for (NewElement* child = elem->childend->next; child->type != LetterType::_ElemEnd; ) {
+		if (child->offscreen != NULL) continue;
 		child->Draw(thgc, child, &g2, local, q);
 		if (elem->orient) {
 			g2.pos.x += child->size.x;
@@ -1018,6 +1086,9 @@ void NewDrawCall(ThreadGC* thgc, NewElement* elem, NewGraphic* g, NewLocal* loca
 		}
 		child = child->next;
 	}
+	// タイル描画状態をクリア
+	g->layer->tiledTarget = nullptr;
+	g->layer->tiledPlaceholderFBO = nullptr;
 }
 void initNewLocal(ThreadGC* thgc, NewLocal* local, NativeWindow* mainWindow = nullptr) {
 	local->next = local->before = (NewElement*)local;
@@ -1060,7 +1131,7 @@ void initNewLocal(ThreadGC* thgc, NewLocal* local, NativeWindow* mainWindow = nu
 	local->background->tex1 = myloadTexture2D(thgc, "123.png", ImageUsage::Background);
 	local->background->fillcolor = 0xffffffff;
 	local->background->borderColor = 0x00000000;
-	local->background->borderWidth = 0.0f;
+	local->background->borderTop = local->background->borderRight = local->background->borderBottom = local->background->borderLeft = 0.0f;
 	local->background->shadowBlur = 1.0f;
 	local->background->shadowColor = 0x00000000;
 	local->dirty = DirtyType::RebuildValue;
@@ -1273,11 +1344,11 @@ void LetterDrawSelect(ThreadGC* thgc, NewLocal* local, NewElement* self, int m, 
 					float w, h;
 					str = SubString(thgc, letter->text, s->start, s->end);
 					MeasureString(*getAtlas(thgc), s->font, str, n - s->start, 10000, &w, &h, &n2, NULL);
-					g->layer->pushFill(pos.x + self->pos.x + s->x + w0, pos.y + self->pos.y + s->y, w - w0 + 1, s->height, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0x4477ff66, 0, 0.0f, 0.0f, 1.0f, 0, 12000.0f, g->fb, g->fbsize, g->viewId);
+					g->layer->pushFill(pos.x + self->pos.x + s->x + w0, pos.y + self->pos.y + s->y, w - w0 + 1, s->height, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0x4477ff66, 0, 0.0f, 0.0f, 1.0f, 0, 12000.0f, g->fb, g->fbsize, g->viewId);
 					break;
 				}
 				else {
-					g->layer->pushFill(pos.x + self->pos.x + s->x + w0, pos.y + self->pos.y + s->y, s->width - w0 + 1, s->height, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0x4477ff66, 0, 0.0f, 0.0f, 1.0f, 0, 12000.0f, g->fb, g->fbsize, g->viewId);
+					g->layer->pushFill(pos.x + self->pos.x + s->x + w0, pos.y + self->pos.y + s->y, s->width - w0 + 1, s->height, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0x4477ff66, 0, 0.0f, 0.0f, 1.0f, 0, 12000.0f, g->fb, g->fbsize, g->viewId);
 				}
 				w0 = 0.0f; h0 = 0.0f;
 				m2++;

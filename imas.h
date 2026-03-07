@@ -49,10 +49,11 @@ struct ResolveResult {
 struct ImageLocation {
     enum class Type : uint8_t {
         None,
-        Standalone,   // standaloneTextures_ に存在
-        FontAtlas,    // FontAtlas に存在
-        GridAtlas,    // ThumbnailGridAtlas に存在
-        ShelfAtlas,   // ThumbnailShelfAtlas に存在
+        Standalone,        // standaloneTextures_ に存在
+        TiledStandalone,   // tiledTextures_ に存在（巨大画像タイル分割）
+        FontAtlas,         // FontAtlas に存在
+        GridAtlas,         // ThumbnailGridAtlas に存在
+        ShelfAtlas,        // ThumbnailShelfAtlas に存在
     };
 
     Type type = Type::None;
@@ -173,6 +174,11 @@ public:
         fontAtlas_.init();
         if (!gridAtlas_.initialize()) return false;
         if (!shelfAtlas_.initialize()) return false;
+        // GPU最大テクスチャサイズを取得
+        const bgfx::Caps* caps = bgfx::getCaps();
+        if (caps) {
+            maxTileSize_ = std::min((uint16_t)caps->limits.maxTextureSize, (uint16_t)8192);
+        }
         return true;
     }
 
@@ -189,6 +195,22 @@ public:
                 }
             }
             standaloneTextures_.clear();
+        }
+
+        // Tiled textures 解放
+        {
+            std::lock_guard lock(tiledMutex_);
+            for (auto& [id, info] : tiledTextures_) {
+                for (auto& tile : info.tiles) {
+                    if (bgfx::isValid(tile.fbo)) {
+                        bgfx::destroy(tile.fbo);
+                    }
+                    else if (bgfx::isValid(tile.handle)) {
+                        bgfx::destroy(tile.handle);
+                    }
+                }
+            }
+            tiledTextures_.clear();
         }
 
         // 配置情報クリア
@@ -223,6 +245,9 @@ public:
 
         // Standalone texture GC
         collectStandaloneGarbage();
+
+        // Tiled texture GC
+        collectTiledGarbage();
     }
 
     void collectStandaloneGarbage() {
@@ -247,6 +272,38 @@ public:
                     bgfx::destroy(it->second.handle);
                 }
                 standaloneTextures_.erase(it);
+
+                // 配置情報を削除
+                std::lock_guard locLock(locationMutex_);
+                imageLocations_.erase(id);
+            }
+        }
+    }
+
+    void collectTiledGarbage() {
+        std::lock_guard lock(tiledMutex_);
+
+        std::vector<ImageId> toRemove;
+        for (auto& [id, info] : tiledTextures_) {
+            if (info.persistent || info.refCount > 0) continue;
+
+            if (currentFrame_ - info.lastUsedFrame > config_.standaloneExpireFrames) {
+                toRemove.push_back(id);
+            }
+        }
+
+        for (ImageId id : toRemove) {
+            auto it = tiledTextures_.find(id);
+            if (it != tiledTextures_.end()) {
+                for (auto& tile : it->second.tiles) {
+                    if (bgfx::isValid(tile.fbo)) {
+                        bgfx::destroy(tile.fbo);
+                    }
+                    else if (bgfx::isValid(tile.handle)) {
+                        bgfx::destroy(tile.handle);
+                    }
+                }
+                tiledTextures_.erase(it);
 
                 // 配置情報を削除
                 std::lock_guard locLock(locationMutex_);
@@ -282,6 +339,11 @@ public:
         size_t standalonePersistentCount;
         uint64_t standaloneTotalBytes;
 
+        // Tiled Textures
+        size_t tiledCount;
+        size_t tiledTotalTiles;
+        uint64_t tiledTotalBytes;
+
         // ImageLocations
         size_t totalRegisteredImages;
         size_t pendingImages;
@@ -316,6 +378,19 @@ public:
             for (const auto& [id, info] : standaloneTextures_) {
                 s.standaloneTotalBytes += (uint64_t)info.size.x * info.size.y * 4;
                 if (info.persistent) ++s.standalonePersistentCount;
+            }
+        }
+
+        {
+            std::lock_guard lock(tiledMutex_);
+            s.tiledCount = tiledTextures_.size();
+            s.tiledTotalTiles = 0;
+            s.tiledTotalBytes = 0;
+            for (const auto& [id, info] : tiledTextures_) {
+                s.tiledTotalTiles += info.tiles.size();
+                for (const auto& tile : info.tiles) {
+                    s.tiledTotalBytes += (uint64_t)tile.w * tile.h * 4;
+                }
             }
         }
 
@@ -433,6 +508,11 @@ public:
                     uint64_t contentId = getImageIdLocal(id);
                     return resolveThumbnail(id);
                 }
+                case ImageLocation::Type::TiledStandalone: {
+                    // タイル画像は最初のタイルを返す（互換用）
+                    // 完全な描画には resolveTiledForDraw() を使うこと
+                    return resolveTiledFirstTile(id);
+                }
                 default:
                     break;
                 }
@@ -506,10 +586,23 @@ public:
             domain == ImageIdDomain::Memory ||
             domain == ImageIdDomain::Generated ||
             domain == ImageIdDomain::File) {
-            std::lock_guard lock(standaloneMutex_);
-            auto it = standaloneTextures_.find(id);
-            if (it != standaloneTextures_.end()) {
-                it->second.lastUsedFrame = currentFrame_;
+            // まずstandaloneを探す
+            {
+                std::lock_guard lock(standaloneMutex_);
+                auto it = standaloneTextures_.find(id);
+                if (it != standaloneTextures_.end()) {
+                    it->second.lastUsedFrame = currentFrame_;
+                    return;
+                }
+            }
+            // tiledを探す
+            {
+                std::lock_guard lock(tiledMutex_);
+                auto it = tiledTextures_.find(id);
+                if (it != tiledTextures_.end()) {
+                    it->second.lastUsedFrame = currentFrame_;
+                    return;
+                }
             }
         }
 
@@ -533,11 +626,23 @@ public:
             domain == ImageIdDomain::Memory ||
             domain == ImageIdDomain::Generated ||
             domain == ImageIdDomain::File) {
-            std::lock_guard lock(standaloneMutex_);
-            auto it = standaloneTextures_.find(id);
-            if (it != standaloneTextures_.end()) {
-                ++it->second.refCount;
-                it->second.lastUsedFrame = currentFrame_;
+            {
+                std::lock_guard lock(standaloneMutex_);
+                auto it = standaloneTextures_.find(id);
+                if (it != standaloneTextures_.end()) {
+                    ++it->second.refCount;
+                    it->second.lastUsedFrame = currentFrame_;
+                    return;
+                }
+            }
+            {
+                std::lock_guard lock(tiledMutex_);
+                auto it = tiledTextures_.find(id);
+                if (it != tiledTextures_.end()) {
+                    ++it->second.refCount;
+                    it->second.lastUsedFrame = currentFrame_;
+                    return;
+                }
             }
         }
         // Grid/Shelfは内部LRUで管理
@@ -549,10 +654,21 @@ public:
             domain == ImageIdDomain::Memory ||
             domain == ImageIdDomain::Generated ||
             domain == ImageIdDomain::File) {
-            std::lock_guard lock(standaloneMutex_);
-            auto it = standaloneTextures_.find(id);
-            if (it != standaloneTextures_.end() && it->second.refCount > 0) {
-                --it->second.refCount;
+            {
+                std::lock_guard lock(standaloneMutex_);
+                auto it = standaloneTextures_.find(id);
+                if (it != standaloneTextures_.end() && it->second.refCount > 0) {
+                    --it->second.refCount;
+                    return;
+                }
+            }
+            {
+                std::lock_guard lock(tiledMutex_);
+                auto it = tiledTextures_.find(id);
+                if (it != tiledTextures_.end() && it->second.refCount > 0) {
+                    --it->second.refCount;
+                    return;
+                }
             }
         }
     }
@@ -592,6 +708,13 @@ public:
     // 作成（空テクスチャ）
     ImageId createEmptyStandaloneTexture(uint16_t w, uint16_t h, bool persistent = false) {
         if (w == 0 || h == 0) return 0;
+
+        // 巨大空テクスチャ → タイル分割パス
+        if (shouldTile(w, h)) {
+            ImageId id = ImageIdGenerator::fromMemory();
+            if (createTiledEmptyInternal(id, w, h, persistent)) return id;
+            return 0;
+        }
 
         ImageId id = ImageIdGenerator::fromMemory();
 
@@ -868,6 +991,18 @@ public:
     bool resizeOffscreenInternal(ImageId id, uint16_t newW, uint16_t newH) {
         if (newW == 0 || newH == 0) return false;
 
+        // タイル画像のリサイズ → 破棄して再作成
+        if (isTiledTexture(id)) {
+            return resizeTiledOffscreenInternal(id, newW, newH);
+        }
+
+        // 新しいサイズがタイル分割が必要な場合 → Standalone→Tiled への移行
+        if (shouldTile(newW, newH)) {
+            // 既存のStandaloneを破棄してTiledで再作成
+            destroyStandalone(id);
+            return createTiledOffscreenInternal(id, newW, newH, false);
+        }
+
         std::lock_guard lock(standaloneMutex_);
         auto it = standaloneTextures_.find(id);
         if (it == standaloneTextures_.end() || !it->second.isRenderTarget) {
@@ -976,6 +1111,10 @@ public:
 
         // 破棄（レンダースレッドで安全に実行）
         for (auto& id : destroys) {
+            if (isTiledTexture(id)) {
+                destroyTiled(id);
+                continue;
+            }
             std::lock_guard lock(standaloneMutex_);
             auto it = standaloneTextures_.find(id);
             if (it != standaloneTextures_.end()) {
@@ -1015,6 +1154,11 @@ public:
         if (size != 0)bgfx::frame();
     }
     void destroyStandalone(ImageId id) {
+        // タイル画像の場合はそちらへ委譲
+        if (isTiledTexture(id)) {
+            destroyTiled(id);
+            return;
+        }
         std::lock_guard lock(standaloneMutex_);
         auto it = standaloneTextures_.find(id);
         if (it != standaloneTextures_.end()) {
@@ -1056,9 +1200,14 @@ public:
         return (it != standaloneTextures_.end()) ? &it->second : nullptr;
     }
 
-    // Standalone テクスチャ更新
+    // Standalone テクスチャ更新（タイル画像は自動分配）
     bool updateStandaloneTexture(ImageId id, const void* pixels,
         uint16_t x, uint16_t y, uint16_t w, uint16_t h, int pitch) {
+        // タイル画像の場合はそちらへ委譲
+        if (isTiledTexture(id)) {
+            return updateTiledTexture(id, pixels, x, y, w, h, pitch);
+        }
+
         std::lock_guard lock(standaloneMutex_);
         auto it = standaloneTextures_.find(id);
         if (it == standaloneTextures_.end()) return false;
@@ -1075,6 +1224,99 @@ public:
 
         it->second.lastUsedFrame = currentFrame_;
         return true;
+    }
+
+    //=========================================================================
+    // 【Layer B-2】Tiled テクスチャ（巨大画像タイル分割）
+    //=========================================================================
+
+    // Tiled テクスチャ情報取得
+    TiledTextureInfo* getTiledTexture(ImageId id) {
+        std::lock_guard lock(tiledMutex_);
+        auto it = tiledTextures_.find(id);
+        return (it != tiledTextures_.end()) ? &it->second : nullptr;
+    }
+
+    // Tiled テクスチャ更新（矩形領域を更新、重なるタイルに自動分配）
+    bool updateTiledTexture(ImageId id, const void* pixels,
+        uint16_t x, uint16_t y, uint16_t w, uint16_t h, int pitch) {
+        std::lock_guard lock(tiledMutex_);
+        auto it = tiledTextures_.find(id);
+        if (it == tiledTextures_.end()) return false;
+
+        auto& info = it->second;
+        const uint8_t* src = (const uint8_t*)pixels;
+
+        // 更新矩形と重なるタイルに自動分配（O(1) グリッド検索）
+        info.forEachTileInRect(x, y, w, h, [&](TiledTextureInfo::Tile& tile,
+            int ix, int iy, int iw, int ih) {
+            std::vector<uint8_t> subData(iw * ih * 4);
+            for (int row = 0; row < ih; ++row) {
+                std::memcpy(
+                    subData.data() + row * iw * 4,
+                    src + ((iy - y) + row) * pitch + (ix - x) * 4,
+                    iw * 4);
+            }
+            bgfx::updateTexture2D(tile.handle, 0, 0,
+                (uint16_t)(ix - tile.x), (uint16_t)(iy - tile.y),
+                (uint16_t)iw, (uint16_t)ih,
+                bgfx::copy(subData.data(), (uint32_t)subData.size()));
+        });
+
+        info.lastUsedFrame = currentFrame_;
+        return true;
+    }
+
+    // Tiled テクスチャ破棄
+    void destroyTiled(ImageId id) {
+        std::lock_guard lock(tiledMutex_);
+        auto it = tiledTextures_.find(id);
+        if (it != tiledTextures_.end()) {
+            for (auto& tile : it->second.tiles) {
+                if (bgfx::isValid(tile.fbo)) {
+                    bgfx::destroy(tile.fbo);  // FBO破棄でattachmentも解放される
+                }
+                else if (bgfx::isValid(tile.handle)) {
+                    bgfx::destroy(tile.handle);
+                }
+            }
+            tiledTextures_.erase(it);
+
+            // 配置情報を削除
+            std::lock_guard locLock(locationMutex_);
+            imageLocations_.erase(id);
+        }
+    }
+
+    // Tiled テクスチャの描画解決（全タイル返却）
+    TiledResolveResult resolveTiledForDraw(ImageId id) {
+        TiledResolveResult result;
+        std::lock_guard lock(tiledMutex_);
+        auto it = tiledTextures_.find(id);
+        if (it == tiledTextures_.end()) return result;
+
+        auto& info = it->second;
+        info.lastUsedFrame = currentFrame_;
+        result.totalWidth = info.totalSize.x;
+        result.totalHeight = info.totalSize.y;
+
+        for (auto& tile : info.tiles) {
+            if (!bgfx::isValid(tile.handle)) continue;
+            result.tiles.push_back({
+                &tile.handle,
+                (float)tile.x, (float)tile.y,
+                (float)tile.w, (float)tile.h
+            });
+        }
+        return result;
+    }
+
+    // タイル画像かどうか判定
+    bool isTiledTexture(ImageId id) const {
+        std::lock_guard lock(locationMutex_);
+        auto it = imageLocations_.find(id);
+        return it != imageLocations_.end() &&
+               it->second.type == ImageLocation::Type::TiledStandalone;
     }
 
     //=========================================================================
@@ -1371,6 +1613,11 @@ public:
     }
 public:
     void destroyOffscreenInternal(ImageId id) {
+        // タイル画像の場合はそちらへ委譲
+        if (isTiledTexture(id)) {
+            destroyTiled(id);
+            return;
+        }
         std::lock_guard lock(standaloneMutex_);
         auto it = standaloneTextures_.find(id);
         if (it != standaloneTextures_.end()) {
@@ -1409,6 +1656,30 @@ private:
         result.resolved.u1 = 1; result.resolved.v1 = 1;
         result.resolved.width = it->second.size.x;
         result.resolved.height = it->second.size.y;
+        return result;
+    }
+
+    // タイル画像の互換resolve（最初のタイルを返す）
+    ResolveResult resolveTiledFirstTile(ImageId id) {
+        ResolveResult result;
+        std::lock_guard lock(tiledMutex_);
+        auto it = tiledTextures_.find(id);
+        if (it == tiledTextures_.end() || it->second.tiles.empty()) {
+            result.status = ResolveStatus::NotFound;
+            return result;
+        }
+
+        auto& info = it->second;
+        info.lastUsedFrame = currentFrame_;
+
+        // 最初のタイルを返す（互換用、完全な描画には resolveTiledForDraw を使用）
+        auto& firstTile = info.tiles[0];
+        result.status = ResolveStatus::Success;
+        result.resolved.texture = &firstTile.handle;
+        result.resolved.u0 = 0; result.resolved.v0 = 0;
+        result.resolved.u1 = 1; result.resolved.v1 = 1;
+        result.resolved.width = info.totalSize.x;
+        result.resolved.height = info.totalSize.y;
         return result;
     }
 
@@ -1454,12 +1725,41 @@ private:
     }
 
     //=========================================================================
+    // タイル分割判定ヘルパー
+    //=========================================================================
+
+    // 辺長超過 or 面積超過でタイル分割が必要か判定
+    bool shouldTile(uint16_t w, uint16_t h) const {
+        if (w > maxTileSize_ || h > maxTileSize_) return true;
+        if ((uint64_t)w * h > maxTextureArea_) return true;
+        return false;
+    }
+
+    // 正方形タイルサイズを計算（面積制約あり）
+    // 正方形 → ビューポート内に入るタイル数が最小 → 描画コスト最小
+    uint16_t computeEffectiveTileSize(uint16_t w, uint16_t h) const {
+        uint16_t ts = maxTileSize_;
+        // 面積制約: ts * ts <= maxTextureArea_ を満たすまで縮小
+        while ((uint64_t)ts * ts > maxTextureArea_ && ts > 256) {
+            ts /= 2;
+        }
+        return ts;
+    }
+
+    //=========================================================================
     // 内部作成関数
     //=========================================================================
 
     bool createStandaloneInternal(ImageId id, const void* pixels, uint16_t w, uint16_t h,
         int pitch, bool persistent, ImageOrigin origin,
         bool isRenderTarget) {
+        // 巨大画像 → タイル分割パスへ（辺長超過 or 面積超過）
+        if (shouldTile(w, h)) {
+            if (isRenderTarget) {
+                return createTiledOffscreenInternal(id, w, h, persistent);
+            }
+            return createTiledInternal(id, pixels, w, h, pitch, persistent, origin);
+        }
         std::lock_guard lock(standaloneMutex_);
 
         std::vector<uint8_t> data(w * h * 4);
@@ -1499,7 +1799,251 @@ private:
 
         return true;
     }
+    //=========================================================================
+    // タイル分割作成関数（巨大画像用）
+    //=========================================================================
+    bool createTiledInternal(ImageId id, const void* pixels, uint16_t w, uint16_t h,
+        int pitch, bool persistent, ImageOrigin origin) {
+        std::lock_guard lock(tiledMutex_);
+
+        uint16_t ts = computeEffectiveTileSize(w, h);
+        TiledTextureInfo info;
+        info.tileSize = ts;
+        info.tilesX = (w + ts - 1) / ts;
+        info.tilesY = (h + ts - 1) / ts;
+        info.totalSize = { w, h };
+        info.persistent = persistent;
+        info.origin = origin;
+
+        const uint8_t* src = (const uint8_t*)pixels;
+
+        for (int ty = 0; ty < info.tilesY; ++ty) {
+            for (int tx = 0; tx < info.tilesX; ++tx) {
+                uint16_t tileX = (uint16_t)(tx * ts);
+                uint16_t tileY = (uint16_t)(ty * ts);
+                uint16_t tileW = std::min((uint16_t)(w - tileX), ts);
+                uint16_t tileH = std::min((uint16_t)(h - tileY), ts);
+
+                // このタイル領域のピクセルをコピー
+                std::vector<uint8_t> tileData(tileW * tileH * 4);
+                for (uint16_t row = 0; row < tileH; ++row) {
+                    std::memcpy(
+                        tileData.data() + row * tileW * 4,
+                        src + (tileY + row) * pitch + tileX * 4,
+                        tileW * 4);
+                }
+
+                bgfx::TextureHandle handle = bgfx::createTexture2D(
+                    tileW, tileH, false, 1, bgfx::TextureFormat::RGBA8,
+                    BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP,
+                    bgfx::copy(tileData.data(), (uint32_t)tileData.size()));
+
+                if (!bgfx::isValid(handle)) {
+                    // ロールバック: 作成済みタイルを全破棄
+                    for (auto& t : info.tiles) bgfx::destroy(t.handle);
+                    return false;
+                }
+
+                info.tiles.push_back({ handle, BGFX_INVALID_HANDLE, tileX, tileY, tileW, tileH, {(int)tileW, (int)tileH} });
+            }
+        }
+
+        info.refCount = 1;
+        info.lastUsedFrame = currentFrame_;
+        tiledTextures_[id] = std::move(info);
+
+        // 配置情報を登録
+        {
+            std::lock_guard locLock(locationMutex_);
+            auto& loc = imageLocations_[id];
+            loc.type = ImageLocation::Type::TiledStandalone;
+            loc.width = w;
+            loc.height = h;
+            loc.isPending = false;
+        }
+
+        return true;
+    }
+
+    //=========================================================================
+    // タイル分割空テクスチャ作成関数
+    //=========================================================================
+    bool createTiledEmptyInternal(ImageId id, uint16_t w, uint16_t h, bool persistent) {
+        std::lock_guard lock(tiledMutex_);
+
+        uint16_t ts = computeEffectiveTileSize(w, h);
+        TiledTextureInfo info;
+        info.tileSize = ts;
+        info.tilesX = (w + ts - 1) / ts;
+        info.tilesY = (h + ts - 1) / ts;
+        info.totalSize = { w, h };
+        info.persistent = persistent;
+        info.origin = ImageOrigin::Memory;
+
+        for (int ty = 0; ty < info.tilesY; ++ty) {
+            for (int tx = 0; tx < info.tilesX; ++tx) {
+                uint16_t tileX = (uint16_t)(tx * ts);
+                uint16_t tileY = (uint16_t)(ty * ts);
+                uint16_t tileW = std::min((uint16_t)(w - tileX), ts);
+                uint16_t tileH = std::min((uint16_t)(h - tileY), ts);
+
+                bgfx::TextureHandle handle = bgfx::createTexture2D(
+                    tileW, tileH, false, 1, bgfx::TextureFormat::RGBA8,
+                    BGFX_TEXTURE_NONE | BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP,
+                    nullptr);
+
+                if (!bgfx::isValid(handle)) {
+                    for (auto& t : info.tiles) bgfx::destroy(t.handle);
+                    return false;
+                }
+
+                info.tiles.push_back({ handle, BGFX_INVALID_HANDLE, tileX, tileY, tileW, tileH, {(int)tileW, (int)tileH} });
+            }
+        }
+
+        info.refCount = 1;
+        info.lastUsedFrame = currentFrame_;
+        tiledTextures_[id] = std::move(info);
+
+        {
+            std::lock_guard locLock(locationMutex_);
+            auto& loc = imageLocations_[id];
+            loc.type = ImageLocation::Type::TiledStandalone;
+            loc.width = w;
+            loc.height = h;
+            loc.isPending = false;
+        }
+
+        return true;
+    }
+
+    //=========================================================================
+    // タイル分割オフスクリーン作成関数（巨大FBO用）
+    //=========================================================================
+    bool createTiledOffscreenInternal(ImageId id, uint16_t w, uint16_t h, bool persistent) {
+        std::lock_guard lock(tiledMutex_);
+
+        uint16_t ts = computeEffectiveTileSize(w, h);
+        TiledTextureInfo info;
+        info.tileSize = ts;
+        info.tilesX = (w + ts - 1) / ts;
+        info.tilesY = (h + ts - 1) / ts;
+        info.totalSize = { w, h };
+        info.persistent = persistent;
+        info.origin = ImageOrigin::Offscreen;
+        info.isRenderTarget = true;
+
+        for (int ty = 0; ty < info.tilesY; ++ty) {
+            for (int tx = 0; tx < info.tilesX; ++tx) {
+                uint16_t tileX = (uint16_t)(tx * ts);
+                uint16_t tileY = (uint16_t)(ty * ts);
+                uint16_t tileW = std::min((uint16_t)(w - tileX), ts);
+                uint16_t tileH = std::min((uint16_t)(h - tileY), ts);
+
+                // Color texture (BGRA8 for Metal compatibility)
+                bgfx::TextureHandle colorHandle = bgfx::createTexture2D(
+                    tileW, tileH, false, 1, bgfx::TextureFormat::BGRA8,
+                    BGFX_TEXTURE_RT | BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP,
+                    nullptr);
+                if (!bgfx::isValid(colorHandle)) {
+                    // ロールバック
+                    for (auto& t : info.tiles) {
+                        if (bgfx::isValid(t.fbo)) bgfx::destroy(t.fbo);
+                        else if (bgfx::isValid(t.handle)) bgfx::destroy(t.handle);
+                    }
+                    return false;
+                }
+
+                // Depth texture
+                bgfx::TextureHandle depthHandle = bgfx::createTexture2D(
+                    tileW, tileH, false, 1, bgfx::TextureFormat::D24S8,
+                    BGFX_TEXTURE_RT, nullptr);
+                if (!bgfx::isValid(depthHandle)) {
+                    bgfx::destroy(colorHandle);
+                    for (auto& t : info.tiles) {
+                        if (bgfx::isValid(t.fbo)) bgfx::destroy(t.fbo);
+                        else if (bgfx::isValid(t.handle)) bgfx::destroy(t.handle);
+                    }
+                    return false;
+                }
+
+                bgfx::Attachment att[2];
+                att[0].init(colorHandle);
+                att[1].init(depthHandle);
+
+                bgfx::FrameBufferHandle fbo = bgfx::createFrameBuffer(2, att, true);
+                if (!bgfx::isValid(fbo)) {
+                    bgfx::destroy(colorHandle);
+                    bgfx::destroy(depthHandle);
+                    for (auto& t : info.tiles) {
+                        if (bgfx::isValid(t.fbo)) bgfx::destroy(t.fbo);
+                        else if (bgfx::isValid(t.handle)) bgfx::destroy(t.handle);
+                    }
+                    return false;
+                }
+
+                TiledTextureInfo::Tile tile;
+                tile.handle = colorHandle;
+                tile.fbo = fbo;
+                tile.x = tileX;
+                tile.y = tileY;
+                tile.w = tileW;
+                tile.h = tileH;
+                tile.size = {(int)tileW, (int)tileH};
+                info.tiles.push_back(tile);
+            }
+        }
+
+        info.refCount = 1;
+        info.lastUsedFrame = currentFrame_;
+        tiledTextures_[id] = std::move(info);
+
+        // 配置情報を登録
+        {
+            std::lock_guard locLock(locationMutex_);
+            auto& loc = imageLocations_[id];
+            loc.type = ImageLocation::Type::TiledStandalone;
+            loc.width = w;
+            loc.height = h;
+            loc.isPending = false;
+        }
+
+        return true;
+    }
+
+    //=========================================================================
+    // タイル分割オフスクリーンリサイズ（破棄→再作成）
+    //=========================================================================
+    bool resizeTiledOffscreenInternal(ImageId id, uint16_t newW, uint16_t newH) {
+        // 現在のサイズチェック
+        {
+            std::lock_guard lock(tiledMutex_);
+            auto it = tiledTextures_.find(id);
+            if (it == tiledTextures_.end() || !it->second.isRenderTarget) return false;
+            if (it->second.totalSize.x == newW && it->second.totalSize.y == newH) return true;
+        }
+
+        // persistent 情報を保存してから破棄→再作成
+        bool persistent = false;
+        {
+            std::lock_guard lock(tiledMutex_);
+            auto it = tiledTextures_.find(id);
+            if (it != tiledTextures_.end()) persistent = it->second.persistent;
+        }
+        destroyTiled(id);
+
+        if (shouldTile(newW, newH)) {
+            return createTiledOffscreenInternal(id, newW, newH, persistent);
+        }
+        // 新サイズが小さくなってタイル不要 → 通常Offscreenに戻る
+        return createOffscreenInternal(id, newW, newH, persistent);
+    }
+
     bool createOffscreenInternal(ImageId id, uint16_t w, uint16_t h, bool persistent) {
+        // 巨大オフスクリーン → タイル分割パスへ
+        if (shouldTile(w, h)) {
+            return createTiledOffscreenInternal(id, w, h, persistent);
+        }
         std::lock_guard lock(standaloneMutex_);
 
         // Use BGRA8 for Metal compatibility
@@ -1570,6 +2114,12 @@ private:
     // Standalone textures
     mutable std::mutex standaloneMutex_;
     std::unordered_map<ImageId, StandaloneTextureInfo> standaloneTextures_;
+
+    // Tiled textures（巨大画像タイル分割）
+    mutable std::mutex tiledMutex_;
+    std::unordered_map<ImageId, TiledTextureInfo> tiledTextures_;
+    uint16_t maxTileSize_ = 4096;           // タイル1枚の最大辺長（GPU限界から設定）
+    uint64_t maxTextureArea_ = 16 * 1024 * 1024;  // 面積閾値（デフォルト16M px = 64MB RGBA8）
 
     // Group Manager
     ImageMasterGroupManager groupManager_;

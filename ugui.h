@@ -121,7 +121,7 @@ struct FontKey {
 // === ヘルパー関数：テキスト描画 ===
 void drawText(LayerInfo* layer, FontAtlas& atlas, FontId font,
     const char* text, float x, float y,
-    float zIndex, uint32_t color, bgfx::FrameBufferHandle* targetFBO, RenderGroup* group, PointI* fbsize, uint8_t viewId) {
+    float zIndex, uint32_t color, bgfx::FrameBufferHandle* targetFBO, RenderGroup* group, PointI* fbsize, uint64_t viewId) {
     float cursorX = x;
     float cursorY = y;
 
@@ -141,7 +141,7 @@ void drawText(LayerInfo* layer, FontAtlas& atlas, FontId font,
 }
 void drawString(LayerInfo* layer, FontAtlas& atlas, FontId font,
     String* text, float x, float y,
-    float zIndex, uint32_t color, ExtendedRenderGroup* group, bgfx::FrameBufferHandle * targetFBO, PointI* fbsize, uint8_t viewId) {
+    float zIndex, uint32_t color, ExtendedRenderGroup* group, bgfx::FrameBufferHandle * targetFBO, PointI* fbsize, uint64_t viewId) {
     float cursorX = x;
     float cursorY = y;
 
@@ -159,7 +159,7 @@ void drawString(LayerInfo* layer, FontAtlas& atlas, FontId font,
 }
 void drawChar16(LayerInfo* layer, FontAtlas& atlas, FontId font,
     uint32_t codepoint, float x, float y,
-    float zIndex, uint32_t color, ExtendedRenderGroup* group, bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId) {
+    float zIndex, uint32_t color, ExtendedRenderGroup* group, bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint64_t viewId) {
     float cursorX = x;
     float cursorY = y;
 
@@ -171,7 +171,7 @@ void drawChar16(LayerInfo* layer, FontAtlas& atlas, FontId font,
     }
 }
 void drawUnderPagingBar(LayerInfo* layer, FontAtlas& atlas, FontId font, float x, float y, float width, float height, float currentPage, float totalPages, float zIndex,
-    ExtendedRenderGroup* group, bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId) {
+    ExtendedRenderGroup* group, bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint64_t viewId) {
 
 
     const uint32_t arrowColor = 0xFFFFFFFF;
@@ -217,7 +217,7 @@ void drawUnderPagingBar(LayerInfo* layer, FontAtlas& atlas, FontId font, float x
         trackX, centerY - trackHeight * 0.5f,
         trackWidth,
         trackHeight,
-        r, r, r, r, 0.0f, 0.0f,
+        r, r, r, r, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
         trackColor, 0x00000000,
         0.5f, 1.0f, 0.0f,
         0x000000AA,
@@ -235,7 +235,7 @@ void drawUnderPagingBar(LayerInfo* layer, FontAtlas& atlas, FontId font, float x
         thumbX - thumbRadius / 2,
         centerY - thumbRadius,
         thumbRadius, thumbRadius * 2,
-        0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
         thumbColor, 0x00000000,
         0.0f, 0.0f, 0.0f,
         0x000000000,
@@ -245,7 +245,7 @@ void drawUnderPagingBar(LayerInfo* layer, FontAtlas& atlas, FontId font, float x
 void drawRightPagingBar(LayerInfo* layer, FontAtlas& atlas, FontId font,
     float x, float y, float width, float height,
 	float currentPage, float totalPages, float zIndex, ExtendedRenderGroup* group,
-    bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId) {
+    bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint64_t viewId) {
 
     const uint32_t arrowColor = 0xFFFFFFFF;
     const uint32_t arrowDisabledColor = 0x60FFFFFF;
@@ -289,7 +289,7 @@ void drawRightPagingBar(LayerInfo* layer, FontAtlas& atlas, FontId font,
         trackY,
         trackWidth,
         trackHeight,
-        r, r, r, r, 0.0f, 0.0f,
+        r, r, r, r, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
         trackColor, 0x00000000,
         0.5f, 1.0f, 0.0f,
         0x000000AA,
@@ -308,7 +308,7 @@ void drawRightPagingBar(LayerInfo* layer, FontAtlas& atlas, FontId font,
         thumbY - thumbRadius / 2,
         thumbRadius * 2,
         thumbRadius,
-        0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
         thumbColor, 0x00000000,
         0.0f, 0.0f, 0.0f,
         0x00000000,
@@ -319,7 +319,7 @@ void drawUnderScrollBar(LayerInfo* layer,
     float x, float y, float width, float height,
     float currentX, float pageWidth, float totalWidth,
     float zIndex,
-    bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId) {
+    bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint64_t viewId) {
 
     // スクロール不要
     if (totalWidth <= pageWidth) {
@@ -338,7 +338,7 @@ void drawUnderScrollBar(LayerInfo* layer,
         x, centerY - trackHeight * 0.5f,
         width,
         trackHeight,
-        r, r, r, r, 0.0f, 0.0f,
+        r, r, r, r, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
         trackColor, 0x00000000,
         0.5f, 1.0f, 0.0f,
         0x000000AA,
@@ -363,7 +363,7 @@ void drawUnderScrollBar(LayerInfo* layer,
         centerY - trackHeight * 1.5f,
         thumbWidth,
         trackHeight * 2,
-        r, r, r, r, 0.0f, 0.0f,
+        r, r, r, r, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
         thumbColor, 0x00000000,
         0.0f, 0.0f, 0.0f,
         0x00000000,
@@ -375,7 +375,7 @@ void drawRightScrollBar(LayerInfo* layer,
     float x, float y, float width, float height,
     float currentY, float pageHeight, float totalHeight,
     float zIndex,
-    bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId) {
+    bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint64_t viewId) {
 
     // スクロール不要
     if (totalHeight <= pageHeight) {
@@ -394,7 +394,7 @@ void drawRightScrollBar(LayerInfo* layer,
         centerX - trackWidth * 0.5f, y,
         trackWidth,
         height,
-        r, r, r, r, 0.0f, 0.0f,
+        r, r, r, r, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
         trackColor, 0x00000000,
         0.5f, 1.0f, 0.0f,
         0x000000AA,
@@ -419,7 +419,7 @@ void drawRightScrollBar(LayerInfo* layer,
         thumbY,
         trackWidth * 2,
         thumbHeight,
-        r, r, r, r, 0.0f, 0.0f,
+        r, r, r, r, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
         thumbColor, 0x00000000,
         0.0f, 0.0f, 0.0f,
         0x00000000,
@@ -464,7 +464,7 @@ uint32_t utf8Decode(const char*& p) {
 
 void drawTextUTF8(LayerInfo* layer, FontAtlas& atlas, FontId font,
     const char* text, int length, float x, float y,
-    int zIndex, uint32_t color, RenderGroup* group, bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId) {
+    int zIndex, uint32_t color, RenderGroup* group, bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint64_t viewId) {
     float cursorX = x;
     float cursorY = y;
 
@@ -703,7 +703,7 @@ public:
 
     // === ウィンドウ管理 ===
     // windows はタブ毎に ThreadGC::windows で管理
-    uint8_t basicViewId = 30;             // 30から連番で割り当て
+    uint64_t basicViewId = 100000;         // ウィンドウ用論理viewId（大きい値 = 後に描画 = オフスクリーン完了後）
 
     // ポップアップコマンドキュー（GoThread → RenderThread）
     std::mutex popupCmdMutex;
@@ -886,7 +886,23 @@ public:
         local = (NewLocal*)te->elem;
         if ((local->dirty & DirtyType::Partial) > 0) {
             q->begin(frameId, 1024);
+            ::viewId = 0;  // フレーム開始時に論理viewIdカウンタをリセット（オフスクリーン用: 小さい値から）
             auto& layer = q->setCurrentSlotLayer({}, 1.0f, true, true, 800, 600);
+            // ルートからの再帰的Measure（ツリーの深さ優先で子オフスクリーンが先に確定）
+            for (auto* nw : target->windows) {
+                if (!nw->local) continue;
+                if (nw->local->offscreen->layout) {
+                    NewMeasure measure;
+                    measure.pos.x = 0; measure.pos.y = 0;
+                    measure.size.x = nw->size.x; measure.size.y = nw->size.y;
+                    measure.start.x = 0; measure.start.y = 0;
+                    measure.group = nw->local->offscreen->group;
+                    int order = 0;
+                    nw->local->Measure(target, (NewElement*)nw->local, &measure, local, &order);
+                    nw->local->offscreen->layout = false;
+                }
+            }
+            // 離れたオフスクリーン用: ルートから到達できなかったもの（layout==trueのまま）をMeasure
             for (int i = 0; i < local->screens->size; i++) {
                 Offscreen* screen = (Offscreen*)*get_list(local->screens, i);
                 if (screen->layout) {
@@ -895,9 +911,9 @@ public:
                     measure.start.x = 0; measure.start.y = 0; measure.group = screen->group;
                     int order = 0;
                     screen->elem->Measure(target, (NewElement*)screen->elem, &measure, local, &order);
+                    screen->layout = false;
                 }
             }
-            int viewId = 30;
             for (int i = 0; i < local->screens->size; i++) {
                 Offscreen* screen = (Offscreen*)*get_list(local->screens, i);
                 if (screen->paint) {
@@ -905,7 +921,7 @@ public:
                     NewGraphic* graphic = new NewGraphic();
                     graphic->pos.x = 0; graphic->pos.y = 0; graphic->size.x = screen->window->size.x; graphic->size.y = screen->window->size.y;
                     graphic->start.x = 0; graphic->start.y = 0; graphic->end.x = screen->window->size.x; graphic->end.y = screen->window->size.y;
-                    graphic->fb = &screen->window->fbo; graphic->viewId = screen->window->viewId; graphic->viewId2 = --viewId; graphic->layer = &layer;
+                    graphic->fb = &screen->window->fbo; graphic->viewId = screen->window->viewId; graphic->viewId2 = ::viewId++; graphic->layer = &layer;
                     graphic->group = NULL; graphic->fbsize = &screen->window->size;
                     screen->elem->Draw(target, (NewElement*)screen->elem, graphic, local, q);
                 }
@@ -1149,7 +1165,7 @@ public:
                     cmd.shadowX = 0.0f;
                     cmd.shadowY = 0.0f;
                     cmd.shadowBlur = 0.0f;
-                    cmd.borderWidth = 0.0f;
+                    cmd.borderTop = cmd.borderRight = cmd.borderBottom = cmd.borderLeft = 0.0f;
 
                     cmd.shadowColor = 0x00000000;
                     cmd.fillColor = 0xFFFFFFFF;
@@ -1386,7 +1402,7 @@ public:
                             nw->visible = cmd.visible;
                             // FBO作成（RenderThread上なので直接OK）
                             nw->fbo = bgfx::createFrameBuffer(nw->nwh, (uint16_t)cmd.w, (uint16_t)cmd.h);
-                            nw->viewId = hoppy_->basicViewId++;
+                            nw->viewId = hoppy_->basicViewId++;  // 永続的な論理viewId（ウィンドウ用）
                             if (cmdThgc) cmdThgc->windows.push_back(nw);
                         } else {
                             SDL_Log("createPopupWindow failed via RenderThread");
@@ -1471,7 +1487,7 @@ public:
 
                             UnifiedDrawCommand cmd{};
                             cmd.type = DrawCommandType::Image;
-                            cmd.viewId = 0;
+                            cmd.viewId = hoppy_->target->windows[0]->viewId;
                             cmd.zIndex = base_z + i * 0.001f;
                             cmd.texture = resolved.resolved.texture;
                             cmd.texture2 = &nulltex;
@@ -1494,7 +1510,7 @@ public:
                             cmd.shadowX = 0.0f;
                             cmd.shadowY = 0.0f;
                             cmd.shadowBlur = 0.0f;
-                            cmd.borderWidth = 0.0f;
+                            cmd.borderTop = cmd.borderRight = cmd.borderBottom = cmd.borderLeft = 0.0f;
 
                             cmd.shadowColor = 0x00000000;
                             cmd.fillColor = 0xFFFFFFFF;
@@ -1550,6 +1566,15 @@ ResolvedTexture myResolveForDraw(ThreadGC* thgc, ImageId imageId) {
 }
 StandaloneTextureInfo* mygetStandaloneTextureInfo(ThreadGC* thgc, ImageId imageId) {
     return thgc->hoppy->master.getStandaloneTexture(imageId);
+}
+TiledTextureInfo* mygetTiledTextureInfo(ThreadGC* thgc, ImageId imageId) {
+    return thgc->hoppy->master.getTiledTexture(imageId);
+}
+TiledResolveResult myResolveTiledForDraw(ThreadGC* thgc, ImageId imageId) {
+    return thgc->hoppy->master.resolveTiledForDraw(imageId);
+}
+bool myIsTiledTexture(ThreadGC* thgc, ImageId imageId) {
+    return thgc->hoppy->master.isTiledTexture(imageId);
 }
 // === ポップアップウィンドウ管理ラッパー（GoThread → RenderThread キュー経由） ===
 

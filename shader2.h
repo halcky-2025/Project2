@@ -49,7 +49,7 @@ struct DrawCommand {
     enum DrawCommandType type;
     bgfx::FrameBufferHandle* targetFBO = NULL;
     PointI* fbsize;
-    uint8_t viewId = 0;
+    uint64_t viewId = 0;  // 論理viewId（renderAllCommandsで実bgfx viewIdに動的マッピング）
 	float zIndex = 0.0f;
     bgfx::TextureHandle* texture = nullptr;
     bgfx::TextureHandle* texture2 = nullptr;
@@ -95,11 +95,14 @@ struct UnifiedDrawCommand : DrawCommand {
     float radiusBR = 0.0f;
     float radiusBL = 0.0f;
 
-    // i_data3
+    // i_data3 (half16パック)
     float shadowX;
     float shadowY;
-    float shadowBlur;  // packInstanceでaaと共にhalf16パック → data3[2]
-    float borderWidth;
+    float shadowBlur;  // packInstanceでaaと共にhalf16パック → data3[3]
+    float borderTop = 0.0f;
+    float borderRight = 0.0f;
+    float borderBottom = 0.0f;
+    float borderLeft = 0.0f;
 
     // i_data4 (colors)
     uint32_t shadowColor;
@@ -121,15 +124,15 @@ struct UnifiedDrawCommand : DrawCommand {
 // data2: scrollX/uvMax.x/uvSize.x, scrollY/uvMax.y/uvSize.y,
 //   Fill/Image/Pattern: pack(radiusTL,radiusTR)(half16×2), pack(radiusBR,radiusBL)(half16×2)
 //   PageCurl: progress(float32), aa(float32)
-// data3: shadowX, shadowY, pack(shadowBlur,aa)(half16×2), borderWidth
-// data4: shadowColor(packed), fillColor(packed), borderColor(packed), zIndex
+// data3: pack(shadowX,shadowY)(half16×2), pack(borderTop,borderRight)(half16×2), pack(borderBottom,borderLeft)(half16×2), pack(shadowBlur,aa)(half16×2)
+// data4: shadowColor(packed), fillColor(packed), borderColor(packed), zIndex/1000(float)
 
 struct alignas(16) UnifiedInstanceData {
     float data0[4];  // x, y, width, height
     float data1[4];  // (モード別)
     float data2[4];  // scrollX/uvMax.x/uvSize.x, scrollY/uvMax.y/uvSize.y, radius/progress, aa
-    float data3[4];  // shadowX, shadowY, shadowBlur, borderWidth
-    float data4[4];  // shadowColor(packed), fillColor(packed), borderColor(packed), zIndex
+    float data3[4];  // pack(shadowXY), pack(borderTR), pack(borderBL), pack(shadowBlur,aa)
+    float data4[4];  // shadowColor(packed), fillColor(packed), borderColor(packed), zIndex/1000(float)
 };
 
 // ============================================================
@@ -227,17 +230,17 @@ inline void packInstance(UnifiedDrawCommand& cmd, UnifiedInstanceData& out, Draw
         out.data2[3] = packHalf2x16(cmd.radiusBR, cmd.radiusBL);
     }
 
-    // i_data3: 共通
-    out.data3[0] = cmd.shadowX;
-    out.data3[1] = cmd.shadowY;
-    out.data3[2] = packHalf2x16(cmd.shadowBlur, cmd.aa);  // pack(shadowBlur, aa)
-    out.data3[3] = cmd.borderWidth;
+    // i_data3: 共通 (全half16パック)
+    out.data3[0] = packHalf2x16(cmd.shadowX, cmd.shadowY);       // pack(shadowX, shadowY)
+    out.data3[1] = packHalf2x16(cmd.borderTop, cmd.borderRight);  // pack(borderTop, borderRight)
+    out.data3[2] = packHalf2x16(cmd.borderBottom, cmd.borderLeft); // pack(borderBottom, borderLeft)
+    out.data3[3] = packHalf2x16(cmd.shadowBlur, cmd.aa);          // pack(shadowBlur, aa)
 
     // i_data4: 共通
     out.data4[0] = packColorAsFloat(cmd.shadowColor);
     out.data4[1] = packColorAsFloat(cmd.fillColor);
     out.data4[2] = packColorAsFloat(cmd.borderColor);
-    out.data4[3] = 5000 - cmd.zIndex / 10;
+    out.data4[3] = 5000 - cmd.zIndex / 10.0f;                          // depth (直接float)
 }
 
 // ============================================================

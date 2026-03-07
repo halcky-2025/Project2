@@ -47,7 +47,7 @@ struct DrawCommand {
     DrawCommandType type;
     bgfx::FrameBufferHandle* targetFBO = nullptr;
     PointI* fbsize = nullptr;
-    uint8_t viewId = 0;
+    uint64_t viewId = 0;  // 論理viewId
     float zIndex = 0.0f;
     bgfx::TextureHandle* texture = nullptr;
     bgfx::TextureHandle* texture2 = nullptr;
@@ -69,7 +69,10 @@ struct UnifiedDrawCommand : DrawCommand {
     float shadowX;
     float shadowY;
     float shadowBlur;
-    float borderWidth;
+    float borderTop = 0.0f;
+    float borderRight = 0.0f;
+    float borderBottom = 0.0f;
+    float borderLeft = 0.0f;
     uint32_t shadowColor;
     uint32_t fillColor;
     uint32_t borderColor;
@@ -102,6 +105,24 @@ inline float packUint16x2(uint16_t hi, uint16_t lo) {
 inline float packColorAsFloat(uint32_t color) {
     float result;
     std::memcpy(&result, &color, 4);
+    return result;
+}
+
+inline uint16_t floatToHalf(float value) {
+    uint32_t f;
+    std::memcpy(&f, &value, 4);
+    uint32_t sign = (f >> 16) & 0x8000;
+    int32_t exponent = ((f >> 23) & 0xFF) - 127 + 15;
+    uint32_t mantissa = f & 0x7FFFFF;
+    if (exponent <= 0) return static_cast<uint16_t>(sign);
+    if (exponent >= 31) return static_cast<uint16_t>(sign | 0x7C00);
+    return static_cast<uint16_t>(sign | (exponent << 10) | (mantissa >> 13));
+}
+
+inline float packHalf2x16(float a, float b) {
+    uint32_t packed = (uint32_t(floatToHalf(a)) << 16) | uint32_t(floatToHalf(b));
+    float result;
+    std::memcpy(&result, &packed, 4);
     return result;
 }
 
@@ -144,15 +165,15 @@ inline void packInstance(UnifiedDrawCommand& cmd, UnifiedInstanceData& out, Draw
     out.data2[2] = cmd.radius;
     out.data2[3] = cmd.aa;
 
-    out.data3[0] = cmd.shadowX;
-    out.data3[1] = cmd.shadowY;
-    out.data3[2] = cmd.shadowBlur;
-    out.data3[3] = cmd.borderWidth;
+    out.data3[0] = packHalf2x16(cmd.shadowX, cmd.shadowY);
+    out.data3[1] = packHalf2x16(cmd.borderTop, cmd.borderRight);
+    out.data3[2] = packHalf2x16(cmd.borderBottom, cmd.borderLeft);
+    out.data3[3] = packHalf2x16(cmd.shadowBlur, cmd.aa);
 
     out.data4[0] = packColorAsFloat(cmd.shadowColor);
     out.data4[1] = packColorAsFloat(cmd.fillColor);
     out.data4[2] = packColorAsFloat(cmd.borderColor);
-    out.data4[3] = cmd.zIndex;
+    out.data4[3] = cmd.zIndex / 1000.0f;
 }
 
 // ============================================================
@@ -209,11 +230,12 @@ struct LayerInfo {
 
     void pushFill(float x, float y, float w, float h,
         float radiusTL, float radiusTR, float radiusBR, float radiusBL,
-        float borderWidth, float aaPixels,
+        float borderTop, float borderRight, float borderBottom, float borderLeft,
+        float aaPixels,
         uint32_t fillColor, uint32_t borderColor,
         float shadowX, float shadowY, float shadowBlur,
         uint32_t shadowColor, float zIndex,
-        bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId,
+        bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint64_t viewId,
         float blendMode = 0.0f,
         float cornerPattern = 0.0f)
     {
@@ -232,7 +254,10 @@ struct LayerInfo {
         cmd->aa = aaPixels;
         cmd->shadowX = shadowX; cmd->shadowY = shadowY;
         cmd->shadowBlur = shadowBlur;
-        cmd->borderWidth = borderWidth;
+        cmd->borderTop = borderTop;
+        cmd->borderRight = borderRight;
+        cmd->borderBottom = borderBottom;
+        cmd->borderLeft = borderLeft;
         cmd->shadowColor = shadowColor;
         cmd->fillColor = fillColor;
         cmd->borderColor = borderColor;

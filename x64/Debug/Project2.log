@@ -20,13 +20,13 @@ C:\Users\hayah\source\repos\Project2\Project2\elem.h(80,16): warning C4091: 'typ
 C:\Users\hayah\source\repos\Project2\Project2\elem.h(86,16): warning C4091: 'typedef ': 変数が何も宣言されていないときは、'PointI' の左辺を無視します。
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\newelem.h(1027,53): warning C4834: [[nodiscard]] 属性を持つ関数の戻り値を破棄しています
+C:\Users\hayah\source\repos\Project2\Project2\newelem.h(1098,53): warning C4834: [[nodiscard]] 属性を持つ関数の戻り値を破棄しています
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\shader.h(714,43): warning C5055: 演算子 '<=': 列挙型と浮動小数点型の間では非推奨です
+C:\Users\hayah\source\repos\Project2\Project2\shader.h(804,43): warning C5055: 演算子 '<=': 列挙型と浮動小数点型の間では非推奨です
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
-C:\Users\hayah\source\repos\Project2\Project2\shader.h(714,73): warning C5055: 演算子 '<=': 列挙型と浮動小数点型の間では非推奨です
+C:\Users\hayah\source\repos\Project2\Project2\shader.h(804,73): warning C5055: 演算子 '<=': 列挙型と浮動小数点型の間では非推奨です
   (ソース ファイル 'main.cpp' をコンパイルしています)
   
 C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include\optional(82,17): warning C4267: '初期化中': 'size_t' から 'int' に変換しました。データが失われているかもしれません。

@@ -27,7 +27,7 @@ void NewImageDraw(ThreadGC* thgc, NewElement* elem, NewGraphic* g, NewLocal* loc
 }
 void ImageDrawSelect(ThreadGC* thgc, NewLocal* local, NewElement* self, int m, int n, NewGraphic* g, PointF pos, RenderCommandQueue* q) {
 	if (m == n) return;
-	g->layer->pushFill(pos.x + self->pos.x + self->pos2.x, self->pos.y + self->pos2.y, pos.y + self->size.x + 1, self->size.y, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0x4477ff66, 0, 0.0f, 0.0f, 1.0f, 0, 12000.0f, g->fb, g->fbsize, g->viewId);
+	g->layer->pushFill(pos.x + self->pos.x + self->pos2.x, self->pos.y + self->pos2.y, pos.y + self->size.x + 1, self->size.y, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0x4477ff66, 0, 0.0f, 0.0f, 1.0f, 0, 12000.0f, g->fb, g->fbsize, g->viewId);
 }
 int ImageMouse(ThreadGC* thgc, NewElement* self, MouseEvent* e, PointF pos, NewLocal* local) {
 	NewImage* letter = (NewImage*)self;
@@ -119,7 +119,7 @@ void NewDropMeasure(ThreadGC* thgc, NewElement* elem, NewMeasure* measure, NewLo
 }
 // シェブロン（V字・45度）を描画
 void drawChevron(LayerInfo* layer, float cx, float cy, float size, float thickness,
-	float zIndex, uint32_t color, bgfx::FrameBufferHandle* fb, PointI* fbsize, uint8_t viewId) {
+	float zIndex, uint32_t color, bgfx::FrameBufferHandle* fb, PointI* fbsize, uint64_t viewId) {
 	int steps = (int)(size * 0.5f);
 	if (steps < 3) steps = 3;
 	float half = size * 0.5f;  // 45度: 幅と高さが同じ
@@ -127,7 +127,7 @@ void drawChevron(LayerInfo* layer, float cx, float cy, float size, float thickne
 	dot.type = DrawCommandType::Fill;
 	dot.fillcolor = color;
 	dot.borderRadiusTL = dot.borderRadiusTR = dot.borderRadiusBR = dot.borderRadiusBL = thickness * 0.5f;
-	dot.borderWidth = 0;
+	dot.borderTop = dot.borderRight = dot.borderBottom = dot.borderLeft = 0;
 	dot.aa = 1.0f;
 	for (int i = 0; i <= steps; i++) {
 		float t = (float)i / (float)steps;
@@ -195,7 +195,7 @@ void initNewDrop(ThreadGC* thgc, NewDrop* drop, PopupWindow* pw) {
 	drop->background->fillcolor = 0xFFFFFFFF;
 	drop->background->type = DrawCommandType::Fill;
 	drop->background->borderRadiusTL = drop->background->borderRadiusTR = drop->background->borderRadiusBR = drop->background->borderRadiusBL = 4;
-	drop->background->borderWidth = 1;
+	drop->background->borderTop = drop->background->borderRight = drop->background->borderBottom = drop->background->borderLeft = 1;
 	drop->background->borderColor = 0x8080a0ff;
 	drop->pw = pw;
 }
@@ -291,7 +291,19 @@ void PopupMeasure(ThreadGC* thgc, NewElement* elem, NewMeasure* measure, NewLoca
 	newmeasure.start = measure->pos; newmeasure.group = measure->group;
 	float sizex = 0, sizey = 0;
 	for (NewElement* child = elem->childend->next; child->type != LetterType::_ElemEnd; ) {
-		child->Measure(thgc, child, &newmeasure, local, n);
+		if (child->offscreen == NULL) {
+			child->Measure(thgc, child, &newmeasure, local, n);
+		} else if (child->offscreen->layout) {
+			// オフスクリーン子: layoutフラグが立っていれば独立座標系でMeasure
+			NewMeasure offMeasure;
+			offMeasure.pos = { 0, 0 };
+			offMeasure.size = { child->size.x, child->size.y };
+			offMeasure.start = { 0, 0 };
+			offMeasure.group = child->offscreen->group;
+			child->Measure(thgc, child, &offMeasure, local, n);
+			child->offscreen->layout = false;
+		}
+		// layout==false のオフスクリーン子は既存のsizeをそのまま使う
 		if (elem->orient) {
 			if (sizey < child->size.y) sizey = child->size.y;
 			newmeasure.pos.x += child->size.x;
@@ -338,7 +350,7 @@ void initPopup(ThreadGC* thgc, NewLocal* local, PopupWindow* popup, PopupAnchor 
 	popup->background->tex1 = myloadTexture2D(thgc, "123.png", ImageUsage::Background);
 	popup->background->fillcolor = 0xffffffff;
 	popup->background->borderColor = 0x00000000;
-	popup->background->borderWidth = 0.0f;
+	popup->background->borderTop = popup->background->borderRight = popup->background->borderBottom = popup->background->borderLeft = 0.0f;
 	popup->background->shadowBlur = 1.0f;
 	popup->background->shadowColor = 0x00000000;
 	popup->Measure = PopupMeasure;
@@ -387,7 +399,7 @@ void NewTabDraw(ThreadGC* thgc, NewElement* elem, NewGraphic* g, NewLocal* local
 	}
 	g->layer->pushBackground(elem->background, g->pos.x, g->pos.y, elem->size.x, elem->size.y, elem->zIndex + 0.1,
 		tex1, tex2, g->fb, g->fbsize, g->viewId, 0.0f);
-	g->layer->pushFill(g->pos.x + 80, g->pos.y, 100, elem->size.y - 2, 6.0f, 6.0f, 6.0f, 6.0f, 1.0f, 3.0f, 0xc0c0ffff, 0x202040ff, 0, 0, 0, 0, elem->zIndex + 0.3, g->fb, g->fbsize, g->viewId, 0.0, 1.0f);
+	g->layer->pushFill(g->pos.x + 80, g->pos.y, 100, elem->size.y - 2, 6.0f, 6.0f, 6.0f, 6.0f, 1.0f, 1.0f, 1.0f, 1.0f, 3.0f, 0xc0c0ffff, 0x202040ff, 0, 0, 0, 0, elem->zIndex + 0.3, g->fb, g->fbsize, g->viewId, 0.0, 0.0f);
 	drawString((LayerInfo*)g->layer, *getAtlas(thgc), elem->font, *(String**)get_list(tab->strs, 0), g->pos.x + elem->pos.x, g->pos.y + elem->pos.y, std::floor(elem->zIndex) + 0.9,
 		0x000000FF, g->group, g->fb, g->fbsize, g->viewId);
 	drawString((LayerInfo*)g->layer, *getAtlas(thgc), elem->font, *(String**)get_list(tab->strs, 1), g->pos.x + elem->pos.x + 100, g->pos.y + elem->pos.y, std::floor(elem->zIndex) + 0.9,
@@ -421,5 +433,5 @@ void initNewTab(ThreadGC* thgc, NewTab* tab) {
 	tab->background->fillcolor = 0x8080aaff;
 	tab->background->type = DrawCommandType::Fill;
 	tab->background->borderRadiusTL = tab->background->borderRadiusTR = tab->background->borderRadiusBR = tab->background->borderRadiusBL = 4;
-	tab->background->borderWidth = 1;
+	tab->background->borderTop = tab->background->borderRight = tab->background->borderBottom = tab->background->borderLeft = 1;
 }

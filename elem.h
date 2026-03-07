@@ -238,12 +238,129 @@ struct StandaloneTextureInfo {
 	bool isRenderTarget = false;
 	ImageOrigin origin = ImageOrigin::File;
 };
+
+//=============================================================================
+// TiledTextureInfo - 巨大テクスチャをタイル分割して管理
+//=============================================================================
+struct TiledTextureInfo {
+	struct Tile {
+		bgfx::TextureHandle handle = BGFX_INVALID_HANDLE;
+		bgfx::FrameBufferHandle fbo = BGFX_INVALID_HANDLE;  // オフスクリーン時のみ有効
+		uint16_t x, y;           // タイルの開始位置（元画像座標系）
+		uint16_t w, h;           // このタイルの実サイズ（端は小さくなる）
+		PointI size = {0, 0};    // {w, h} の PointI 版（fbsizeポインタ用）
+	};
+	std::vector<Tile> tiles;     // row-major 順
+	PointI totalSize;            // 元画像の全体サイズ
+	uint16_t tileSize = 0;      // 正方形タイルの辺長（端タイルは小さくなる）
+	int tilesX = 0, tilesY = 0; // グリッド次元
+	uint32_t refCount = 0;
+	uint64_t lastUsedFrame = 0;
+	bool persistent = false;
+	bool isRenderTarget = false;
+	ImageOrigin origin = ImageOrigin::File;
+
+	// 座標 (px, py) を含むタイルのインデックスを O(1) で取得
+	int tileIndexAt(int px, int py) const {
+		if (tileSize == 0) return -1;
+		int col = px / tileSize;
+		int row = py / tileSize;
+		if (col < 0 || col >= tilesX || row < 0 || row >= tilesY) return -1;
+		return row * tilesX + col;
+	}
+
+	// 座標 (px, py) を含むタイルへのポインタを O(1) で取得
+	Tile* tileAt(int px, int py) {
+		int idx = tileIndexAt(px, py);
+		return (idx >= 0) ? &tiles[idx] : nullptr;
+	}
+	const Tile* tileAt(int px, int py) const {
+		int idx = tileIndexAt(px, py);
+		return (idx >= 0) ? &tiles[idx] : nullptr;
+	}
+
+	// 矩形領域 (rx, ry, rw, rh) と重なるタイルを列挙
+	// callback: void(Tile& tile, int intersectX, int intersectY, int intersectW, int intersectH)
+	template<typename Func>
+	void forEachTileInRect(int rx, int ry, int rw, int rh, Func&& callback) {
+		if (tileSize == 0) return;
+		int col0 = std::max(0, rx / (int)tileSize);
+		int row0 = std::max(0, ry / (int)tileSize);
+		int col1 = std::min(tilesX - 1, (rx + rw - 1) / (int)tileSize);
+		int row1 = std::min(tilesY - 1, (ry + rh - 1) / (int)tileSize);
+		for (int row = row0; row <= row1; ++row) {
+			for (int col = col0; col <= col1; ++col) {
+				auto& tile = tiles[row * tilesX + col];
+				int ix0 = std::max(rx, (int)tile.x);
+				int iy0 = std::max(ry, (int)tile.y);
+				int ix1 = std::min(rx + rw, (int)(tile.x + tile.w));
+				int iy1 = std::min(ry + rh, (int)(tile.y + tile.h));
+				if (ix0 < ix1 && iy0 < iy1) {
+					callback(tile, ix0, iy0, ix1 - ix0, iy1 - iy0);
+				}
+			}
+		}
+	}
+};
+
+// タイル画像の描画用解決結果
+struct TiledResolveResult {
+	struct TileRegion {
+		bgfx::TextureHandle* texture;
+		float offsetX, offsetY;  // 元画像座標系でのオフセット
+		float width, height;     // タイルの実サイズ
+	};
+	std::vector<TileRegion> tiles;
+	uint16_t totalWidth = 0, totalHeight = 0;
+	bool isValid() const { return !tiles.empty(); }
+};
+
+//=============================================================================
+// TiledRenderPass - タイルFBOへの描画ヘルパー
+// 境界をまたぐ描画を各タイルに射影をずらして再発行する
+//=============================================================================
+//
+// 使い方:
+//   TiledTextureInfo* tiled = mygetTiledTextureInfo(thgc, offscreenId);
+//   if (tiled && tiled->isRenderTarget) {
+//       // ビューポート矩形（スクロール考慮）と重なるタイルだけ処理
+//       tiled->forEachTileInRect(scrollX, scrollY, viewW, viewH,
+//           [&](auto& tile, int ix, int iy, int iw, int ih) {
+//               // 1) このタイルのFBOをレンダーターゲットに設定
+//               bgfx::setViewFrameBuffer(viewId, tile.fbo);
+//               bgfx::setViewRect(viewId, 0, 0, tile.w, tile.h);
+//
+//               // 2) 射影行列: タイルの原点 (tile.x, tile.y) → 画面 (0,0)
+//               float proj[16];
+//               bx::mtxOrtho(proj,
+//                   (float)tile.x, (float)(tile.x + tile.w),   // left, right
+//                   (float)(tile.y + tile.h), (float)tile.y,   // bottom, top
+//                   0.0f, 10000.0f, 0.0f, caps->homogeneousDepth);
+//               bgfx::setViewTransform(viewId, NULL, proj);
+//
+//               // 3) 同じ描画コマンドを発行（座標は元画像座標系のまま）
+//               //    bgfxが射影で自動クリッピングするのでタイル外は描画されない
+//               submitDrawCommands(layer, viewId);
+//
+//               viewId++;  // 次のタイルは別のviewIdを使用
+//           });
+//   }
+//
+// 原理:
+//   通常: 射影 = (0, totalW) × (0, totalH) → 1つのFBOに全描画
+//   タイル: 射影 = (tile.x, tile.x+tile.w) × (tile.y, tile.y+tile.h)
+//           → 各タイルのFBOにはタイル領域内の描画だけが入る
+//           → 同じ描画コマンド・同じ座標系で、射影だけ変える
+
 bgfx::TextureHandle nulltex = BGFX_INVALID_HANDLE;
 struct LayerInfo;
 struct ExtendedRenderGroup;
 struct ImageMaster;
 struct FontAtlas;
 StandaloneTextureInfo* mygetStandaloneTextureInfo(ThreadGC* thgc, ImageId imageId);
+TiledTextureInfo* mygetTiledTextureInfo(ThreadGC* thgc, ImageId imageId);
+TiledResolveResult myResolveTiledForDraw(ThreadGC* thgc, ImageId imageId);
+bool myIsTiledTexture(ThreadGC* thgc, ImageId imageId);
 ImageId queueOffscreenNew(ThreadGC* thgc, int width, int height);
 void queueOffscreenResize(ThreadGC* thgc, ImageId offscreenid, int width, int height);
 ImageId myloadTexture2D(ThreadGC* thgc, const char* path, ImageUsage usage);
@@ -255,26 +372,26 @@ void drawTextUTF8(LayerInfo* layer, FontAtlas& atlas, FontId font,
 	float zIndex, ExtendedRenderGroup* group, uint32_t color);
 void drawString(LayerInfo* layer, FontAtlas& atlas, FontId font,
 	String* text, float x, float y,
-	float zIndex, uint32_t color, ExtendedRenderGroup* group, bgfx::FrameBufferHandle* targetFBO, PointI *fbsize, uint8_t viewId);
+	float zIndex, uint32_t color, ExtendedRenderGroup* group, bgfx::FrameBufferHandle* targetFBO, PointI *fbsize, uint64_t viewId);
 void drawUnderPagingBar(LayerInfo* layer, FontAtlas& atlas, FontId font, float x, float y, float width, float height, float currentPage, float totalPages, float zIndex,
-	ExtendedRenderGroup* group, bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId);
+	ExtendedRenderGroup* group, bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint64_t viewId);
 void drawRightPagingBar(LayerInfo* layer, FontAtlas& atlas, FontId font,
 	float x, float y, float width, float height,
 	float currentPage, float totalPage,
 	float zIndex, ExtendedRenderGroup* group,
-	bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId);
+	bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint64_t viewId);
 FontAtlas* getAtlas(ThreadGC* thgc);
 TTF_Font* getFont(FontAtlas* atlas);
 void drawUnderScrollBar(LayerInfo* layer,
 	float x, float y, float width, float height,
 	float currentX, float pageWidth, float totalWidth,
 	float zIndex,
-	bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId);
+	bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint64_t viewId);
 void drawRightScrollBar(LayerInfo* layer,
 	float x, float y, float width, float height,
 	float currentY, float pageHeight, float totalHeight,
 	float zIndex,
-	bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint8_t viewId);
+	bgfx::FrameBufferHandle* targetFBO, PointI* fbsize, uint64_t viewId);
 #include "newelem.h"
 
 // ポップアップウィンドウ管理ラッパー（GoThread → RenderThread キュー経由）

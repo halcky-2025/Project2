@@ -1,1 +1,7 @@
-#
+﻿<tabcontrol popup=|
+  <tab|#page>
+  <tab|#page>
+  <tab|#page>
+  <pages|
+  >
+>

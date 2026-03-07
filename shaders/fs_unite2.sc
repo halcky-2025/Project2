@@ -76,12 +76,24 @@ void main()
     //   PageCurl: uvSize.x, uvSize.y, progress, aa
     vec2 scrollXY = v_scroll.xy;
 
-    // v_shadowBorder: shadowX, shadowY, pack(shadowBlur,aa), borderWidth
-    vec2 shadowOffset = v_shadowBorder.xy;
-    uint sbPacked = floatBitsToUint(v_shadowBorder.z);
+    // v_shadowBorder: pack(shadowX,shadowY), pack(bTop,bRight), pack(bBottom,bLeft), pack(shadowBlur,aa)
+    uint sxyPacked = floatBitsToUint(v_shadowBorder.x);
+    vec2 shadowOffset = vec2(unpackHalfHi(sxyPacked), unpackHalfLo(sxyPacked));
+
+    uint btPacked = floatBitsToUint(v_shadowBorder.y);
+    float borderTop = unpackHalfHi(btPacked);
+    float borderRight = unpackHalfLo(btPacked);
+
+    uint bbPacked = floatBitsToUint(v_shadowBorder.z);
+    float borderBottom = unpackHalfHi(bbPacked);
+    float borderLeft = unpackHalfLo(bbPacked);
+
+    uint sbPacked = floatBitsToUint(v_shadowBorder.w);
     float shadowBlur = unpackHalfHi(sbPacked);
     float aa = unpackHalfLo(sbPacked);
-    float borderWidth = v_shadowBorder.w;
+
+    // cornerPattern>0 用の均一borderWidth (4辺の最大値)
+    float borderWidth = max(max(borderTop, borderRight), max(borderBottom, borderLeft));
 
     // per-corner radius アンパック (PageCurl以外)
     vec4 cornerRadii = vec4(0.0, 0.0, 0.0, 0.0); // TR, BR, BL, TL
@@ -849,9 +861,26 @@ void main()
     // Border (ベース矩形 + 凹角のユニオン, 内側も同様)
     // ============================================================
 
-    vec4 innerR = max(rSafe - vec4(borderWidth, borderWidth, borderWidth, borderWidth), 0.0);
-    vec2 innerHalf = sdfHalf + innerSdfExt - vec2(borderWidth, borderWidth);
-    vec2 innerPos = sdfPos - innerSdfShift;
+    // Per-side border: 非対称内側矩形
+    float bwH = (borderLeft + borderRight) * 0.5;   // 水平方向の平均
+    float bwV = (borderTop + borderBottom) * 0.5;    // 垂直方向の平均
+    vec2 borderShift = vec2((borderLeft - borderRight) * 0.5, (borderTop - borderBottom) * 0.5);
+
+    // cornerPattern>0 の場合は均一borderWidthを使用 (凹角計算との互換性)
+    float useBW = step(0.5, cornerPattern);
+    float effH = mix(bwH, borderWidth, useBW);
+    float effV = mix(bwV, borderWidth, useBW);
+    vec2 effShift = mix(borderShift, vec2(0.0, 0.0), useBW);
+
+    // 各角の内側radius: 隣接2辺の最大値で縮小
+    vec4 innerR = max(vec4(
+        rSafe.x - mix(max(borderBottom, borderRight), borderWidth, useBW),  // BR
+        rSafe.y - mix(max(borderTop, borderRight), borderWidth, useBW),     // TR
+        rSafe.z - mix(max(borderTop, borderLeft), borderWidth, useBW),      // TL
+        rSafe.w - mix(max(borderBottom, borderLeft), borderWidth, useBW)    // BL
+    ), 0.0);
+    vec2 innerHalf = sdfHalf + innerSdfExt - vec2(effH, effV);
+    vec2 innerPos = sdfPos - innerSdfShift - effShift;
     float distInner = min(
         sdRoundBox(innerPos, innerHalf, innerR),
         concaveInner);
