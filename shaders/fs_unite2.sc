@@ -88,9 +88,10 @@ void main()
     float borderBottom = unpackHalfHi(bbPacked);
     float borderLeft = unpackHalfLo(bbPacked);
 
+    // pack順: aa(上位), shadowBlur(下位)
     uint sbPacked = floatBitsToUint(v_shadowBorder.w);
-    float shadowBlur = unpackHalfHi(sbPacked);
-    float aa = unpackHalfLo(sbPacked);
+    float aa = unpackHalfHi(sbPacked);
+    float shadowBlur = unpackHalfLo(sbPacked);
 
     // cornerPattern>0 用の均一borderWidth (4辺の最大値)
     float borderWidth = max(max(borderTop, borderRight), max(borderBottom, borderLeft));
@@ -884,12 +885,16 @@ void main()
     float distInner = min(
         sdRoundBox(innerPos, innerHalf, innerR),
         concaveInner);
-    float alphaInner = smoothstep(aaSafe, -aaSafe, distInner);
-    float alphaBorder = clamp(alphaFill - alphaInner, 0.0, 1.0);
+    // ボーダーAA適応: ボーダー幅に応じてAA幅を調整し、薄いボーダーでも色が薄くならないようにする
+    // approxBW = 外側SDFから内側SDFまでの距離 ≈ そのピクセルでのボーダー幅
+    float approxBW = max(-dist + distInner, 0.001);
+    float bAA = clamp(approxBW * 0.45, 0.5, aaSafe);
+    float alphaFillB = smoothstep(bAA, -bAA, dist);
+    float alphaInnerB = smoothstep(bAA, -bAA, distInner);
+    float alphaBorder = clamp(alphaFillB - alphaInnerB, 0.0, 1.0);
     // 接合部補正: 矩形の直線ボーダーを弧の曲線ボーダーに置換
-    // arcBorderは弧のfill-inner差分で計算済み、alphaFillでキャップしてはみ出し防止
-    alphaBorder = mix(alphaBorder, min(concaveArcBorder, alphaFill), concaveJunctionFactor);
-    alphaInner = alphaFill - alphaBorder;
+    alphaBorder = mix(alphaBorder, min(concaveArcBorder, alphaFillB), concaveJunctionFactor);
+    float alphaInner = alphaFillB - alphaBorder;
     
     // ============================================================
     // 合成
@@ -932,7 +937,7 @@ void main()
         // 優先度: ボーダー > パネル > 影 (分岐なし)
         float bordA  = v_borderColor.a * alphaBorder;
         float panelA = patternCol.a * alphaInner;
-        float shadA  = v_shadowColor.a * shadowAlpha * (1.0 - alphaFill);
+        float shadA  = v_shadowColor.a * shadowAlpha * (1.0 - alphaFillB);
 
         // ボーダーがあればボーダー、なければパネル
         float useBord = step(0.001, bordA);

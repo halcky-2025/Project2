@@ -63,8 +63,9 @@ void main()
     float shadowY = unpackHalfLo(sxyPacked);
 
     // shadowBlur を half16 からアンパック（影マージン計算に必要）
+    // pack順: aa(上位), shadowBlur(下位)
     uint sbPacked = floatBitsToUint(shadowBorder.w);
-    float shadowBlur = unpackHalfHi(sbPacked);
+    float shadowBlur = unpackHalfLo(sbPacked);
 
     // 影パラメータ
     vec2 shadowOffset = vec2(shadowX, shadowY);

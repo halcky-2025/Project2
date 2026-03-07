@@ -234,7 +234,7 @@ inline void packInstance(UnifiedDrawCommand& cmd, UnifiedInstanceData& out, Draw
     out.data3[0] = packHalf2x16(cmd.shadowX, cmd.shadowY);       // pack(shadowX, shadowY)
     out.data3[1] = packHalf2x16(cmd.borderTop, cmd.borderRight);  // pack(borderTop, borderRight)
     out.data3[2] = packHalf2x16(cmd.borderBottom, cmd.borderLeft); // pack(borderBottom, borderLeft)
-    out.data3[3] = packHalf2x16(cmd.shadowBlur, cmd.aa);          // pack(shadowBlur, aa)
+    out.data3[3] = packHalf2x16(cmd.aa, cmd.shadowBlur);          // pack(aa, shadowBlur) ※aaを上位に置きデノーマル回避
 
     // i_data4: 共通
     out.data4[0] = packColorAsFloat(cmd.shadowColor);
